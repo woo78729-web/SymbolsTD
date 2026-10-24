@@ -3485,8 +3485,12 @@ function selectedTower() {
     hideStoryScreens();
     var kicker = document.getElementById('difficulty-kicker');
     var note = document.getElementById('difficulty-note');
-    if (kicker) kicker.textContent = state.difficultyMode === 'custom' ? '自訂路線' : '無限防守';
-    if (note) note.textContent = '普通與地獄分開記錄最遠波次。第 3 波起會出現抗性怪。';
+    if (kicker) kicker.textContent = state.difficultyMode === 'custom' ? '自訂路線' : '無限隨機模式';
+    if (note) {
+      note.textContent = state.difficultyMode === 'custom'
+        ? '普通與地獄分開記錄最遠波次。第 3 波起會出現抗性怪。'
+        : '地圖隨機產生，每 10 波自動更換路線（起點終點不變）。普通與地獄分開記錄最遠波次。第 3 波起會出現抗性怪。';
+    }
     screenDifficulty.hidden = false;
     renderDifficulties();
   }
