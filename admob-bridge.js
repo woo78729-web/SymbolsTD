@@ -363,7 +363,8 @@
 
   function placementTitle(placement, fallback) {
     if (placement === 'revive') return '滿血復活';
-    if (placement === 'wave_double_gold') return '金幣 +30%';
+    if (placement === 'wave_gift_tower') return '隨機送塔';
+    if (placement === 'card_reroll') return '更換獎勵';
     if (placement === 'wave_interval') return '波次休息';
     if (placement === 'restart') return '重新開始';
     return fallback;

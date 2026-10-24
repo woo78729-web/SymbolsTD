@@ -251,6 +251,8 @@
     best: loadNumber('fantasia-td-best'),
     difficulty: 'normal',
     difficultyMode: 'infinite',
+    clearCountdown: 0,
+    clearKind: '',
     towers: [],
     enemies: [],
     projectiles: [],
@@ -285,6 +287,7 @@
     reviveUsed: false,
     waveGoldEarned: 0,
     waveDoubled: false,
+    waveGiftDone: false,
     speed: 1,
     adBusy: false,
     banner: null,
@@ -454,12 +457,29 @@
     return route.set.has(c + ',' + r);
   }
 
+  var PATH_JUMPS = [];
+
+  function rebuildPathJumps() {
+    PATH_JUMPS = [];
+    for (var i = 0; i < WAYPOINTS.length; i++) {
+      for (var j = i + 4; j < WAYPOINTS.length; j++) {
+        var dx = WAYPOINTS[j].x - WAYPOINTS[i].x;
+        var dy = WAYPOINTS[j].y - WAYPOINTS[i].y;
+        var spatial = Math.hypot(dx, dy);
+        if (spatial <= 3.05 && (j - i) > spatial + 1.5) {
+          PATH_JUMPS.push({ from: i, to: j, span: spatial });
+        }
+      }
+    }
+  }
+
   function setRoute(cells) {
     route.cells = cells.map(function (cell) { return { c: cell.c, r: cell.r }; });
     route.set = new Set(route.cells.map(function (cell) { return cell.c + ',' + cell.r; }));
     WAYPOINTS = route.cells.map(function (cell) {
       return { x: cell.c + 0.5, y: cell.r + 0.5 };
     });
+    rebuildPathJumps();
     if (state && state.walls) {
       state.walls = state.walls.filter(function (wall) { return route.set.has(wall.c + ',' + wall.r); });
       state.traps = state.traps.filter(function (trap) { return route.set.has(trap.c + ',' + trap.r); });
@@ -536,6 +556,101 @@
 
   function buildInfinitePath() {
     return traceMask(cellOnInfinite, { c: 0, r: 0 }, { c: 6, r: 12 });
+  }
+
+  function infiniteStart() { return { c: 0, r: 0 }; }
+  function infiniteEnd() { return { c: 6, r: 12 }; }
+
+  function towerBlockSet() {
+    var blocked = new Set();
+    for (var i = 0; i < state.towers.length; i++) {
+      blocked.add(state.towers[i].c + ',' + state.towers[i].r);
+    }
+    blocked.delete(infiniteStart().c + ',' + infiniteStart().r);
+    blocked.delete(infiniteEnd().c + ',' + infiniteEnd().r);
+    return blocked;
+  }
+
+  function randomWeightPath(start, end, blocked) {
+    var key = function (c, r) { return c + ',' + r; };
+    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    var best = {};
+    var prev = {};
+    var queue = [start];
+    best[key(start.c, start.r)] = 0;
+    while (queue.length) {
+      var cur = queue.shift();
+      var ck = key(cur.c, cur.r);
+      if (cur.c === end.c && cur.r === end.r) break;
+      for (var i = 0; i < dirs.length; i++) {
+        var nc = cur.c + dirs[i][0];
+        var nr = cur.r + dirs[i][1];
+        if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
+        var nk = key(nc, nr);
+        if (blocked.has(nk)) continue;
+        var nextCost = best[ck] + 1 + Math.random() * 4.5;
+        if (best[nk] == null || nextCost < best[nk]) {
+          best[nk] = nextCost;
+          prev[nk] = cur;
+          queue.push({ c: nc, r: nr });
+        }
+      }
+    }
+    var endKey = key(end.c, end.r);
+    if (best[endKey] == null) return null;
+    var cells = [end];
+    var walk = end;
+    while (walk.c !== start.c || walk.r !== start.r) {
+      walk = prev[key(walk.c, walk.r)];
+      if (!walk) return null;
+      cells.push(walk);
+    }
+    cells.reverse();
+    return cells;
+  }
+
+  function buildRandomInfinitePath() {
+    var start = infiniteStart();
+    var end = infiniteEnd();
+    var blocked = towerBlockSet();
+    var best = null;
+    for (var attempt = 0; attempt < 48; attempt++) {
+      var cells = randomWeightPath(start, end, blocked);
+      if (!cells || cells.length < ROWS + 4) continue;
+      if (!best || cells.length > best.length) best = cells;
+      if (cells.length >= ROWS * 2) return cells;
+    }
+    if (best) return best;
+    var open = randomWeightPath(start, end, new Set());
+    return open || buildInfinitePath();
+  }
+
+  function refundTowersOnPath() {
+    var kept = [];
+    var refund = 0;
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (isPath(tower.c, tower.r)) {
+        refund += Math.floor(tower.invested * sellRatio());
+      } else kept.push(tower);
+    }
+    if (kept.length === state.towers.length) return;
+    state.towers = kept;
+    if (refund > 0) {
+      state.gold += refund;
+      toast('路線佔用塔位，退回 ' + refund + ' 金幣');
+    }
+    state.selectedId = null;
+    renderInspector();
+  }
+
+  function reshuffleInfinitePath() {
+    setRoute(buildRandomInfinitePath());
+    refundTowersOnPath();
+    state.selectedId = null;
+    state.buildSite = null;
+    toast('路線已更換（起點終點不變）');
+    syncHud();
   }
 
   var CHAPTERS = [
@@ -761,6 +876,33 @@
     return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
   }
 
+  function enemyPos(enemy) {
+    if (enemy.jumping) {
+      var from = WAYPOINTS[enemy.jumping.from];
+      var to = WAYPOINTS[enemy.jumping.to];
+      var t = Math.max(0, Math.min(1, enemy.jumping.t));
+      return {
+        x: from.x + (to.x - from.x) * t,
+        y: from.y + (to.y - from.y) * t - Math.sin(Math.PI * t) * 1.15,
+      };
+    }
+    return pointAt(enemy.dist);
+  }
+
+  function tryHopperJump(enemy) {
+    if (!PATH_JUMPS.length || enemy.jumpCd > 0 || enemy.jumping || enemy.freeze > 0) return;
+    var best = null;
+    for (var i = 0; i < PATH_JUMPS.length; i++) {
+      var jump = PATH_JUMPS[i];
+      if (enemy.dist < jump.from - 0.15 || enemy.dist > jump.from + 0.55) continue;
+      if (jump.to <= enemy.dist + 2) continue;
+      if (!best || jump.to - jump.from > best.to - best.from) best = jump;
+    }
+    if (!best) return;
+    enemy.jumping = { from: best.from, to: best.to, t: 0, dur: 0.38 };
+    enemy.jumpCd = 2.2;
+  }
+
   function worldX(x) { return view.originX + x * view.tile; }
   function worldY(y) { return view.originY + y * view.tile; }
 
@@ -902,6 +1044,12 @@ function selectedTower() {
       }
       jobs.push({ type: 'grunt', gap: gap });
     }
+    var hoppers = 0;
+    if (wave >= 4) {
+      hoppers = 1 + Math.floor((wave - 4) / 5);
+      if (diff.id === 'hell') hoppers += 1;
+      for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: gap * 0.9 });
+    }
     var brutes = 0;
     var boss = bossForWave(wave);
     if (boss) {
@@ -918,7 +1066,7 @@ function selectedTower() {
       for (var b = 0; b < pack; b++) jobs.push({ type: 'brute', gap: 1.05 });
       brutes += pack;
     }
-    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, boss: boss };
+    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, boss: boss };
   }
 
   function planWave(wave) {
@@ -938,6 +1086,11 @@ function selectedTower() {
       }
       jobs.push({ type: 'grunt', gap: gap });
     }
+    var hoppers = 0;
+    if (wave >= 4) {
+      hoppers = 1 + Math.floor((wave - 4) / 6);
+      for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: gap * 0.88 });
+    }
     var brutes = 0;
     var boss = bossForWave(wave);
     if (boss) {
@@ -946,13 +1099,14 @@ function selectedTower() {
       jobs.push({ type: 'brute', gap: 1.15 });
       brutes = 1;
     }
-    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, boss: boss };
+    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, boss: boss };
   }
 
   function compositionText(plan) {
     if (state.mode !== 'campaign') {
-      var count = plan.grunts + plan.swifts + plan.brutes;
+      var count = plan.grunts + plan.swifts + plan.brutes + (plan.hoppers || 0);
       var text = '隨機小怪 ' + count;
+      if (plan.hoppers) text += ' · 跳躍 ' + plan.hoppers;
       if (plan.brutes) text += ' · 精英 ' + plan.brutes;
       if (plan.boss) text += ' · ' + plan.boss.name;
       return text;
@@ -1023,12 +1177,15 @@ function selectedTower() {
     var table = {
       grunt: { hp: gruntHp, speed: gruntSpeed, gold: Math.max(2, wave), radius: 0.3, color: '#e25b4a', leak: 1 },
       swift: { hp: Math.round(gruntHp * 0.62), speed: Math.min(diff ? speedCap + 0.45 : 2.1, gruntSpeed * 1.55), gold: Math.max(2, wave - 1), radius: 0.23, color: '#f0a202', leak: 1 },
+      hopper: { hp: Math.round(gruntHp * 0.8), speed: Math.min((diff ? speedCap : 1.7) + 0.15, gruntSpeed * 1.25), gold: Math.max(3, wave + 1), radius: 0.26, color: '#4ec6e8', leak: 1 },
       brute: { hp: Math.round(gruntHp * 7.5), speed: gruntSpeed * 0.52, gold: 8 + wave * 2, radius: 0.44, color: '#8d6bff', leak: 3 },
     };
     var spec = table[type] || table.grunt;
     if (goldMul !== 1) spec.gold = Math.max(2, Math.round(spec.gold * goldMul));
-    var kind = pickMinion(type === 'swift' ? 'swift' : 'grunt');
-    var resist = rollResist(wave);
+    var kind = type === 'hopper'
+      ? { id: 'hopper', name: '跳躍怪', color: '#4ec6e8' }
+      : pickMinion(type === 'swift' ? 'swift' : 'grunt');
+    var resist = type === 'hopper' ? '' : rollResist(wave);
     return {
       id: state.nextId++,
       type: type,
@@ -1046,6 +1203,8 @@ function selectedTower() {
       dead: false,
       hitFlash: 0,
       lastNum: 0,
+      jumpCd: type === 'hopper' ? 0.6 : 0,
+      jumping: null,
     };
   }
 
@@ -1169,6 +1328,7 @@ function selectedTower() {
     state.paused = false;
     state.waveGoldEarned = 0;
     state.waveDoubled = false;
+    state.waveGiftDone = false;
     state.spawnQueue = plan.jobs.slice();
     state.spawnTimer = 0.55;
     state.banner = plan.boss
@@ -1211,17 +1371,27 @@ function selectedTower() {
     for (var i = 0; i < state.enemies.length; i++) {
       var enemy = state.enemies[i];
       if (enemy.dead || state.phase !== 'combat') continue;
-      var step = moveSpeed(enemy) * dt;
-      var block = wallStop(enemy.dist);
-      if (block != null) step = Math.min(step, Math.max(0, block - 0.32 - enemy.dist));
-      enemy.dist += step;
+      if (enemy.jumpCd > 0) enemy.jumpCd -= dt;
+      if (enemy.jumping) {
+        enemy.jumping.t += dt / enemy.jumping.dur;
+        if (enemy.jumping.t >= 1) {
+          enemy.dist = enemy.jumping.to;
+          enemy.jumping = null;
+        }
+      } else {
+        var step = moveSpeed(enemy) * dt;
+        var block = wallStop(enemy.dist);
+        if (block != null) step = Math.min(step, Math.max(0, block - 0.32 - enemy.dist));
+        enemy.dist += step;
+        if (enemy.type === 'hopper') tryHopperJump(enemy);
+      }
       triggerTrap(enemy);
       if (enemy.freeze > 0) enemy.freeze -= dt;
       if (enemy.slowTime > 0) {
         enemy.slowTime -= dt;
         if (enemy.slowTime <= 0) enemy.slow = 0;
       }
-      if (enemy.dist >= WAYPOINTS.length - 1) {
+      if (!enemy.jumping && enemy.dist >= WAYPOINTS.length - 1) {
         leakEnemy(enemy);
         continue;
       }
@@ -1790,7 +1960,7 @@ function selectedTower() {
     tower.cooldown -= dt;
     var targets = targetsInRange(tower, stats.range, stats.targets || 1);
     if (!targets.length) return;
-    var pos = pointAt(targets[0].dist);
+    var pos = enemyPos(targets[0]);
     tower.aim = Math.atan2(pos.y - (tower.r + 0.5), pos.x - (tower.c + 0.5));
     if (tower.cooldown > 0) return;
     heroFire(tower, targets, stats);
@@ -1831,6 +2001,29 @@ function selectedTower() {
 
   function cardWaveDue(wave) {
     return (state.mode === 'infinite' || state.mode === 'custom') && wave > 0 && wave % 10 === 0;
+  }
+
+  function giftWaveDue(wave) {
+    if (!(wave > 0)) return false;
+    var m = wave % 10;
+    return m === 3 || m === 6 || m === 9;
+  }
+
+  function cardPool() {
+    return [
+      { id: 'gold', name: '金幣 +200', desc: '立刻獲得 200 金幣' },
+      { id: 'interest', name: '利息', desc: '立刻 +50，接下來 5 波每波 +30' },
+      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等，可到 6 等並全面加強' },
+      { id: 'wall', name: '阻擋物', desc: '放在路上，擋住怪物 10 秒' },
+      { id: 'push', name: '擊退', desc: '使用後全場怪物沿路退回總長的 10%' },
+      { id: 'hero', name: '英雄塔', desc: '自選英雄。選定後不能轉職，打怪升到 10 等' },
+    ].filter(function (card) { return card.id !== 'hero' || !hasHero(); });
+  }
+
+  function pickRandomCard(exceptId) {
+    var pool = cardPool().filter(function (card) { return card.id !== exceptId; });
+    if (!pool.length) pool = cardPool();
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   function finishCard() {
@@ -2020,35 +2213,55 @@ function selectedTower() {
     }
   }
 
+  function showRandomCardModal() {
+    var card = state.pendingCard;
+    if (!card) return;
+    openModal({
+      tone: 'reward',
+      kicker: '第 ' + state.cardWave + ' 波',
+      title: '隨機獎勵',
+      desc: '抽到「' + card.name + '」。' + card.desc + (state.cardRerolled ? '' : ' 不滿意可看廣告再抽一次。'),
+      actions: [
+        {
+          label: '接受 ' + card.name,
+          className: 'btn-mint',
+          onClick: function () { chooseCard(card.id); },
+        },
+      ].concat(state.cardRerolled ? [] : [{
+        label: '觀看廣告更換獎勵',
+        className: 'btn-gold',
+        ad: true,
+        onClick: rerollCardAd,
+      }]),
+    });
+  }
+
   function openCardDraft(cleared) {
     state.phase = 'reward';
     state.paused = true;
     state.cardWave = cleared;
-    var pool = [
-      { id: 'gold', name: '金幣 +200', desc: '立刻獲得 200 金幣' },
-      { id: 'interest', name: '利息', desc: '立刻 +50，接下來 5 波每波 +30' },
-      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等，可到 6 等並全面加強' },
-      { id: 'wall', name: '阻擋物', desc: '放在路上，擋住怪物 10 秒' },
-      { id: 'push', name: '擊退', desc: '使用後全場怪物沿路退回總長的 10%' },
-      { id: 'hero', name: '英雄塔', desc: '自選英雄。選定後不能轉職，打怪升到 10 等' },
-    ].filter(function (card) { return card.id !== 'hero' || !hasHero(); });
-    var picks = [];
-    var bag = pool.slice();
-    while (picks.length < 3 && bag.length) {
-      picks.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0]);
-    }
-    openModal({
-      tone: 'reward',
-      kicker: '第 ' + cleared + ' 波',
-      title: '三選一',
-      desc: '選一張卡。英雄選定職業後不能更換。',
-      actions: picks.map(function (card) {
-        return {
-          label: card.name + '　' + card.desc,
-          className: 'btn-ghost',
-          onClick: function () { chooseCard(card.id); },
-        };
-      }),
+    state.cardRerolled = false;
+    state.pendingCard = pickRandomCard();
+    showRandomCardModal();
+  }
+
+  function rerollCardAd() {
+    if (state.adBusy || state.cardRerolled || !state.pendingCard) return;
+    state.adBusy = true;
+    setModalBusy(true);
+    Ads.showRewarded({ placement: 'card_reroll' }).then(function (result) {
+      state.adBusy = false;
+      if (!result || !result.rewarded) {
+        setModalBusy(false);
+        toast(result && result.error ? '廣告載入失敗' : '未看完廣告，獎勵未更換');
+        return;
+      }
+      state.cardRerolled = true;
+      state.pendingCard = pickRandomCard(state.pendingCard.id);
+      Sfx.unlock();
+      Sfx.ui();
+      toast('已更換為 ' + state.pendingCard.name);
+      showRandomCardModal();
     });
   }
 
@@ -2079,7 +2292,7 @@ function selectedTower() {
       tower.cooldown -= dt;
       var targets = targetsInRange(tower, stats.range, stats.targets || 1);
       if (!targets.length) continue;
-      var pos = pointAt(targets[0].dist);
+      var pos = enemyPos(targets[0]);
       var desired = Math.atan2(pos.y - (tower.r + 0.5), pos.x - (tower.c + 0.5));
       tower.aim = lerpAngle(tower.aim, desired, Math.min(1, dt * 12));
       if (tower.cooldown <= 0) {
@@ -2090,7 +2303,7 @@ function selectedTower() {
   }
 
   function enemyInRange(tower, enemy, range) {
-    var pos = pointAt(enemy.dist);
+    var pos = enemyPos(enemy);
     var dx = pos.x - (tower.c + 0.5);
     var dy = pos.y - (tower.r + 0.5);
     return dx * dx + dy * dy <= range * range;
@@ -2105,7 +2318,7 @@ function selectedTower() {
       tower.beamId = target ? target.id : null;
     }
     if (!target) return;
-    var pos = pointAt(target.dist);
+    var pos = enemyPos(target);
     tower.aim = Math.atan2(pos.y - (tower.r + 0.5), pos.x - (tower.c + 0.5));
     tower.flash = 0.4;
     tower.cooldown -= dt;
@@ -2122,7 +2335,7 @@ function selectedTower() {
     for (var i = 0; i < state.enemies.length; i++) {
       var enemy = state.enemies[i];
       if (enemy.dead) continue;
-      var pos = pointAt(enemy.dist);
+      var pos = enemyPos(enemy);
       var dx = pos.x - ox;
       var dy = pos.y - oy;
       if (dx * dx + dy * dy > range * range) continue;
@@ -2309,7 +2522,7 @@ function selectedTower() {
       if (target) shot.targetId = target.id;
     }
     if (!target) { shot.dead = true; return; }
-    var pos = pointAt(target.dist);
+    var pos = enemyPos(target);
     var dx = pos.x - shot.x;
     var dy = pos.y - shot.y;
     var dist = Math.hypot(dx, dy) || 0.0001;
@@ -2333,7 +2546,7 @@ function selectedTower() {
       if (target) shot.targetId = target.id;
     }
     if (!target) { shot.dead = true; return; }
-    var pos = pointAt(target.dist);
+    var pos = enemyPos(target);
     var dx = pos.x - shot.x;
     var dy = pos.y - shot.y;
     var dist = Math.hypot(dx, dy) || 0.0001;
@@ -2476,7 +2689,7 @@ function selectedTower() {
     for (var i = 0; i < state.enemies.length; i++) {
       var enemy = state.enemies[i];
       if (enemy.dead) continue;
-      var pos = pointAt(enemy.dist);
+      var pos = enemyPos(enemy);
       var dist = Math.hypot(pos.x - x, pos.y - y);
       if (dist < bestDist) {
         best = enemy;
@@ -2509,7 +2722,7 @@ function selectedTower() {
     enemy.hitFlash = 0.12;
     if (state.time - enemy.lastNum > 0.07) {
       enemy.lastNum = state.time;
-      var pos = pointAt(enemy.dist);
+      var pos = enemyPos(enemy);
       spawnFloater(pos.x, pos.y - 0.35, String(damage), '#e02323');
     }
     if (enemy.hp <= 0) killEnemy(enemy);
@@ -2544,6 +2757,49 @@ function selectedTower() {
     Sfx.kill();
   }
 
+  function beginClearCountdown(kind) {
+    state.clearKind = kind || 'wave';
+    state.clearCountdown = 5;
+    state.paused = true;
+    state.projectiles = [];
+    state.arcs = [];
+    var title = kind === 'victory' ? '關卡通過' : ('第 ' + state.wave + ' 波守住了');
+    var sub = kind === 'victory'
+      ? (nextStage(state.stagePlan) && stageUnlocked(nextStage(state.stagePlan)) ? '5 秒後下一關' : '5 秒後返回關卡')
+      : (cardWaveDue(state.wave)
+        ? (state.mode === 'infinite' ? '5 秒後改道並抽獎勵' : '5 秒後隨機獎勵')
+        : (state.mode === 'custom' && state.wave % 10 === 0 ? '5 秒後改道' : '5 秒後下一波'));
+    state.banner = { text: title, sub: sub, life: 5.2, countdown: true };
+  }
+
+  function tickClearCountdown(dt) {
+    if (!(state.clearCountdown > 0)) return;
+    state.clearCountdown -= dt;
+    var left = Math.max(0, Math.ceil(state.clearCountdown));
+    if (state.banner && state.banner.countdown) {
+      state.banner.life = Math.max(state.banner.life, state.clearCountdown + 0.05);
+      if (state.clearKind === 'victory') {
+        var upcoming = nextStage(state.stagePlan);
+        state.banner.sub = (upcoming && stageUnlocked(upcoming) ? '下一關 ' : '返回關卡 ') + left;
+      } else if (cardWaveDue(state.wave)) state.banner.sub = (state.mode === 'infinite' ? '改道抽獎 ' : '隨機獎勵 ') + left;
+      else if (state.mode === 'custom' && state.wave % 10 === 0) state.banner.sub = '改道 ' + left;
+      else state.banner.sub = '下一波 ' + left;
+    }
+    if (state.clearCountdown > 0) return;
+    state.clearCountdown = 0;
+    state.banner = null;
+    if (state.clearKind === 'victory') finishVictoryAdvance();
+    else goNextWave();
+  }
+
+  function finishVictoryAdvance() {
+    state.clearKind = '';
+    closeModal();
+    var upcoming = nextStage(state.stagePlan);
+    if (upcoming && stageUnlocked(upcoming)) startRun('campaign', upcoming.stageId);
+    else openStages(state.chapter);
+  }
+
   function onWaveClear() {
     if (state.phase !== 'combat') return;
     state.paused = true;
@@ -2552,15 +2808,24 @@ function selectedTower() {
     state.tileGainText = '';
     if (state.mode === 'custom' && state.wave % 5 === 0) state.tileGainText = grantRouteTiles();
     Sfx.fanfare();
+    toast(rewardDesc());
+    if (state.tileGainText) toast('獲得路線圖 ' + state.tileGainText);
     if (state.mode === 'campaign' && state.wave >= state.levelWaves) {
       state.phase = 'victory';
       state.outcome = 'victory';
-      openVictoryModal();
+      var stars = earnedStars();
+      var prev = state.stars[state.level] || 0;
+      if (stars > prev) {
+        state.stars[state.level] = stars;
+        saveStars();
+      }
+      beginClearCountdown('victory');
+      state.banner.text = starGlyph(stars) + ' 通過';
       return;
     }
     state.phase = 'reward';
     state.outcome = 'reward';
-    openRewardModal();
+    beginClearCountdown('wave');
   }
 
   function grantRouteTiles() {
@@ -2599,8 +2864,9 @@ function selectedTower() {
     state.time += dt;
     state.shake = Math.max(0, state.shake - dt * 16);
     state.hurt = Math.max(0, state.hurt - dt);
+    tickClearCountdown(dt);
     if (state.banner) {
-      state.banner.life -= dt;
+      if (!state.banner.countdown) state.banner.life -= dt;
       if (state.banner.life <= 0) state.banner = null;
     }
     if (state.rangePing) {
@@ -2637,44 +2903,126 @@ function selectedTower() {
     state.arcs = state.arcs.filter(function (arc) { return arc.life > 0; });
   }
 
-  function adGoldBonus() {
-    return Math.round(state.waveGoldEarned * 0.3);
-  }
-
-  function goldAdReady() {
-    return state.wave > 0 && state.wave % 3 === 0 && state.waveGoldEarned > 0 && adGoldBonus() > 0 && !state.waveDoubled;
+  function giftTowerAdReady() {
+    return giftWaveDue(state.wave) && !state.waveGiftDone;
   }
 
   function rewardDesc() {
-    var text = state.waveDoubled
-      ? '本波獲得 ' + (state.waveGoldEarned + adGoldBonus()) + ' 金幣（含廣告 +30%）'
-      : '本波獲得 ' + state.waveGoldEarned + ' 金幣';
+    var text = '本波獲得 ' + state.waveGoldEarned + ' 金幣';
     if (state.tileGainText) text += '。獲得路線圖 ' + state.tileGainText;
     if (state.mode === 'custom' && state.wave % 10 === 0) text += '。接下來可以修改路線';
-    if (state.wave % 3 === 0) text += '。下一波開始前會播放插頁廣告';
+    if (giftWaveDue(state.wave)) text += '。可看廣告隨機獲贈一座塔';
     return text + '。';
   }
 
-  function openRewardModal() {
-    var actions = [];
-    if (goldAdReady()) {
-      actions.push({
-        label: '觀看廣告，本波金幣再 +30%',
-        className: 'btn-gold',
-        ad: true,
-        onClick: watchDouble,
-      });
+  function emptyBuildCells() {
+    var list = [];
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        if (!isPath(c, r) && !towerAt(c, r)) list.push({ c: c, r: r });
+      }
     }
-    var nextLabel = cardWaveDue(state.wave)
-      ? '選擇卡牌'
-      : (state.mode === 'custom' && state.wave % 10 === 0 ? '修改路線' : '下一波');
-    actions.push({ label: nextLabel, className: 'btn-mint', onClick: goNextWave });
+    return list;
+  }
+
+  function placeFreeTower(type, cell) {
+    var def = TOWERS[type];
+    if (!def || !cell) return false;
+    state.towers.push({
+      id: state.nextId++,
+      type: type,
+      c: cell.c,
+      r: cell.r,
+      level: 0,
+      cooldown: 0.15,
+      aim: -Math.PI / 2,
+      flash: 0,
+      chill: 0,
+      spec: null,
+      invested: 0,
+    });
+    flashCell(cell.c, cell.r, true);
+    state.rangePing = { c: cell.c, r: cell.r, range: def.levels[0].range, color: def.color, t: 0.9 };
+    burst(cell.c + 0.5, cell.r + 0.5, def.color, 8);
+    Sfx.build();
+    return true;
+  }
+
+  function grantAdTower() {
+    var empties = emptyBuildCells();
+    if (!empties.length) {
+      toast('沒有空地可放塔');
+      return false;
+    }
+    var cell = empties[Math.floor(Math.random() * empties.length)];
+    if (Math.random() < 0.08 && !hasHero()) {
+      var heroes = ['sword', 'archer', 'mage', 'priest'];
+      var heroId = heroes[Math.floor(Math.random() * heroes.length)];
+      state.pendingHero = heroId;
+      placeHero(cell);
+      toast('廣告贈送英雄：' + heroName(heroId));
+      return true;
+    }
+    var type = Math.random() < 0.55 ? 'arrow' : 'cannon';
+    placeFreeTower(type, cell);
+    toast('廣告贈送 ' + TOWERS[type].name);
+    syncHud();
+    return true;
+  }
+
+  function continueAfterWaveAds(cleared) {
+    if (cardWaveDue(cleared)) {
+      if (state.mode === 'infinite') reshuffleInfinitePath();
+      openCardDraft(cleared);
+    } else if (state.mode === 'custom' && cleared % 10 === 0) enterEdit();
+    else startWave(cleared + 1);
+  }
+
+  function openGiftTowerOffer(cleared) {
+    state.phase = 'reward';
+    state.paused = true;
+    state.cardWave = cleared;
     openModal({
       tone: 'reward',
-      kicker: '波次結算',
-      title: '第 ' + state.wave + ' 波守住了',
-      desc: rewardDesc(),
-      actions: actions,
+      kicker: '第 ' + cleared + ' 波',
+      title: '廣告贈禮',
+      desc: '觀看廣告可隨機獲得一座防禦塔（低機率英雄塔）。不想要可直接跳過。',
+      actions: [
+        {
+          label: '跳過',
+          className: 'btn-ghost',
+          onClick: function () {
+            state.waveGiftDone = true;
+            closeModal();
+            continueAfterWaveAds(cleared);
+          },
+        },
+        {
+          label: '觀看廣告，隨機送塔',
+          className: 'btn-gold',
+          ad: true,
+          onClick: function () { watchGiftTower(cleared); },
+        },
+      ],
+    });
+  }
+
+  function watchGiftTower(cleared) {
+    if (state.adBusy || state.waveGiftDone) return;
+    state.adBusy = true;
+    setModalBusy(true);
+    Ads.showRewarded({ placement: 'wave_gift_tower' }).then(function (result) {
+      state.adBusy = false;
+      if (!result || !result.rewarded) {
+        setModalBusy(false);
+        toast(result && result.error ? '廣告載入失敗' : '未看完廣告，獎勵未發放');
+        return;
+      }
+      state.waveGiftDone = true;
+      closeModal();
+      Sfx.unlock();
+      grantAdTower();
+      continueAfterWaveAds(cleared);
     });
   }
 
@@ -2715,14 +3063,6 @@ function selectedTower() {
       saveStars();
     }
     var actions = [];
-    if (goldAdReady()) {
-      actions.push({
-        label: '觀看廣告，本波金幣再 +30%',
-        className: 'btn-gold',
-        ad: true,
-        onClick: watchDouble,
-      });
-    }
     var upcoming = nextStage(state.stagePlan);
     if (upcoming && stageUnlocked(upcoming)) {
       actions.push({
@@ -2739,7 +3079,7 @@ function selectedTower() {
       tone: 'reward',
       kicker: '關卡通過',
       title: starGlyph(stars) + '  ' + state.level,
-      desc: state.chapterName + ' ' + state.levelName + ' 守住了。基地受傷 ' + state.lifeLost + ' 點。' + starNote + (state.waveDoubled ? ' 本波金幣已 +30%。' : ''),
+      desc: state.chapterName + ' ' + state.levelName + ' 守住了。基地受傷 ' + state.lifeLost + ' 點。' + starNote,
       actions: actions,
     });
   }
@@ -2783,29 +3123,6 @@ function selectedTower() {
     for (var i = 0; i < buttons.length; i++) buttons[i].disabled = busy;
   }
 
-  function watchDouble() {
-    if (state.adBusy || !goldAdReady()) return;
-    state.adBusy = true;
-    setModalBusy(true);
-    Ads.showRewarded({ placement: 'wave_double_gold' }).then(function (result) {
-      state.adBusy = false;
-      if (!result || !result.rewarded) {
-        setModalBusy(false);
-        toast(result && result.error ? '廣告載入失敗' : '未看完廣告，獎勵未發放');
-        return;
-      }
-      var bonus = adGoldBonus();
-      state.gold += bonus;
-      state.waveDoubled = true;
-      Sfx.unlock();
-      Sfx.coin();
-      toast('額外獲得 ' + bonus + ' 金幣');
-      if (state.outcome === 'victory') openVictoryModal();
-      else openRewardModal();
-      syncHud();
-    });
-  }
-
   function watchRevive() {
     if (state.adBusy || state.reviveUsed) return;
     state.adBusy = true;
@@ -2832,22 +3149,14 @@ function selectedTower() {
   function goNextWave() {
     if (state.adBusy || state.phase !== 'reward') return;
     var cleared = state.wave;
+    state.clearCountdown = 0;
+    state.clearKind = '';
     closeModal();
-    function proceed() {
-      if (cardWaveDue(cleared)) openCardDraft(cleared);
-      else if (state.mode === 'custom' && cleared % 10 === 0) enterEdit();
-      else startWave(cleared + 1);
-    }
-    if (cleared % 3 === 0) {
-      state.adBusy = true;
-      state.paused = true;
-      Ads.showInterstitial({ placement: 'wave_interval' }).then(function () {
-        state.adBusy = false;
-        proceed();
-      });
+    if (giftTowerAdReady()) {
+      openGiftTowerOffer(cleared);
       return;
     }
-    proceed();
+    continueAfterWaveAds(cleared);
   }
 
   function enterEdit() {
@@ -3357,14 +3666,19 @@ function selectedTower() {
     state.reviveUsed = false;
     state.waveGoldEarned = 0;
     state.waveDoubled = false;
+    state.waveGiftDone = false;
+    state.pendingCard = null;
+    state.cardRerolled = false;
     state.banner = null;
     state.rangePing = null;
     state.shake = 0;
     state.hurt = 0;
+    state.clearCountdown = 0;
+    state.clearKind = '';
     clearRunExtras();
     if (mode === 'campaign') setRoute(chain(level.path));
     else if (mode === 'custom') setRoute(straightColumn(4));
-    else setRoute(buildInfinitePath());
+    else setRoute(buildRandomInfinitePath());
     hideStoryScreens();
     closeModal();
     renderInspector();
@@ -3403,6 +3717,8 @@ function selectedTower() {
     state.rangePing = null;
     state.shake = 0;
     state.hurt = 0;
+    state.clearCountdown = 0;
+    state.clearKind = '';
     clearRunExtras();
     closeModal();
     renderInspector();
@@ -3708,8 +4024,9 @@ function selectedTower() {
       waveBtnSub.textContent = '接著第 ' + (state.wave + 1) + ' 波';
     } else {
       waveBtn.disabled = true;
-      waveBtnLabel.textContent = state.phase === 'gameover' ? '防線崩潰' : '結算中';
-      waveBtnSub.textContent = state.phase === 'gameover' ? '本局結束' : '選擇獎勵';
+      waveBtnLabel.textContent = state.phase === 'gameover' ? '防線崩潰' : (state.phase === 'victory' ? '關卡通過' : '下一波');
+      if (state.clearCountdown > 0) waveBtnSub.textContent = Math.ceil(state.clearCountdown) + ' 秒後繼續';
+      else waveBtnSub.textContent = state.phase === 'gameover' ? '本局結束' : '準備中';
     }
     if (state.pickMode === 'level' || state.pickMode === 'heroPlace') {
       waveBtn.disabled = true;
@@ -5129,19 +5446,33 @@ function selectedTower() {
   }
 
   function drawEnemy(enemy) {
-    var pos = pointAt(enemy.dist);
+    var pos = enemyPos(enemy);
     var x = worldX(pos.x);
     var y = worldY(pos.y);
     var rad = Math.max(6, enemy.radius * view.tile);
+    var resist = enemy.resist && RESISTS[enemy.resist] ? RESISTS[enemy.resist] : null;
     ctx.save();
-    ctx.lineWidth = enemy.boss ? 3 : 2;
-    ctx.strokeStyle = '#161616';
-    ctx.fillStyle = enemy.hitFlash > 0 ? '#161616' : '#fff';
+    ctx.lineWidth = enemy.boss ? 3 : (resist ? 3 : 2);
+    ctx.strokeStyle = resist ? resist.color : '#161616';
+    ctx.fillStyle = enemy.hitFlash > 0 ? '#161616' : (resist ? resist.color : (enemy.type === 'hopper' ? '#4ec6e8' : '#fff'));
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.translate(x, y);
     if (enemy.type === 'shard') {
       inkX(0, 0, rad);
+    } else if (enemy.type === 'hopper') {
+      ctx.beginPath();
+      ctx.moveTo(0, -rad);
+      ctx.lineTo(rad * 0.85, rad * 0.55);
+      ctx.lineTo(-rad * 0.85, rad * 0.55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = '#161616';
+      ctx.beginPath();
+      ctx.moveTo(-rad * 0.2, rad * 0.1);
+      ctx.quadraticCurveTo(0, rad * 1.15, rad * 0.55, rad * 0.35);
+      ctx.stroke();
     } else if (enemy.type === 'swift') {
       ctx.beginPath();
       ctx.arc(0, 0, rad * 0.72, 0, Math.PI * 2);
@@ -5210,13 +5541,16 @@ function selectedTower() {
       ctx.textBaseline = 'middle';
       ctx.fillText(enemy.name, x, y + rad + Math.max(10, view.tile * 0.24));
     }
-    if (enemy.resist && RESISTS[enemy.resist]) {
-      var resist = RESISTS[enemy.resist];
+    if (resist) {
       ctx.font = '800 ' + Math.max(10, Math.round(view.tile * 0.2)) + 'px ' + FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#fff';
       ctx.fillStyle = resist.color;
-      ctx.fillText(resist.name, x, y - rad - Math.max(9, view.tile * 0.18));
+      var labelY = y - rad - Math.max(9, view.tile * 0.18);
+      ctx.strokeText(resist.name, x, labelY);
+      ctx.fillText(resist.name, x, labelY);
     }
   }
 
@@ -5329,7 +5663,7 @@ function selectedTower() {
         if (tower.spec !== 'laser' || !tower.beamId) continue;
         var enemy = findEnemy(tower.beamId);
         if (!enemy) continue;
-        var pos = pointAt(enemy.dist);
+        var pos = enemyPos(enemy);
         ctx.globalAlpha = 0.95;
         ctx.strokeStyle = '#7c3aed';
         ctx.lineWidth = Math.max(3, view.tile * 0.07);
