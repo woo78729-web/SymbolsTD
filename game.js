@@ -286,6 +286,9 @@
     buildSite: null,
     buildMenu: 'root',
     splashLedger: {},
+    hellDeffs: [],
+    hellDeffHalf: false,
+    hellLockCd: 0,
     sellArmed: false,
     hover: null,
     mode: 'menu',
@@ -1246,12 +1249,132 @@ function selectedTower() {
     },
     hell: {
       id: 'hell', name: '地獄',
-      blurb: '血量、速度、數量都更高，擊殺金幣較少。起始 100 金、14 生命。',
+      blurb: '基礎更高。另有地獄詞綴：1–9 波隨機 1 則（半效），之後每 10 波重抽 2 則。起始 100 金、14 生命。',
       hp: 1.68, growth: 1.295, speed: 1.16, speedGrow: 0.05, speedCap: 2.0,
       gold: 0.62, gap: 0.76, gapMin: 0.38, extra: 2, rush: 0.24,
       lives: 14, purse: 100, swiftFrom: 2, swiftEvery: 2, bruteEvery: 3,
     },
   };
+
+  var HELL_DEFFS = [
+    { id: 'speed', name: '疾行', blurb: '怪移速 +10%', full: 0.10 },
+    { id: 'lock', name: '鎖塔', blurb: '隨機鎖住一座塔 2 秒', full: 2 },
+    { id: 'boss', name: '亂王', blurb: '每波隨機出一支王', full: 1 },
+    { id: 'split', name: '分裂', blurb: '怪死後裂成兩隻 20% 血', full: 0.20 },
+    { id: 'regen', name: '回血', blurb: '怪每秒回復 3% 血', full: 0.03 },
+    { id: 'enrage', name: '殘暴', blurb: '怪血到 10% 時加速 15%', full: 0.15 },
+    { id: 'thick', name: '厚皮', blurb: '怪血量 +50%', full: 0.50 },
+  ];
+
+  function hellModeActive() {
+    return (state.mode === 'infinite' || state.mode === 'custom') && state.difficulty === 'hell';
+  }
+
+  function hellDeffDef(id) {
+    for (var i = 0; i < HELL_DEFFS.length; i++) {
+      if (HELL_DEFFS[i].id === id) return HELL_DEFFS[i];
+    }
+    return null;
+  }
+
+  function hasHellDeff(id) {
+    var list = state.hellDeffs || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return true;
+    return false;
+  }
+
+  function hellDeffValue(id) {
+    if (!hasHellDeff(id)) return 0;
+    var def = hellDeffDef(id);
+    if (!def) return 0;
+    return state.hellDeffHalf ? def.full * 0.5 : def.full;
+  }
+
+  function pickHellDeffs(count) {
+    var pool = HELL_DEFFS.slice();
+    for (var i = pool.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
+    }
+    return pool.slice(0, Math.min(count, pool.length)).map(function (item) {
+      return { id: item.id, name: item.name, blurb: item.blurb };
+    });
+  }
+
+  function hellDeffLabel() {
+    var list = state.hellDeffs || [];
+    if (!list.length) return '';
+    var names = list.map(function (item) { return item.name; }).join(' · ');
+    return names + (state.hellDeffHalf ? '（半效）' : '');
+  }
+
+  function syncHellDeffs(wave) {
+    if (!hellModeActive()) {
+      state.hellDeffs = [];
+      state.hellDeffHalf = false;
+      state.hellLockCd = 0;
+      return;
+    }
+    if (wave <= 9) {
+      if (wave === 1 || !(state.hellDeffs && state.hellDeffs.length)) {
+        state.hellDeffs = pickHellDeffs(1);
+        state.hellDeffHalf = true;
+        state.hellLockCd = 1.2;
+      }
+    } else if (wave % 10 === 0) {
+      state.hellDeffs = pickHellDeffs(2);
+      state.hellDeffHalf = false;
+      state.hellLockCd = 1.2;
+    }
+  }
+
+  function applyHellBossDeff(plan) {
+    if (!plan || !hasHellDeff('boss')) return plan;
+    if (plan.boss) return plan;
+    var idx = Math.floor(Math.random() * BOSSES.length);
+    plan.boss = BOSSES[idx];
+    plan.jobs = plan.jobs ? plan.jobs.slice() : [];
+    plan.jobs.splice(Math.min(2, plan.jobs.length), 0, { type: 'boss', gap: 1.2, bossIndex: idx });
+    return plan;
+  }
+
+  function tickHellLock(dt) {
+    if (!hasHellDeff('lock') || state.phase !== 'combat') return;
+    state.hellLockCd = (state.hellLockCd || 0) - dt;
+    if (state.hellLockCd > 0) return;
+    state.hellLockCd = 4.8;
+    if (!state.towers.length) return;
+    var tower = state.towers[Math.floor(Math.random() * state.towers.length)];
+    var dur = Math.max(0.6, hellDeffValue('lock'));
+    tower.chill = Math.max(tower.chill || 0, dur);
+    var pos = { x: tower.c + 0.5, y: tower.r + 0.5 };
+    spawnFloater(pos.x, pos.y - 0.55, '鎖塔', '#161616');
+  }
+
+  function applyHellSpawnStats(enemy) {
+    if (!enemy || !hellModeActive() || enemy.skipHellStats || enemy.hellBuffed) return enemy;
+    enemy.hellBuffed = true;
+    var thick = hellDeffValue('thick');
+    if (thick > 0) {
+      enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * (1 + thick)));
+      enemy.hp = enemy.maxHp;
+      if (enemy.shield > 0) enemy.shield = Math.round(enemy.shield * (1 + thick));
+      if (enemy.splitHp) enemy.splitHp = Math.round(enemy.splitHp * (1 + thick));
+    }
+    var spd = hellDeffValue('speed');
+    if (spd > 0) {
+      enemy.speed *= 1 + spd;
+      if (enemy.baseSpeed) enemy.baseSpeed *= 1 + spd;
+    }
+    if (hasHellDeff('boss') && state.hellDeffHalf && enemy.boss) {
+      enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * 0.5));
+      enemy.hp = enemy.maxHp;
+      if (enemy.shield > 0) enemy.shield = Math.round(enemy.shield * 0.5);
+    }
+    return enemy;
+  }
 
   function infiniteProfile() {
     return state.difficulty === 'hell' ? INFINITE_PROFILES.hell : INFINITE_PROFILES.normal;
@@ -1497,6 +1620,7 @@ function selectedTower() {
   }
 
   function queueEnemy(enemy) {
+    applyHellSpawnStats(enemy);
     state.pendingSpawns.push(enemy);
   }
 
@@ -1562,7 +1686,9 @@ function selectedTower() {
       state.interestLeft -= 1;
       toast('利息 +30');
     }
-    var plan = planWave(n);
+    var refreshed = hellModeActive() && (n === 1 || n % 10 === 0 || (n <= 9 && !(state.hellDeffs && state.hellDeffs.length)));
+    syncHellDeffs(n);
+    var plan = applyHellBossDeff(planWave(n));
     state.wave = n;
     state.phase = 'combat';
     state.paused = false;
@@ -1571,9 +1697,11 @@ function selectedTower() {
     state.waveGiftDone = false;
     state.spawnQueue = plan.jobs.slice();
     state.spawnTimer = 0.55;
+    var deffText = hellDeffLabel();
+    if (refreshed && deffText) toast('地獄詞綴 · ' + deffText);
     state.banner = plan.boss
-      ? { text: '第 ' + n + ' 波 · ' + plan.boss.name, sub: plan.boss.blurb, life: 3.2 }
-      : { text: '第 ' + n + ' 波', sub: compositionText(plan), life: 1.8 };
+      ? { text: '第 ' + n + ' 波 · ' + plan.boss.name, sub: deffText || plan.boss.blurb, life: 3.2 }
+      : { text: '第 ' + n + ' 波', sub: deffText || compositionText(plan), life: 2.2 };
     if (state.mode === 'infinite') markBest(n);
     if (plan.boss) Sfx.boss();
     else Sfx.fanfare();
@@ -1585,6 +1713,7 @@ function selectedTower() {
     updateSpawns(dt);
     updateWalls(dt);
     updateEnemies(dt);
+    tickHellLock(dt);
     updateTowers(dt);
     updateGusts(dt);
     updateMeteor(dt);
@@ -1603,6 +1732,7 @@ function selectedTower() {
     if (state.spawnTimer > 0) return;
     var job = state.spawnQueue.shift();
     var spawned = job.type === 'boss' ? makeBoss(job.bossIndex, state.wave) : makeEnemy(job.type, state.wave);
+    applyHellSpawnStats(spawned);
     state.enemies.push(spawned);
     state.spawnTimer = state.spawnQueue.length ? state.spawnQueue[0].gap : 0;
   }
@@ -1634,6 +1764,18 @@ function selectedTower() {
       if (!enemy.jumping && enemy.dist >= WAYPOINTS.length - 1) {
         leakEnemy(enemy);
         continue;
+      }
+      var regenRate = hellDeffValue('regen');
+      if (regenRate > 0 && enemy.hp < enemy.maxHp) {
+        enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * regenRate * dt);
+      }
+      var enrageMul = hellDeffValue('enrage');
+      if (enrageMul > 0 && !enemy.hellEnraged && enemy.hp <= enemy.maxHp * 0.1) {
+        enemy.hellEnraged = true;
+        enemy.speed *= 1 + enrageMul;
+        if (enemy.baseSpeed) enemy.baseSpeed *= 1 + enrageMul;
+        var ragePos = enemyPos(enemy);
+        spawnFloater(ragePos.x, ragePos.y - 0.55, '殘暴', '#ff5a36');
       }
       if (enemy.burnTime > 0) {
         enemy.burnTime -= dt;
@@ -1997,6 +2139,9 @@ function selectedTower() {
     state.freeSpec = false;
     state.splashLedger = {};
     state.buildMenu = 'root';
+    state.hellDeffs = [];
+    state.hellDeffHalf = false;
+    state.hellLockCd = 0;
   }
 
   function pathIndex(c, r) {
@@ -2537,6 +2682,7 @@ function selectedTower() {
     if (state.phase !== 'combat') return;
     for (var i = 0; i < state.towers.length; i++) {
       var tower = state.towers[i];
+      if (tower.chill > 0) continue;
       if (tower.type === 'hero') {
         updateHero(tower, dt);
         continue;
@@ -3018,11 +3164,34 @@ function selectedTower() {
         shard.gold = 5 + state.wave;
         shard.leak = 1;
         shard.resist = '';
+        shard.noSplit = true;
         shard.dist = Math.max(0, Math.min(enemy.dist + (s - 1) * 0.22, WAYPOINTS.length - 1.05));
         queueEnemy(shard);
       }
       var splitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(splitPos.x, splitPos.y - 0.5, '分裂', '#c084fc');
+    }
+    var hellSplit = hellDeffValue('split');
+    if (hellSplit > 0 && !enemy.boss && !enemy.noSplit && enemy.type !== 'shard') {
+      var childType = enemy.type === 'hopper' || enemy.type === 'brute' ? 'grunt' : (enemy.type || 'grunt');
+      var childHp = Math.max(1, Math.round(enemy.maxHp * hellSplit));
+      var spdBonus = hellDeffValue('speed');
+      for (var h = 0; h < 2; h++) {
+        var child = makeEnemy(childType, state.wave);
+        child.hp = childHp;
+        child.maxHp = childHp;
+        child.gold = Math.max(1, Math.floor((enemy.gold || 1) * 0.2));
+        child.leak = 1;
+        child.noSplit = true;
+        child.skipHellStats = true;
+        child.resist = enemy.resist || '';
+        child.radius = Math.max(0.2, (enemy.radius || 0.3) * 0.78);
+        if (spdBonus > 0) child.speed *= 1 + spdBonus;
+        child.dist = Math.max(0, Math.min(enemy.dist + (h === 0 ? -0.18 : 0.18), WAYPOINTS.length - 1.05));
+        queueEnemy(child);
+      }
+      var hellPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+      spawnFloater(hellPos.x, hellPos.y - 0.45, '裂殖', '#ff8fab');
     }
     state.gold += enemy.gold;
     state.waveGoldEarned += enemy.gold;
@@ -3188,11 +3357,11 @@ function selectedTower() {
   }
 
   function rewardDesc() {
-    var text = '本波獲得 ' + state.waveGoldEarned + ' 金幣';
-    if (state.tileGainText) text += '。獲得路線圖 ' + state.tileGainText;
-    if (state.mode === 'custom' && state.wave % 10 === 0) text += '。接下來可以修改路線';
-    if (giftWaveDue(state.wave)) text += '。可看廣告隨機獲贈一座塔';
-    return text + '。';
+    var text = '本波 +' + state.waveGoldEarned + ' 金幣';
+    if (state.tileGainText) text += ' · 路線圖 ' + state.tileGainText;
+    if (state.mode === 'custom' && state.wave % 10 === 0) text += ' · 可改道';
+    if (giftWaveDue(state.wave)) text += ' · 可看廣告送塔';
+    return text;
   }
 
   function emptyBuildCells() {
@@ -4284,19 +4453,25 @@ function selectedTower() {
     } else if (state.mode === 'custom') {
       var customName = state.difficulty === 'hell' ? '地獄' : '普通';
       hudWave.textContent = state.wave === 0 ? customName : '第 ' + state.wave + ' 波';
+      var customDeff = hellDeffLabel();
       var customBoss = state.phase === 'combat' ? bossForWave(state.wave) : null;
-      hudWaveSub.textContent = customBoss
-        ? '王 · ' + customBoss.name
-        : customName + ' · 直線 ' + state.tiles.straight + ' · 轉彎 ' + state.tiles.turn;
+      hudWaveSub.textContent = customDeff
+        ? customDeff
+        : (customBoss
+          ? '王 · ' + customBoss.name
+          : customName + ' · 直線 ' + state.tiles.straight + ' · 轉彎 ' + state.tiles.turn);
     } else if (state.wave === 0) {
       hudWave.textContent = state.mode === 'infinite' ? infiniteProfile().name : '準備';
       hudWaveSub.textContent = '點空地放塔';
     } else {
       hudWave.textContent = '第 ' + state.wave + ' 波';
+      var infiniteDeff = hellDeffLabel();
       var infiniteBoss = state.phase === 'combat' ? bossForWave(state.wave) : null;
-      hudWaveSub.textContent = infiniteBoss
-        ? '王 · ' + infiniteBoss.name
-        : (state.mode === 'infinite' ? infiniteProfile().name : (state.phase === 'combat' ? '入侵中' : '整補'));
+      hudWaveSub.textContent = infiniteDeff
+        ? infiniteDeff
+        : (infiniteBoss
+          ? '王 · ' + infiniteBoss.name
+          : (state.mode === 'infinite' ? infiniteProfile().name : (state.phase === 'combat' ? '入侵中' : '整補')));
     }
     var selected = selectedTower();
     var upgradeBtn = inspectActions.querySelector('[data-act="upgrade"]');
@@ -5448,17 +5623,30 @@ function selectedTower() {
     ctx.restore();
   }
 
+  function buildMenuTypes() {
+    return ['basic', 'poison', 'fire', 'ice', 'bolt'];
+  }
+
+  function buildMenuLabel(type) {
+    if (type === 'basic') return '無屬';
+    if (type === 'poison') return '毒';
+    if (type === 'fire') return '火';
+    if (type === 'ice') return '冰';
+    if (type === 'bolt') return '雷';
+    return TOWERS[type] ? TOWERS[type].name : type;
+  }
+
   function buildMenuLayout() {
     if (!state.buildSite) return null;
     var tile = view.tile;
-    var gap = 8;
-    var elementMode = state.buildMenu === 'element';
-    var cols = elementMode ? 2 : 2;
-    var rows = elementMode ? 3 : 1;
-    var btnW = Math.max(78, tile * 1.7);
-    var btnH = Math.max(88, tile * 1.85);
+    var gap = 6;
+    var types = buildMenuTypes();
+    var cols = 3;
+    var rows = 2;
+    var btnW = Math.max(64, Math.min(88, tile * 1.45));
+    var btnH = Math.max(72, Math.min(96, tile * 1.65));
     var panelW = btnW * cols + gap * (cols + 1);
-    var panelH = btnH * rows + gap * (rows + 1);
+    var panelH = btnH * rows + gap * (rows + 1) + 18;
     var cx = worldX(state.buildSite.c + 0.5);
     var cellTop = worldY(state.buildSite.r);
     var cellBottom = worldY(state.buildSite.r + 1);
@@ -5475,29 +5663,18 @@ function selectedTower() {
       below = false;
     }
     var buttons = [];
-    if (elementMode) {
-      var elems = ELEMENT_TYPES;
-      for (var e = 0; e < elems.length; e++) {
-        var ec = e % 2;
-        var er = Math.floor(e / 2);
-        buttons.push({
-          type: elems[e],
-          x: x + gap + ec * (btnW + gap),
-          y: y + gap + er * (btnH + gap),
-          w: btnW,
-          h: btnH,
-        });
-      }
+    for (var i = 0; i < types.length; i++) {
+      var col = i % cols;
+      var row = Math.floor(i / cols);
+      var rowCount = row === 0 ? Math.min(cols, types.length) : types.length - cols;
+      var rowOffset = row === 0 ? 0 : (panelW - (rowCount * btnW + (rowCount + 1) * gap)) / 2;
       buttons.push({
-        type: 'back',
-        x: x + gap,
-        y: y + gap + 2 * (btnH + gap),
-        w: btnW * 2 + gap,
-        h: btnH * 0.72,
+        type: types[i],
+        x: x + gap + rowOffset + col * (btnW + gap),
+        y: y + gap + 16 + row * (btnH + gap),
+        w: btnW,
+        h: btnH,
       });
-    } else {
-      buttons.push({ type: 'basic', x: x + gap, y: y + gap, w: btnW, h: btnH });
-      buttons.push({ type: 'element', x: x + gap * 2 + btnW, y: y + gap, w: btnW, h: btnH });
     }
     return { x: x, y: y, w: panelW, h: panelH, below: below, buttons: buttons };
   }
@@ -5513,7 +5690,7 @@ function selectedTower() {
     var sx = worldX(site.c);
     var sy = worldY(site.r);
     ctx.save();
-    ctx.fillStyle = 'rgba(22, 22, 22, 0.08)';
+    ctx.fillStyle = 'rgba(22, 22, 22, 0.1)';
     ctx.fillRect(sx + 2, sy + 2, tile - 4, tile - 4);
     ctx.strokeStyle = '#161616';
     ctx.lineWidth = 2.5;
@@ -5528,54 +5705,59 @@ function selectedTower() {
     ctx.fillStyle = '#fff';
     ctx.beginPath();
     if (menu.below) {
-      ctx.moveTo(anchorX - 9, menu.y);
-      ctx.lineTo(anchorX, menu.y - 10);
-      ctx.lineTo(anchorX + 9, menu.y);
+      ctx.moveTo(anchorX - 8, menu.y);
+      ctx.lineTo(anchorX, menu.y - 9);
+      ctx.lineTo(anchorX + 8, menu.y);
     } else {
-      ctx.moveTo(anchorX - 9, menu.y + menu.h);
-      ctx.lineTo(anchorX, menu.y + menu.h + 10);
-      ctx.lineTo(anchorX + 9, menu.y + menu.h);
+      ctx.moveTo(anchorX - 8, menu.y + menu.h);
+      ctx.lineTo(anchorX, menu.y + menu.h + 9);
+      ctx.lineTo(anchorX + 8, menu.y + menu.h);
     }
     ctx.fill();
-    roundRect(menu.x, menu.y, menu.w, menu.h, 16);
+    roundRect(menu.x, menu.y, menu.w, menu.h, 14);
     ctx.fillStyle = '#fff';
     ctx.fill();
     ctx.strokeStyle = '#161616';
     ctx.lineWidth = 2;
     ctx.stroke();
 
+    ctx.fillStyle = '#6d675f';
+    ctx.font = '700 11px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('選擇防禦塔', menu.x + menu.w / 2, menu.y + 11);
+
     for (var i = 0; i < menu.buttons.length; i++) {
       var btn = menu.buttons[i];
       var def = TOWERS[btn.type];
-      var label = btn.type === 'element' ? '屬性塔' : (btn.type === 'back' ? '返回' : def.name);
+      var label = buildMenuLabel(btn.type);
       var cost = def ? def.cost : 0;
       var poor = def && state.gold < def.cost;
-      roundRect(btn.x, btn.y, btn.w, btn.h, 12);
-      ctx.fillStyle = '#fff';
+      roundRect(btn.x, btn.y, btn.w, btn.h, 10);
+      ctx.fillStyle = poor ? '#f3f0ea' : '#fff';
       ctx.fill();
-      ctx.strokeStyle = '#161616';
-      ctx.lineWidth = poor ? 1 : 2;
-      if (poor) ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = poor ? 'rgba(22,22,22,0.35)' : '#161616';
+      ctx.lineWidth = poor ? 1.5 : 2;
       ctx.stroke();
-      ctx.setLineDash([]);
       ctx.save();
-      ctx.translate(btn.x + btn.w / 2, btn.y + Math.min(34, btn.h * 0.38));
-      ctx.strokeStyle = def && def.color ? def.color : '#161616';
-      ctx.fillStyle = ctx.strokeStyle;
-      ctx.lineWidth = 2.5;
+      ctx.translate(btn.x + btn.w / 2, btn.y + btn.h * 0.34);
+      ctx.globalAlpha = poor ? 0.45 : 1;
+      ctx.strokeStyle = '#161616';
+      ctx.fillStyle = def && def.color ? def.color : '#161616';
+      ctx.lineWidth = 2.4;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       drawBuildGlyph(btn.type);
       ctx.restore();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.globalAlpha = poor ? 0.5 : 1;
       ctx.fillStyle = '#161616';
-      ctx.font = '800 ' + (btn.type === 'back' ? '14' : '13') + 'px ' + FONT;
-      ctx.fillText(label, btn.x + btn.w / 2, btn.y + btn.h - (cost ? 28 : 16));
-      if (cost) {
-        ctx.font = '800 13px ' + FONT;
-        ctx.fillText(String(cost), btn.x + btn.w / 2, btn.y + btn.h - 12);
-      }
+      ctx.font = '800 12px ' + FONT;
+      ctx.fillText(label, btn.x + btn.w / 2, btn.y + btn.h - 26);
+      ctx.font = '800 12px ' + FONT;
+      ctx.fillText(String(cost), btn.x + btn.w / 2, btn.y + btn.h - 11);
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
   }
@@ -5583,56 +5765,42 @@ function selectedTower() {
   function drawBuildGlyph(type) {
     if (type === 'basic') {
       ctx.beginPath();
-      ctx.arc(0, 0, 15, 0, Math.PI * 2);
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(-7, 0);
-      ctx.lineTo(7, 0);
-      ctx.moveTo(1, -5);
-      ctx.lineTo(9, 0);
-      ctx.lineTo(1, 5);
-      ctx.stroke();
-    } else if (type === 'element') {
-      ctx.strokeRect(-14, -14, 28, 28);
-      ctx.beginPath();
-      ctx.moveTo(-6, 6);
-      ctx.lineTo(0, -8);
-      ctx.lineTo(6, 6);
-      ctx.closePath();
-      ctx.stroke();
-    } else if (type === 'back') {
-      ctx.beginPath();
-      ctx.moveTo(6, -8);
-      ctx.lineTo(-8, 0);
-      ctx.lineTo(6, 8);
+      ctx.moveTo(-6, 0);
+      ctx.lineTo(6, 0);
+      ctx.moveTo(1, -4);
+      ctx.lineTo(8, 0);
+      ctx.lineTo(1, 4);
       ctx.stroke();
     } else if (type === 'poison') {
       ctx.beginPath();
-      ctx.arc(0, 4, 8, 0, Math.PI * 2);
+      ctx.arc(0, 3, 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(-5, -6, 3.5, 0, Math.PI * 2);
+      ctx.arc(-4, -5, 3, 0, Math.PI * 2);
       ctx.fill();
     } else if (type === 'fire') {
-      inkX(0, 0, 10);
+      inkX(0, 0, 8);
     } else if (type === 'ice') {
       ctx.beginPath();
-      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.arc(0, 0, 9, 0, Math.PI * 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(0, -10);
-      ctx.lineTo(0, 10);
-      ctx.moveTo(-9, -4);
-      ctx.lineTo(9, 4);
+      ctx.moveTo(0, -8);
+      ctx.lineTo(0, 8);
+      ctx.moveTo(-7, -3);
+      ctx.lineTo(7, 3);
       ctx.stroke();
     } else if (type === 'bolt') {
       ctx.beginPath();
-      ctx.moveTo(-4, -12);
-      ctx.lineTo(4, -2);
-      ctx.lineTo(-2, 0);
-      ctx.lineTo(5, 12);
-      ctx.lineTo(-5, 2);
-      ctx.lineTo(1, 0);
+      ctx.moveTo(-3, -10);
+      ctx.lineTo(3, -1);
+      ctx.lineTo(-2, 1);
+      ctx.lineTo(4, 10);
+      ctx.lineTo(-4, 1);
+      ctx.lineTo(1, -1);
       ctx.closePath();
       ctx.stroke();
     }
@@ -5804,59 +5972,255 @@ function selectedTower() {
     }
   }
 
+  function enemyFacing(enemy, pos) {
+    var ahead = pointAt(Math.min(WAYPOINTS.length - 1, (enemy.dist || 0) + 0.4));
+    if (enemy.jumping) {
+      var to = WAYPOINTS[enemy.jumping.to];
+      ahead = { x: to.x, y: to.y };
+    }
+    return Math.atan2(ahead.y - pos.y, ahead.x - pos.x);
+  }
+
+  function enemyBodyColors(enemy, resist) {
+    var hit = enemy.hitFlash > 0;
+    return {
+      fill: hit ? '#161616' : '#fff',
+      ink: hit ? '#fff' : '#161616',
+      accent: resist ? resist.color : (enemy.color || '#161616'),
+      rim: resist ? resist.color : '#161616',
+    };
+  }
+
+  function drawEnemyEyes(rad, ink, open) {
+    var eye = Math.max(1.4, rad * 0.13);
+    var gap = rad * 0.28;
+    var ey = -rad * 0.08;
+    ctx.fillStyle = ink;
+    ctx.beginPath();
+    ctx.arc(-gap, ey, eye, 0, Math.PI * 2);
+    ctx.arc(gap, ey, eye, 0, Math.PI * 2);
+    ctx.fill();
+    if (open !== false) {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-gap - eye * 0.25, ey - eye * 0.25, eye * 0.35, 0, Math.PI * 2);
+      ctx.arc(gap - eye * 0.25, ey - eye * 0.25, eye * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawEnemyShadow(rad) {
+    ctx.fillStyle = 'rgba(22, 22, 22, 0.12)';
+    ctx.beginPath();
+    ctx.ellipse(0, rad * 0.92, rad * 0.72, rad * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawGruntBody(rad, colors, bob) {
+    ctx.translate(0, bob);
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.92, rad * 0.15);
+    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.55, -rad * 0.35, -rad * 0.95);
+    ctx.quadraticCurveTo(0, -rad * 1.18, rad * 0.35, -rad * 0.95);
+    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.55, rad * 0.92, rad * 0.15);
+    ctx.quadraticCurveTo(rad * 0.55, rad * 0.95, 0, rad * 0.82);
+    ctx.quadraticCurveTo(-rad * 0.55, rad * 0.95, -rad * 0.92, rad * 0.15);
+    ctx.closePath();
+    ctx.fillStyle = colors.fill;
+    ctx.fill();
+    ctx.strokeStyle = colors.rim;
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.fillStyle = colors.accent;
+    ctx.globalAlpha = 0.28;
+    ctx.beginPath();
+    ctx.ellipse(0, rad * 0.28, rad * 0.55, rad * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    drawEnemyEyes(rad, colors.ink, true);
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, rad * 0.22, rad * 0.22, 0.15, Math.PI - 0.15);
+    ctx.stroke();
+  }
+
+  function drawSwiftBody(rad, colors, bob) {
+    ctx.translate(0, bob * 0.6);
+    ctx.beginPath();
+    ctx.moveTo(rad * 1.15, 0);
+    ctx.quadraticCurveTo(rad * 0.2, -rad * 0.85, -rad * 0.95, -rad * 0.35);
+    ctx.lineTo(-rad * 0.55, 0);
+    ctx.lineTo(-rad * 0.95, rad * 0.35);
+    ctx.quadraticCurveTo(rad * 0.2, rad * 0.85, rad * 1.15, 0);
+    ctx.closePath();
+    ctx.fillStyle = colors.fill;
+    ctx.fill();
+    ctx.strokeStyle = colors.rim;
+    ctx.lineWidth = 2.3;
+    ctx.stroke();
+    ctx.strokeStyle = colors.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.15, -rad * 0.45);
+    ctx.lineTo(rad * 0.55, -rad * 0.12);
+    ctx.moveTo(-rad * 0.15, rad * 0.45);
+    ctx.lineTo(rad * 0.55, rad * 0.12);
+    ctx.stroke();
+    ctx.fillStyle = colors.ink;
+    ctx.beginPath();
+    ctx.arc(rad * 0.35, -rad * 0.08, Math.max(1.5, rad * 0.12), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawBruteBody(rad, colors, bob) {
+    ctx.translate(0, bob * 0.4);
+    roundRect(-rad * 0.95, -rad * 0.85, rad * 1.9, rad * 1.7, rad * 0.28);
+    ctx.fillStyle = colors.fill;
+    ctx.fill();
+    ctx.strokeStyle = colors.rim;
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+    ctx.fillStyle = colors.accent;
+    ctx.globalAlpha = 0.22;
+    roundRect(-rad * 0.7, -rad * 0.55, rad * 1.4, rad * 0.55, rad * 0.12);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.55, -rad * 0.85);
+    ctx.lineTo(-rad * 0.72, -rad * 1.25);
+    ctx.lineTo(-rad * 0.2, -rad * 0.95);
+    ctx.moveTo(rad * 0.55, -rad * 0.85);
+    ctx.lineTo(rad * 0.72, -rad * 1.25);
+    ctx.lineTo(rad * 0.2, -rad * 0.95);
+    ctx.stroke();
+    drawEnemyEyes(rad * 0.95, colors.ink, true);
+    ctx.strokeStyle = colors.ink;
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.28, rad * 0.28);
+    ctx.lineTo(rad * 0.28, rad * 0.28);
+    ctx.stroke();
+  }
+
+  function drawHopperBody(rad, colors, bob, jumping) {
+    var stretch = jumping ? 1.18 : 1;
+    ctx.translate(0, bob);
+    ctx.scale(1 / Math.sqrt(stretch), stretch);
+    ctx.beginPath();
+    ctx.moveTo(0, -rad * 1.05);
+    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.15, rad * 0.78, rad * 0.7);
+    ctx.quadraticCurveTo(0, rad * 0.95, -rad * 0.78, rad * 0.7);
+    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.15, 0, -rad * 1.05);
+    ctx.closePath();
+    ctx.fillStyle = colors.fill;
+    ctx.fill();
+    ctx.strokeStyle = colors.rim;
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.fillStyle = colors.accent;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.ellipse(0, rad * 0.2, rad * 0.42, rad * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    drawEnemyEyes(rad, colors.ink, true);
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.35, rad * 0.55);
+    ctx.quadraticCurveTo(-rad * 0.85, rad * 1.05, -rad * 0.15, rad * 1.15);
+    ctx.moveTo(rad * 0.35, rad * 0.55);
+    ctx.quadraticCurveTo(rad * 0.85, rad * 1.05, rad * 0.15, rad * 1.15);
+    ctx.stroke();
+  }
+
+  function drawShardBody(rad, colors) {
+    ctx.strokeStyle = colors.rim;
+    ctx.fillStyle = colors.fill;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(0, -rad);
+    ctx.lineTo(rad * 0.7, 0);
+    ctx.lineTo(0, rad);
+    ctx.lineTo(-rad * 0.7, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = colors.accent;
+    inkX(0, 0, rad * 0.45);
+  }
+
+  function drawBossBody(enemy, rad, colors, bob) {
+    ctx.translate(0, bob * 0.35);
+    ctx.beginPath();
+    for (var i = 0; i < 6; i++) {
+      var a = -Math.PI / 2 + i * Math.PI / 3;
+      var px = Math.cos(a) * rad * 1.05;
+      var py = Math.sin(a) * rad * 1.05;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = colors.fill;
+    ctx.fill();
+    ctx.strokeStyle = colors.rim;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = colors.accent;
+    ctx.globalAlpha = 0.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, rad * 0.62, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = colors.ink;
+    ctx.fillStyle = colors.ink;
+    drawBossSymbol(enemy.bossId, rad);
+    ctx.fillStyle = '#f2c14e';
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.55, -rad * 1.05);
+    ctx.lineTo(-rad * 0.28, -rad * 1.42);
+    ctx.lineTo(0, -rad * 1.08);
+    ctx.lineTo(rad * 0.28, -rad * 1.42);
+    ctx.lineTo(rad * 0.55, -rad * 1.05);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+  }
+
   function drawEnemy(enemy) {
     var pos = enemyPos(enemy);
     var x = worldX(pos.x);
     var y = worldY(pos.y);
-    var rad = Math.max(6, enemy.radius * view.tile);
+    var rad = Math.max(7, enemy.radius * view.tile);
     var resist = enemy.resist && RESISTS[enemy.resist] ? RESISTS[enemy.resist] : null;
+    var colors = enemyBodyColors(enemy, resist);
+    var bob = Math.sin(state.time * (enemy.type === 'swift' ? 11 : 7) + enemy.id * 1.7) * rad * 0.08;
+    if (enemy.freeze > 0) bob = 0;
+    var ang = enemyFacing(enemy, pos);
     ctx.save();
-    ctx.lineWidth = enemy.boss ? 3 : (resist ? 3 : 2);
-    ctx.strokeStyle = resist ? resist.color : '#161616';
-    ctx.fillStyle = enemy.hitFlash > 0 ? '#161616' : (resist ? resist.color : (enemy.type === 'hopper' ? '#4ec6e8' : '#fff'));
+    ctx.translate(x, y);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.translate(x, y);
-    if (enemy.type === 'shard') {
-      inkX(0, 0, rad);
-    } else if (enemy.type === 'hopper') {
-      ctx.beginPath();
-      ctx.moveTo(0, -rad);
-      ctx.lineTo(rad * 0.85, rad * 0.55);
-      ctx.lineTo(-rad * 0.85, rad * 0.55);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = '#161616';
-      ctx.beginPath();
-      ctx.moveTo(-rad * 0.2, rad * 0.1);
-      ctx.quadraticCurveTo(0, rad * 1.15, rad * 0.55, rad * 0.35);
-      ctx.stroke();
-    } else if (enemy.type === 'swift') {
-      ctx.beginPath();
-      ctx.arc(0, 0, rad * 0.72, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    } else if (enemy.type === 'brute') {
-      ctx.fillRect(-rad, -rad, rad * 2, rad * 2);
-      ctx.strokeRect(-rad, -rad, rad * 2, rad * 2);
-    } else {
-      ctx.beginPath();
-      ctx.arc(0, 0, rad, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      if (enemy.boss) {
-        ctx.strokeStyle = enemy.hitFlash > 0 ? '#fff' : '#161616';
-        ctx.fillStyle = ctx.strokeStyle;
-        drawBossSymbol(enemy.bossId, rad);
-      }
-    }
+    drawEnemyShadow(rad);
+    ctx.save();
+    if (enemy.type === 'swift' || enemy.type === 'hopper') ctx.rotate(ang);
+    if (enemy.boss) drawBossBody(enemy, rad, colors, bob);
+    else if (enemy.type === 'shard') drawShardBody(rad, colors);
+    else if (enemy.type === 'hopper') drawHopperBody(rad, colors, bob, !!enemy.jumping);
+    else if (enemy.type === 'swift') drawSwiftBody(rad, colors, bob);
+    else if (enemy.type === 'brute') drawBruteBody(rad, colors, bob);
+    else drawGruntBody(rad, colors, bob);
+    ctx.restore();
     ctx.restore();
     if (enemy.bossId === 'ward' && enemy.shield > 0) {
-      ctx.strokeStyle = '#161616';
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#67e8f9';
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(x, y, rad + 6, 0, Math.PI * 2);
+      ctx.arc(x, y, rad + 7, 0, Math.PI * 2);
       ctx.stroke();
     }
     if (enemy.freeze > 0) {
@@ -5875,30 +6239,37 @@ function selectedTower() {
     if (enemy.burnTime > 0) {
       ctx.strokeStyle = '#e02323';
       ctx.lineWidth = 2;
-      inkX(x + rad * 0.85, y - rad * 0.85, Math.max(3, rad * 0.28));
+      inkX(x + rad * 0.9, y - rad * 0.9, Math.max(3, rad * 0.28));
     }
     if (enemy.poisonTime > 0) {
       ctx.fillStyle = '#3cbf4a';
       ctx.beginPath();
-      ctx.arc(x + rad * 0.7, y + rad * 0.15, Math.max(3, rad * 0.22), 0, Math.PI * 2);
+      ctx.arc(x + rad * 0.75, y + rad * 0.2, Math.max(3, rad * 0.22), 0, Math.PI * 2);
       ctx.fill();
     }
     var ratio = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 0;
     if (ratio < 0.995) {
-      var bh = Math.max(2, rad * 0.18);
-      var bw = rad * 1.35;
+      var bh = Math.max(3, rad * 0.2);
+      var bw = rad * 1.5;
       var bx = x - bw / 2;
-      var by = y + rad * 0.42;
+      var by = y + rad + Math.max(4, view.tile * 0.08);
       ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#161616';
+      ctx.lineWidth = 1.5;
       ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = '#161616';
+      ctx.strokeRect(bx, by, bw, bh);
+      ctx.fillStyle = ratio < 0.3 ? '#e02323' : '#161616';
       ctx.fillRect(bx, by, Math.max(0, bw * Math.max(0, ratio)), bh);
     }
     if (enemy.boss) {
       ctx.font = '700 ' + Math.max(10, Math.round(view.tile * 0.22)) + 'px ' + FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(enemy.name, x, y + rad + Math.max(10, view.tile * 0.24));
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#fff';
+      ctx.fillStyle = '#161616';
+      ctx.strokeText(enemy.name, x, y + rad + Math.max(14, view.tile * 0.32));
+      ctx.fillText(enemy.name, x, y + rad + Math.max(14, view.tile * 0.32));
     }
     if (resist) {
       ctx.font = '800 ' + Math.max(10, Math.round(view.tile * 0.2)) + 'px ' + FONT;
@@ -5907,7 +6278,7 @@ function selectedTower() {
       ctx.lineWidth = 3;
       ctx.strokeStyle = '#fff';
       ctx.fillStyle = resist.color;
-      var labelY = y - rad - Math.max(9, view.tile * 0.18);
+      var labelY = y - rad - Math.max(10, view.tile * 0.2);
       ctx.strokeText(resist.name, x, labelY);
       ctx.fillText(resist.name, x, labelY);
     }
@@ -6237,18 +6608,7 @@ function selectedTower() {
     if (menu) {
       for (var i = 0; i < menu.buttons.length; i++) {
         if (pointInRect(point.x, point.y, menu.buttons[i])) {
-          var pick = menu.buttons[i].type;
-          if (pick === 'element') {
-            state.buildMenu = 'element';
-            Sfx.ui();
-            return;
-          }
-          if (pick === 'back') {
-            state.buildMenu = 'root';
-            Sfx.ui();
-            return;
-          }
-          placeChosen(pick);
+          placeChosen(menu.buttons[i].type);
           return;
         }
       }
@@ -6383,13 +6743,10 @@ function selectedTower() {
         event.preventDefault();
         startWave(state.wave + 1);
       } else if (event.key === '1') placeChosen('basic');
-      else if (event.key === '2') {
-        if (state.buildSite) state.buildMenu = 'element';
-      }
-      else if (event.key === '3') placeChosen('poison');
-      else if (event.key === '4') placeChosen('fire');
-      else if (event.key === '5') placeChosen('ice');
-      else if (event.key === '6') placeChosen('bolt');
+      else if (event.key === '2') placeChosen('poison');
+      else if (event.key === '3') placeChosen('fire');
+      else if (event.key === '4') placeChosen('ice');
+      else if (event.key === '5') placeChosen('bolt');
     });
     document.addEventListener('visibilitychange', function () { lastTs = 0; });
     window.addEventListener('resize', resize);
