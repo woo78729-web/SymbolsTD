@@ -189,6 +189,23 @@
     </div>
   </div>
 
+  <div class="hell-wheel" id="hell-wheel" hidden aria-hidden="true">
+    <div class="hell-wheel-card" role="dialog" aria-modal="true" aria-labelledby="hell-wheel-title">
+      <p class="hell-wheel-kicker" id="hell-wheel-kicker">地獄詞綴</p>
+      <h2 id="hell-wheel-title">命運轉盤</h2>
+      <p class="hell-wheel-desc" id="hell-wheel-desc">點轉動，看看這輪會抽到什麼</p>
+      <div class="hell-wheel-stage">
+        <div class="hell-wheel-pointer" aria-hidden="true"></div>
+        <canvas id="hell-wheel-canvas" width="600" height="600"></canvas>
+      </div>
+      <p class="hell-wheel-result" id="hell-wheel-result"></p>
+      <div class="hell-wheel-actions">
+        <button type="button" class="btn btn-mint" id="hell-wheel-spin">轉動</button>
+        <button type="button" class="btn btn-ghost" id="hell-wheel-ok" hidden>確定</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status"></div>
 
   <script src="admob-bridge.js"></script>

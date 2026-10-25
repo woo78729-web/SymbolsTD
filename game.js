@@ -310,7 +310,9 @@
     splashLedger: {},
     hellDeffs: [],
     hellDeffHalf: false,
+    hellDeffWave: 0,
     hellLockCd: 0,
+    hellWheel: null,
     sellArmed: false,
     hover: null,
     mode: 'menu',
@@ -1340,20 +1342,393 @@ function selectedTower() {
     if (!hellModeActive()) {
       state.hellDeffs = [];
       state.hellDeffHalf = false;
+      state.hellDeffWave = 0;
       state.hellLockCd = 0;
       return;
     }
     if (wave <= 9) {
-      if (wave === 1 || !(state.hellDeffs && state.hellDeffs.length)) {
-        state.hellDeffs = pickHellDeffs(1);
-        state.hellDeffHalf = true;
-        state.hellLockCd = 1.2;
-      }
-    } else if (wave % 10 === 0) {
-      state.hellDeffs = pickHellDeffs(2);
+      state.hellDeffHalf = true;
+      if (state.hellDeffs && state.hellDeffs.length && state.hellDeffWave >= 1) return;
+      state.hellDeffs = pickHellDeffs(1);
+      state.hellDeffWave = 1;
+      state.hellLockCd = 1.2;
+      return;
+    }
+    if (wave % 10 === 0) {
       state.hellDeffHalf = false;
+      if (state.hellDeffWave === wave && state.hellDeffs && state.hellDeffs.length) return;
+      state.hellDeffs = pickHellDeffs(2);
+      state.hellDeffWave = wave;
       state.hellLockCd = 1.2;
     }
+  }
+
+  function hellRefreshNeeded(wave) {
+    if (!hellModeActive()) return false;
+    if (wave === 1) return !(state.hellDeffs && state.hellDeffs.length && state.hellDeffWave >= 1);
+    return wave >= 10 && wave % 10 === 0 && state.hellDeffWave !== wave;
+  }
+
+  function requestStartWave(n) {
+    if (hellRefreshNeeded(n)) {
+      openHellWheel({
+        count: n <= 9 ? 1 : 2,
+        half: n <= 9,
+        wave: n,
+        onDone: function (picks) {
+          state.hellDeffs = picks;
+          state.hellDeffHalf = n <= 9;
+          state.hellDeffWave = n <= 9 ? 1 : n;
+          state.hellLockCd = 1.2;
+          startWave(n);
+        },
+      });
+      return;
+    }
+    startWave(n);
+  }
+
+  function hellWheelEls() {
+    return {
+      root: document.getElementById('hell-wheel'),
+      canvas: document.getElementById('hell-wheel-canvas'),
+      kicker: document.getElementById('hell-wheel-kicker'),
+      title: document.getElementById('hell-wheel-title'),
+      desc: document.getElementById('hell-wheel-desc'),
+      result: document.getElementById('hell-wheel-result'),
+      spin: document.getElementById('hell-wheel-spin'),
+      ok: document.getElementById('hell-wheel-ok'),
+    };
+  }
+
+  function hellWheelNoise(i) {
+    var n = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+    return n - Math.floor(n);
+  }
+
+  function drawHellWheelGlyph(ctx2, id, s) {
+    ctx2.save();
+    ctx2.strokeStyle = '#161616';
+    ctx2.fillStyle = '#161616';
+    ctx2.lineWidth = Math.max(2.2, s * 0.16);
+    ctx2.lineCap = 'round';
+    ctx2.lineJoin = 'round';
+    if (id === 'speed') {
+      ctx2.beginPath();
+      ctx2.moveTo(-s * 0.45, -s * 0.35);
+      ctx2.lineTo(s * 0.05, 0);
+      ctx2.lineTo(-s * 0.45, s * 0.35);
+      ctx2.moveTo(-s * 0.05, -s * 0.35);
+      ctx2.lineTo(s * 0.45, 0);
+      ctx2.lineTo(-s * 0.05, s * 0.35);
+      ctx2.stroke();
+    } else if (id === 'lock') {
+      ctx2.strokeRect(-s * 0.35, -s * 0.05, s * 0.7, s * 0.55);
+      ctx2.beginPath();
+      ctx2.arc(0, -s * 0.05, s * 0.28, Math.PI, 0);
+      ctx2.stroke();
+    } else if (id === 'boss') {
+      ctx2.beginPath();
+      ctx2.moveTo(-s * 0.45, s * 0.15);
+      ctx2.lineTo(-s * 0.3, -s * 0.4);
+      ctx2.lineTo(-s * 0.05, s * 0.05);
+      ctx2.lineTo(0, -s * 0.5);
+      ctx2.lineTo(s * 0.05, s * 0.05);
+      ctx2.lineTo(s * 0.3, -s * 0.4);
+      ctx2.lineTo(s * 0.45, s * 0.15);
+      ctx2.closePath();
+      ctx2.stroke();
+    } else if (id === 'split') {
+      ctx2.beginPath();
+      ctx2.arc(-s * 0.28, 0, s * 0.28, 0, Math.PI * 2);
+      ctx2.stroke();
+      ctx2.beginPath();
+      ctx2.arc(s * 0.28, 0, s * 0.28, 0, Math.PI * 2);
+      ctx2.stroke();
+    } else if (id === 'regen') {
+      ctx2.beginPath();
+      ctx2.arc(0, 0, s * 0.38, 0.4, Math.PI * 1.7);
+      ctx2.stroke();
+      ctx2.beginPath();
+      ctx2.moveTo(s * 0.18, -s * 0.42);
+      ctx2.lineTo(s * 0.42, -s * 0.18);
+      ctx2.lineTo(s * 0.08, -s * 0.12);
+      ctx2.closePath();
+      ctx2.fill();
+    } else if (id === 'enrage') {
+      ctx2.beginPath();
+      ctx2.moveTo(0, -s * 0.5);
+      ctx2.lineTo(s * 0.22, -s * 0.05);
+      ctx2.lineTo(s * 0.08, -s * 0.05);
+      ctx2.lineTo(s * 0.32, s * 0.48);
+      ctx2.lineTo(-s * 0.12, s * 0.05);
+      ctx2.lineTo(s * 0.02, s * 0.05);
+      ctx2.closePath();
+      ctx2.stroke();
+    } else {
+      // thick: shield
+      ctx2.beginPath();
+      ctx2.moveTo(0, -s * 0.48);
+      ctx2.lineTo(s * 0.4, -s * 0.2);
+      ctx2.lineTo(s * 0.34, s * 0.2);
+      ctx2.quadraticCurveTo(0, s * 0.55, -s * 0.34, s * 0.2);
+      ctx2.lineTo(-s * 0.4, -s * 0.2);
+      ctx2.closePath();
+      ctx2.stroke();
+    }
+    ctx2.restore();
+  }
+
+  function drawHellWheelFace(angle) {
+    var els = hellWheelEls();
+    var canvas = els.canvas;
+    if (!canvas) return;
+    var ctx2 = canvas.getContext('2d');
+    if (!ctx2) return;
+    var size = canvas.width;
+    var cx = size / 2;
+    var cy = size / 2;
+    var r = size * 0.44;
+    var hub = r * 0.22;
+    var n = HELL_DEFFS.length;
+    var slice = (Math.PI * 2) / n;
+    var scale = size / 300;
+    ctx2.clearRect(0, 0, size, size);
+    ctx2.save();
+    ctx2.translate(cx, cy);
+    ctx2.rotate(angle || 0);
+    ctx2.lineCap = 'round';
+    ctx2.lineJoin = 'round';
+
+    function inkStroke2(lw) {
+      ctx2.save();
+      ctx2.globalAlpha = 0.18;
+      ctx2.lineWidth = lw * 1.45;
+      ctx2.stroke();
+      ctx2.restore();
+      ctx2.lineWidth = lw;
+      ctx2.stroke();
+    }
+
+    function rimPath(rr, wobAmp, seed) {
+      var steps = 48;
+      ctx2.beginPath();
+      for (var s = 0; s <= steps; s++) {
+        var a = (s / steps) * Math.PI * 2 - Math.PI / 2;
+        var wob = 1 + (hellWheelNoise(seed + s) - 0.5) * wobAmp;
+        var x = Math.cos(a) * rr * wob;
+        var y = Math.sin(a) * rr * wob;
+        if (s === 0) ctx2.moveTo(x, y);
+        else ctx2.lineTo(x, y);
+      }
+      ctx2.closePath();
+    }
+
+    // soft outer shadow ring
+    rimPath(r * 1.04, 0.018, 11);
+    ctx2.fillStyle = 'rgba(22,22,22,0.06)';
+    ctx2.fill();
+
+    // pie fills (clean arcs, readable)
+    for (var i = 0; i < n; i++) {
+      var a0 = -Math.PI / 2 + i * slice;
+      var a1 = a0 + slice;
+      ctx2.beginPath();
+      ctx2.moveTo(0, 0);
+      ctx2.arc(0, 0, r, a0, a1);
+      ctx2.closePath();
+      ctx2.fillStyle = i % 2 ? '#ffffff' : '#f0f0f0';
+      ctx2.fill();
+    }
+
+    // outer ink rim
+    rimPath(r, 0.022, 40);
+    ctx2.strokeStyle = '#161616';
+    inkStroke2(3.6 * scale);
+
+    // spokes
+    for (var sp = 0; sp < n; sp++) {
+      var sa = -Math.PI / 2 + sp * slice;
+      var j = (hellWheelNoise(sp + 70) - 0.5) * 0.018;
+      ctx2.beginPath();
+      ctx2.moveTo(Math.cos(sa) * hub * 0.85, Math.sin(sa) * hub * 0.85);
+      ctx2.lineTo(Math.cos(sa + j) * r * 0.98, Math.sin(sa + j) * r * 0.98);
+      ctx2.strokeStyle = '#161616';
+      inkStroke2(2.4 * scale);
+    }
+
+    // glyphs + labels (radial, flip left side so readable)
+    for (var k = 0; k < n; k++) {
+      var mid = -Math.PI / 2 + k * slice + slice / 2;
+      var flip = Math.cos(mid) < -0.08;
+      ctx2.save();
+      ctx2.rotate(mid);
+      if (flip) ctx2.rotate(Math.PI);
+      var dir = flip ? -1 : 1;
+      ctx2.translate(dir * r * 0.46, 0);
+      drawHellWheelGlyph(ctx2, HELL_DEFFS[k].id, 14 * scale);
+      ctx2.translate(dir * r * 0.2, 0);
+      ctx2.font = '800 ' + Math.round(15 * scale) + 'px ' + FONT;
+      ctx2.textAlign = 'center';
+      ctx2.textBaseline = 'middle';
+      ctx2.lineWidth = 3.5 * scale;
+      ctx2.strokeStyle = 'rgba(255,255,255,0.92)';
+      ctx2.fillStyle = '#161616';
+      ctx2.strokeText(HELL_DEFFS[k].name, 0, 0);
+      ctx2.fillText(HELL_DEFFS[k].name, 0, 0);
+      ctx2.restore();
+    }
+
+    // center hub
+    rimPath(hub, 0.03, 200);
+    ctx2.fillStyle = '#fff';
+    ctx2.fill();
+    ctx2.strokeStyle = '#161616';
+    inkStroke2(3.2 * scale);
+    rimPath(hub * 0.55, 0.04, 230);
+    ctx2.strokeStyle = '#c62828';
+    inkStroke2(2.2 * scale);
+    ctx2.fillStyle = '#c62828';
+    ctx2.font = '800 ' + Math.round(18 * scale) + 'px ' + FONT;
+    ctx2.textAlign = 'center';
+    ctx2.textBaseline = 'middle';
+    ctx2.fillText('獄', 0, 1 * scale);
+    ctx2.restore();
+  }
+
+  function hellWheelIndexAtPointer(angle) {
+    var n = HELL_DEFFS.length;
+    var slice = (Math.PI * 2) / n;
+    // pointer at top (-PI/2). segment i starts at -PI/2 + i*slice in wheel local space before rotation.
+    // After rotating by `angle`, local angle under pointer is (-PI/2 - angle).
+    var local = (-Math.PI / 2 - angle) % (Math.PI * 2);
+    if (local < 0) local += Math.PI * 2;
+    // map so 0 is first segment start
+    var fromStart = (local + Math.PI / 2) % (Math.PI * 2);
+    return Math.floor(fromStart / slice) % n;
+  }
+
+  function openHellWheel(opts) {
+    opts = opts || {};
+    var els = hellWheelEls();
+    if (!els.root) {
+      var fallback = pickHellDeffs(opts.count || 1);
+      if (opts.onDone) opts.onDone(fallback);
+      return;
+    }
+    state.paused = true;
+    state.hellWheel = {
+      count: opts.count || 1,
+      half: !!opts.half,
+      wave: opts.wave || 0,
+      onDone: opts.onDone || null,
+      picks: [],
+      spinning: false,
+      angle: 0,
+      anim: null,
+    };
+    els.kicker.textContent = opts.half ? '地獄詞綴 · 半效' : '地獄詞綴 · 全效';
+    els.title.textContent = opts.count > 1 ? '雙重命運' : '命運轉盤';
+    els.desc.textContent = opts.wave
+      ? ('第 ' + opts.wave + ' 波 · 點轉動抽出 ' + opts.count + ' 則詞綴')
+      : ('點轉動抽出 ' + opts.count + ' 則詞綴');
+    els.result.textContent = '';
+    els.spin.hidden = false;
+    els.spin.disabled = false;
+    els.spin.textContent = '轉動';
+    els.ok.hidden = true;
+    els.root.hidden = false;
+    els.root.classList.add('is-open');
+    els.root.setAttribute('aria-hidden', 'false');
+    drawHellWheelFace(0);
+    Sfx.ui();
+  }
+
+  function closeHellWheel() {
+    var els = hellWheelEls();
+    if (els.root) {
+      els.root.classList.remove('is-open');
+      els.root.hidden = true;
+      els.root.setAttribute('aria-hidden', 'true');
+    }
+    if (state.hellWheel && state.hellWheel.anim) {
+      cancelAnimationFrame(state.hellWheel.anim);
+      state.hellWheel.anim = null;
+    }
+    var done = state.hellWheel && state.hellWheel.onDone;
+    var picks = (state.hellWheel && state.hellWheel.picks) ? state.hellWheel.picks.slice() : [];
+    state.hellWheel = null;
+    if (state.phase === 'prep') state.paused = false;
+    if (done) done(picks);
+  }
+
+  function spinHellWheelOnce() {
+    var wheel = state.hellWheel;
+    var els = hellWheelEls();
+    if (!wheel || wheel.spinning || !els.canvas) return;
+    wheel.spinning = true;
+    els.spin.disabled = true;
+    els.result.textContent = '轉動中…';
+    var targetIdx = Math.floor(Math.random() * HELL_DEFFS.length);
+    // avoid duplicate when picking second
+    if (wheel.picks.length) {
+      var guard = 0;
+      while (guard < 12 && wheel.picks.some(function (p) { return p.id === HELL_DEFFS[targetIdx].id; })) {
+        targetIdx = Math.floor(Math.random() * HELL_DEFFS.length);
+        guard += 1;
+      }
+    }
+    var n = HELL_DEFFS.length;
+    var slice = (Math.PI * 2) / n;
+    // Want pointer on center of segment targetIdx after spin
+    var centerLocal = -Math.PI / 2 + targetIdx * slice + slice / 2;
+    // angle such that local under pointer equals centerLocal: -PI/2 - angle = centerLocal  => angle = -PI/2 - centerLocal
+    var finalAngle = -Math.PI / 2 - centerLocal;
+    var turns = 4 + Math.floor(Math.random() * 3);
+    var start = wheel.angle || 0;
+    // normalize so we always spin forward many turns
+    while (finalAngle <= start) finalAngle += Math.PI * 2;
+    finalAngle += turns * Math.PI * 2;
+    var t0 = performance.now();
+    var dur = 2200 + Math.random() * 600;
+    function easeOut(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+    function frame(now) {
+      if (!state.hellWheel) return;
+      var u = Math.min(1, (now - t0) / dur);
+      var a = start + (finalAngle - start) * easeOut(u);
+      state.hellWheel.angle = a;
+      drawHellWheelFace(a);
+      if (u < 1) {
+        state.hellWheel.anim = requestAnimationFrame(frame);
+        return;
+      }
+      state.hellWheel.anim = null;
+      state.hellWheel.spinning = false;
+      state.hellWheel.angle = finalAngle;
+      var landed = HELL_DEFFS[targetIdx];
+      var pick = { id: landed.id, name: landed.name, blurb: landed.blurb };
+      state.hellWheel.picks.push(pick);
+      var label = pick.name + (state.hellWheel.half ? '（半效）' : '');
+      var remain = state.hellWheel.count - state.hellWheel.picks.length;
+      if (remain > 0) {
+        els.result.textContent = '抽中：' + label + ' · 再轉一次（剩 ' + remain + '）';
+        els.spin.disabled = false;
+        els.spin.textContent = '再轉一次';
+        Sfx.unlock();
+      } else {
+        var names = state.hellWheel.picks.map(function (p) {
+          return p.name + (state.hellWheel.half ? '（半效）' : '');
+        }).join(' · ');
+        els.result.textContent = '本輪詞綴：' + names;
+        els.spin.hidden = true;
+        els.ok.hidden = false;
+        Sfx.fanfare();
+      }
+    }
+    state.hellWheel.anim = requestAnimationFrame(frame);
+    Sfx.ui();
   }
 
   function applyHellBossDeff(plan) {
@@ -1753,7 +2128,7 @@ function selectedTower() {
       state.interestLeft -= 1;
       toast('利息 +30');
     }
-    var refreshed = hellModeActive() && (n === 1 || n % 10 === 0 || (n <= 9 && !(state.hellDeffs && state.hellDeffs.length)));
+    var refreshed = hellModeActive() && (n === 1 || n % 10 === 0);
     syncHellDeffs(n);
     var plan = applyHellBossDeff(planWave(n));
     state.wave = n;
@@ -2098,6 +2473,7 @@ function selectedTower() {
     }
     if (!best) return;
     best.chill = Math.max(best.chill || 0, 1.6);
+    best.devilFork = Math.max(best.devilFork || 0, 1.6);
     spawnFloater(best.c + 0.5, best.r + 0.5 - 0.5, '惡咒', '#c62828');
   }
 
@@ -2631,7 +3007,7 @@ function selectedTower() {
     state.banner = null;
     syncHud();
     if (state.mode === 'custom' && cleared % 10 === 0) enterEdit();
-    else startWave(cleared + 1);
+    else requestStartWave(cleared + 1);
   }
 
   function applyLevelCard(tower) {
@@ -3441,8 +3817,8 @@ function selectedTower() {
     var sub = kind === 'victory'
       ? (nextStage(state.stagePlan) && stageUnlocked(nextStage(state.stagePlan)) ? '5 秒後下一關' : '5 秒後返回關卡')
       : (cardWaveDue(state.wave)
-        ? '5 秒後隨機獎勵'
-        : (state.mode === 'custom' && state.wave % 10 === 0 ? '5 秒後改道' : '5 秒後下一波'));
+        ? '5 秒後隨機獎勵（可點提前）'
+        : (state.mode === 'custom' && state.wave % 10 === 0 ? '5 秒後改道（可點提前）' : '5 秒後下一波（可點提前）'));
     state.banner = { text: title, sub: sub, life: 5.2, countdown: true };
   }
 
@@ -3454,11 +3830,12 @@ function selectedTower() {
       state.banner.life = Math.max(state.banner.life, state.clearCountdown + 0.05);
       if (state.clearKind === 'victory') {
         var upcoming = nextStage(state.stagePlan);
-        state.banner.sub = (upcoming && stageUnlocked(upcoming) ? '下一關 ' : '返回關卡 ') + left;
-      } else if (cardWaveDue(state.wave)) state.banner.sub = '隨機獎勵 ' + left;
-      else if (state.mode === 'custom' && state.wave % 10 === 0) state.banner.sub = '改道 ' + left;
-      else state.banner.sub = '下一波 ' + left;
+        state.banner.sub = (upcoming && stageUnlocked(upcoming) ? '下一關 ' : '返回關卡 ') + left + '（可點提前）';
+      } else if (cardWaveDue(state.wave)) state.banner.sub = '隨機獎勵 ' + left + '（可點提前）';
+      else if (state.mode === 'custom' && state.wave % 10 === 0) state.banner.sub = '改道 ' + left + '（可點提前）';
+      else state.banner.sub = '下一波 ' + left + '（可點提前）';
     }
+    syncHud();
     if (state.clearCountdown > 0) return;
     state.clearCountdown = 0;
     state.banner = null;
@@ -3552,6 +3929,10 @@ function selectedTower() {
       if (state.towers[t].swing) state.towers[t].swing = Math.max(0, state.towers[t].swing - dt * 3.4);
       if (state.towers[t].auraTime) state.towers[t].auraTime = Math.max(0, state.towers[t].auraTime - dt);
       if (state.towers[t].chill) state.towers[t].chill = Math.max(0, state.towers[t].chill - dt);
+      if (state.towers[t].devilFork) {
+        state.towers[t].devilFork = Math.max(0, state.towers[t].devilFork - dt);
+        if (state.towers[t].devilFork <= 0) state.towers[t].devilFork = 0;
+      }
     }
     for (var e = 0; e < state.enemies.length; e++) {
       state.enemies[e].hitFlash = Math.max(0, state.enemies[e].hitFlash - dt);
@@ -3691,7 +4072,7 @@ function selectedTower() {
     if (cardWaveDue(cleared)) {
       openCardDraft(cleared);
     } else if (state.mode === 'custom' && cleared % 10 === 0) enterEdit();
-    else startWave(cleared + 1);
+    else requestStartWave(cleared + 1);
   }
 
   function openGiftTowerOffer(cleared) {
@@ -3892,7 +4273,19 @@ function selectedTower() {
 
   function finishEdit() {
     state.editTool = null;
-    startWave(state.wave + 1);
+    requestStartWave(state.wave + 1);
+  }
+
+  function skipClearCountdown() {
+    if (!(state.clearCountdown > 0)) return;
+    if (state.pickMode === 'level' || state.pickMode === 'heroPlace') {
+      toast('先完成卡牌選擇');
+      return;
+    }
+    state.clearCountdown = 0;
+    state.banner = null;
+    if (state.clearKind === 'victory') finishVictoryAdvance();
+    else goNextWave();
   }
 
   function routeEditTap(cell) {
@@ -4370,7 +4763,7 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '快怪', paint: { kind: 'enemy', type: 'swift', color: '#f0a202' },
-        desc: '手繪蝙蝠，擅長衝線。',
+        desc: '蝙蝠俠標誌風蝙蝠，翅膀會扇動，擅長衝線。',
         stats: [
           '<strong>血量</strong>：普通怪 ×0.62',
           '<strong>移速</strong>：普通怪 ×1.55（較快）',
@@ -4401,7 +4794,7 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '小惡魔', paint: { kind: 'enemy', type: 'devil', color: '#c62828' },
-        desc: '塗鴉風圓臉小惡魔。近塔會惡咒鎖塔，漏關還會偷金幣。',
+        desc: '塗鴉風小惡魔（翅膀＋紅叉）。惡咒鎖塔時會把紅叉插在塔旁。漏關還會偷金幣。',
         stats: [
           '<strong>血量</strong>：普通怪 ×0.95',
           '<strong>移速</strong>：略快於普通怪',
@@ -4849,6 +5242,11 @@ function selectedTower() {
     state.clearCountdown = 0;
     state.clearKind = '';
     state.lastPathSig = '';
+    state.hellDeffs = [];
+    state.hellDeffHalf = false;
+    state.hellDeffWave = 0;
+    state.hellLockCd = 0;
+    state.hellWheel = null;
     clearRunExtras();
     if (mode === 'campaign') setRoute(chain(level.path));
     else if (mode === 'custom') setRoute(straightColumn(4));
@@ -4859,6 +5257,21 @@ function selectedTower() {
     syncHud();
     syncRouteBar();
     requestAnimationFrame(resize);
+    if (hellModeActive()) {
+      openHellWheel({
+        count: 1,
+        half: true,
+        wave: 1,
+        onDone: function (picks) {
+          state.hellDeffs = picks;
+          state.hellDeffHalf = true;
+          state.hellDeffWave = 1;
+          state.hellLockCd = 1.2;
+          toast('地獄詞綴 · ' + hellDeffLabel());
+          syncHud();
+        },
+      });
+    }
   }
 
   function resetGame() {
@@ -5208,11 +5621,14 @@ function selectedTower() {
       waveBtn.disabled = false;
       waveBtnLabel.textContent = '完成改道';
       waveBtnSub.textContent = '接著第 ' + (state.wave + 1) + ' 波';
+    } else if (state.clearCountdown > 0 && (state.phase === 'reward' || state.phase === 'victory')) {
+      waveBtn.disabled = false;
+      waveBtnLabel.textContent = '提前開始';
+      waveBtnSub.textContent = Math.ceil(state.clearCountdown) + ' 秒（點我跳過）';
     } else {
       waveBtn.disabled = true;
       waveBtnLabel.textContent = state.phase === 'gameover' ? '防線崩潰' : (state.phase === 'victory' ? '關卡通過' : '下一波');
-      if (state.clearCountdown > 0) waveBtnSub.textContent = Math.ceil(state.clearCountdown) + ' 秒後繼續';
-      else waveBtnSub.textContent = state.phase === 'gameover' ? '本局結束' : '準備中';
+      waveBtnSub.textContent = state.phase === 'gameover' ? '本局結束' : '準備中';
     }
     if (state.pickMode === 'level' || state.pickMode === 'heroPlace') {
       waveBtn.disabled = true;
@@ -6671,6 +7087,48 @@ function selectedTower() {
       ctx.stroke();
       ctx.setLineDash([]);
     }
+    if (tower.devilFork > 0) {
+      ctx.save();
+      ctx.translate(x + tile * 0.38, y - tile * 0.08);
+      ctx.rotate(0.55);
+      drawRedPitchfork(tile * 0.28);
+      ctx.restore();
+    }
+  }
+
+  function drawRedPitchfork(s) {
+    ctx.save();
+    ctx.strokeStyle = '#c62828';
+    ctx.fillStyle = '#c62828';
+    ctx.lineWidth = Math.max(2, s * 0.22);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // shaft
+    ctx.beginPath();
+    ctx.moveTo(0, s * 0.95);
+    ctx.lineTo(0, -s * 0.15);
+    ctx.stroke();
+    // three triangular prongs
+    var tips = [-s * 0.42, 0, s * 0.42];
+    for (var i = 0; i < tips.length; i++) {
+      ctx.beginPath();
+      ctx.moveTo(tips[i] * 0.35, -s * 0.05);
+      ctx.lineTo(tips[i], -s * 0.95);
+      ctx.lineTo(tips[i] * 0.55 + (i === 1 ? 0 : tips[i] * 0.15), -s * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#161616';
+      ctx.lineWidth = Math.max(1.2, s * 0.1);
+      ctx.stroke();
+      ctx.strokeStyle = '#c62828';
+      ctx.lineWidth = Math.max(2, s * 0.22);
+    }
+    // crossbar
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.38, -s * 0.08);
+    ctx.lineTo(s * 0.38, -s * 0.08);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function roundRect(x, y, w, h, r) {
@@ -6771,54 +7229,68 @@ function selectedTower() {
   }
 
   function drawSwiftBody(rad, colors, bob) {
-    // bat: body + ear tips + wing arcs
+    // batman-logo bat: scalloped wings + pointed ears, wings flap
     inkSeed = Math.round(rad * 37 + 22);
     ctx.translate(0, bob * 0.5);
-    inkSetup(Math.max(2.1, rad * 0.16));
+    inkSetup(Math.max(2.1, rad * 0.15));
     ctx.fillStyle = colors.fill;
     ctx.strokeStyle = colors.rim;
-    // left wing
+    var flap = Math.sin((state.time || 0) * 16 + rad) * 0.38;
+    // left wing (flaps)
+    ctx.save();
+    ctx.translate(-rad * 0.08, 0);
+    ctx.rotate(-0.12 - flap);
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.15, -rad * 0.1);
-    ctx.quadraticCurveTo(-rad * 0.85, -rad * 0.85, -rad * 1.35, -rad * 0.15);
-    ctx.quadraticCurveTo(-rad * 0.95, rad * 0.05, -rad * 1.2, rad * 0.45);
-    ctx.quadraticCurveTo(-rad * 0.55, rad * 0.1, -rad * 0.15, rad * 0.2);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-rad * 0.55, -rad * 0.35);
+    ctx.lineTo(-rad * 1.05, -rad * 0.15);
+    ctx.lineTo(-rad * 1.45, rad * 0.08);
+    ctx.lineTo(-rad * 1.15, rad * 0.22);
+    ctx.quadraticCurveTo(-rad * 0.95, rad * 0.55, -rad * 0.7, rad * 0.2);
+    ctx.quadraticCurveTo(-rad * 0.5, rad * 0.52, -rad * 0.28, rad * 0.18);
+    ctx.quadraticCurveTo(-rad * 0.12, rad * 0.4, 0, rad * 0.08);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    // right wing
+    ctx.restore();
+    // right wing (flaps)
+    ctx.save();
+    ctx.translate(rad * 0.08, 0);
+    ctx.rotate(0.12 + flap);
     ctx.beginPath();
-    ctx.moveTo(rad * 0.15, -rad * 0.1);
-    ctx.quadraticCurveTo(rad * 0.85, -rad * 0.85, rad * 1.35, -rad * 0.15);
-    ctx.quadraticCurveTo(rad * 0.95, rad * 0.05, rad * 1.2, rad * 0.45);
-    ctx.quadraticCurveTo(rad * 0.55, rad * 0.1, rad * 0.15, rad * 0.2);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(rad * 0.55, -rad * 0.35);
+    ctx.lineTo(rad * 1.05, -rad * 0.15);
+    ctx.lineTo(rad * 1.45, rad * 0.08);
+    ctx.lineTo(rad * 1.15, rad * 0.22);
+    ctx.quadraticCurveTo(rad * 0.95, rad * 0.55, rad * 0.7, rad * 0.2);
+    ctx.quadraticCurveTo(rad * 0.5, rad * 0.52, rad * 0.28, rad * 0.18);
+    ctx.quadraticCurveTo(rad * 0.12, rad * 0.4, 0, rad * 0.08);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    // body
-    inkCircle(0, rad * 0.08, rad * 0.55, 14);
-    ctx.fill();
-    inkStroke();
-    // ears
+    ctx.restore();
+    // center emblem body
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.28, -rad * 0.35);
-    ctx.lineTo(-rad * 0.38, -rad * 0.85);
-    ctx.lineTo(-rad * 0.05, -rad * 0.48);
+    ctx.moveTo(0, rad * 0.55);
+    ctx.lineTo(-rad * 0.22, rad * 0.15);
+    ctx.lineTo(-rad * 0.18, -rad * 0.15);
+    ctx.lineTo(-rad * 0.32, -rad * 0.55);
+    ctx.lineTo(-rad * 0.08, -rad * 0.28);
+    ctx.lineTo(0, -rad * 0.72);
+    ctx.lineTo(rad * 0.08, -rad * 0.28);
+    ctx.lineTo(rad * 0.32, -rad * 0.55);
+    ctx.lineTo(rad * 0.18, -rad * 0.15);
+    ctx.lineTo(rad * 0.22, rad * 0.15);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    ctx.beginPath();
-    ctx.moveTo(rad * 0.28, -rad * 0.35);
-    ctx.lineTo(rad * 0.38, -rad * 0.85);
-    ctx.lineTo(rad * 0.05, -rad * 0.48);
-    ctx.closePath();
+    // eye dots
+    ctx.fillStyle = colors.ink;
+    inkCircle(-rad * 0.1, -rad * 0.08, Math.max(1.4, rad * 0.08), 6);
     ctx.fill();
-    inkStroke();
-    drawEnemyEyes(rad * 0.7, colors.ink, { size: 0.16, gap: 0.28, y: -0.02 });
-    ctx.strokeStyle = colors.accent;
-    ctx.lineWidth = Math.max(1.4, rad * 0.1);
-    inkLine(-rad * 0.12, rad * 0.28, rad * 0.12, rad * 0.28, 2);
-    inkStroke();
+    inkCircle(rad * 0.1, -rad * 0.08, Math.max(1.4, rad * 0.08), 6);
+    ctx.fill();
   }
 
   function drawBruteBody(rad, colors, bob) {
@@ -6914,13 +7386,28 @@ function selectedTower() {
   }
 
   function drawDevilBody(rad, colors, bob) {
-    // doodle imp: round face + sharp triangle horns (match welcome bg)
+    // doodle imp: wings + round face + horns + red pitchfork
     inkSeed = Math.round(rad * 41 + 9);
     ctx.translate(0, bob);
     inkSetup(Math.max(2.2, rad * 0.17));
     ctx.fillStyle = colors.fill;
     ctx.strokeStyle = colors.rim;
-    // sharp horns (filled triangles, slight outward tilt)
+    // small doodle wings
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.55, rad * 0.05);
+    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.42, -rad * 1.2, rad * 0.12);
+    ctx.quadraticCurveTo(-rad * 0.85, rad * 0.08, -rad * 0.55, rad * 0.32);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.55, rad * 0.05);
+    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.42, rad * 1.2, rad * 0.12);
+    ctx.quadraticCurveTo(rad * 0.85, rad * 0.08, rad * 0.55, rad * 0.32);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    // sharp horns
     ctx.beginPath();
     ctx.moveTo(-rad * 0.42, -rad * 0.55);
     ctx.lineTo(-rad * 0.58, -rad * 1.12);
@@ -6936,26 +7423,30 @@ function selectedTower() {
     ctx.fill();
     inkStroke();
     // round head
-    inkCircle(0, rad * 0.06, rad * 0.82, 16);
+    inkCircle(0, rad * 0.06, rad * 0.78, 16);
     ctx.fill();
     inkStroke();
-    // dot eyes
+    // dot eyes + angry brows + grin
     ctx.fillStyle = colors.ink;
-    inkCircle(-rad * 0.28, -rad * 0.06, Math.max(1.8, rad * 0.12), 8);
+    inkCircle(-rad * 0.26, -rad * 0.06, Math.max(1.8, rad * 0.11), 8);
     ctx.fill();
-    inkCircle(rad * 0.28, -rad * 0.06, Math.max(1.8, rad * 0.12), 8);
+    inkCircle(rad * 0.26, -rad * 0.06, Math.max(1.8, rad * 0.11), 8);
     ctx.fill();
-    // angry brows (bg style)
     ctx.strokeStyle = colors.ink;
     ctx.lineWidth = Math.max(1.8, rad * 0.12);
-    inkLine(-rad * 0.48, -rad * 0.28, -rad * 0.12, -rad * 0.18, 2);
+    inkLine(-rad * 0.46, -rad * 0.28, -rad * 0.12, -rad * 0.18, 2);
     inkStroke();
-    inkLine(rad * 0.48, -rad * 0.28, rad * 0.12, -rad * 0.18, 2);
+    inkLine(rad * 0.46, -rad * 0.28, rad * 0.12, -rad * 0.18, 2);
     inkStroke();
-    // mischievous grin
     ctx.beginPath();
-    ctx.arc(0, rad * 0.22, rad * 0.32, 0.15, Math.PI - 0.15);
+    ctx.arc(0, rad * 0.22, rad * 0.3, 0.15, Math.PI - 0.15);
     inkStroke();
+    // held red pitchfork (side)
+    ctx.save();
+    ctx.translate(rad * 0.85, rad * 0.15);
+    ctx.rotate(0.35);
+    drawRedPitchfork(rad * 0.7);
+    ctx.restore();
   }
 
   function drawShardBody(rad, colors) {
@@ -7752,13 +8243,22 @@ function selectedTower() {
 
     waveBtn.addEventListener('click', function () {
       if (state.adBusy) return;
+      if (state.hellWheel) return;
       if (state.pickMode === 'level' || state.pickMode === 'heroPlace') {
         toast('先完成卡牌選擇');
         return;
       }
-      if (state.phase === 'prep') startWave(state.wave + 1);
+      if (state.clearCountdown > 0 && (state.phase === 'reward' || state.phase === 'victory')) {
+        skipClearCountdown();
+        return;
+      }
+      if (state.phase === 'prep') requestStartWave(state.wave + 1);
       else if (state.phase === 'edit') finishEdit();
     });
+    var hellSpinBtn = document.getElementById('hell-wheel-spin');
+    var hellOkBtn = document.getElementById('hell-wheel-ok');
+    if (hellSpinBtn) hellSpinBtn.addEventListener('click', spinHellWheelOnce);
+    if (hellOkBtn) hellOkBtn.addEventListener('click', closeHellWheel);
     itemWallBtn.addEventListener('click', function () {
       if (state.items.wall <= 0) return;
       if (state.pickMode === 'level' || state.pickMode === 'heroPlace') {
@@ -7830,9 +8330,9 @@ function selectedTower() {
         return;
       }
       if (event.target.closest && event.target.closest('button')) return;
-      if ((event.key === ' ' || event.key === 'Enter') && state.phase === 'prep' && !state.pickMode && !state.adBusy && screenMenu.hidden && screenChapters.hidden && screenStages.hidden && screenDifficulty.hidden) {
+      if ((event.key === ' ' || event.key === 'Enter') && state.phase === 'prep' && !state.pickMode && !state.adBusy && !state.hellWheel && screenMenu.hidden && screenChapters.hidden && screenStages.hidden && screenDifficulty.hidden) {
         event.preventDefault();
-        startWave(state.wave + 1);
+        requestStartWave(state.wave + 1);
       } else if (event.key === '1') placeChosen('basic');
       else if (event.key === '2') placeChosen('poison');
       else if (event.key === '3') placeChosen('fire');
