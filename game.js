@@ -1440,6 +1440,13 @@ function selectedTower() {
       hoppers = Math.min(diff.id === 'hell' ? 3 : 2, hoppers);
       for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: Math.max(1.35, gap * 2.2) });
     }
+    var devils = 0;
+    if (wave >= 8) {
+      devils = 1 + Math.floor((wave - 8) / 10);
+      if (diff.id === 'hell' && wave >= 14) devils += 1;
+      devils = Math.min(diff.id === 'hell' ? 3 : 2, devils);
+      for (var d = 0; d < devils; d++) jobs.push({ type: 'devil', gap: Math.max(1.2, gap * 1.8) });
+    }
     var brutes = 0;
     var boss = bossForWave(wave);
     if (boss) {
@@ -1456,7 +1463,7 @@ function selectedTower() {
       for (var b = 0; b < pack; b++) jobs.push({ type: 'brute', gap: 1.05 });
       brutes += pack;
     }
-    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, boss: boss };
+    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, boss: boss };
   }
 
   function planWave(wave) {
@@ -1481,6 +1488,11 @@ function selectedTower() {
       hoppers = Math.min(2, 1 + Math.floor((wave - 6) / 10));
       for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: Math.max(1.4, gap * 2.1) });
     }
+    var devils = 0;
+    if (wave >= 8) {
+      devils = Math.min(2, 1 + Math.floor((wave - 8) / 11));
+      for (var d = 0; d < devils; d++) jobs.push({ type: 'devil', gap: Math.max(1.25, gap * 1.85) });
+    }
     var brutes = 0;
     var boss = bossForWave(wave);
     if (boss) {
@@ -1489,14 +1501,15 @@ function selectedTower() {
       jobs.push({ type: 'brute', gap: 1.15 });
       brutes = 1;
     }
-    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, boss: boss };
+    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, boss: boss };
   }
 
   function compositionText(plan) {
     if (state.mode !== 'campaign') {
-      var count = plan.grunts + plan.swifts + plan.brutes + (plan.hoppers || 0);
+      var count = plan.grunts + plan.swifts + plan.brutes + (plan.hoppers || 0) + (plan.devils || 0);
       var text = '隨機小怪 ' + count;
       if (plan.hoppers) text += ' · 跳躍 ' + plan.hoppers;
+      if (plan.devils) text += ' · 惡魔 ' + plan.devils;
       if (plan.brutes) text += ' · 精英 ' + plan.brutes;
       if (plan.boss) text += ' · ' + plan.boss.name;
       return text;
@@ -1569,14 +1582,17 @@ function selectedTower() {
       grunt: { hp: gruntHp, speed: gruntSpeed, gold: Math.max(2, softWaveGold), radius: 0.3, color: '#e25b4a', leak: 1 },
       swift: { hp: Math.round(gruntHp * 0.62), speed: Math.min(diff ? speedCap + 0.45 : 2.1, gruntSpeed * 1.55), gold: Math.max(2, softWaveGold - 1), radius: 0.23, color: '#f0a202', leak: 1 },
       hopper: { hp: Math.round(gruntHp * 0.8), speed: Math.min((diff ? speedCap : 1.7) + 0.15, gruntSpeed * 1.25), gold: Math.max(3, softWaveGold + 1), radius: 0.26, color: '#4ec6e8', leak: 1 },
+      devil: { hp: Math.round(gruntHp * 0.95), speed: Math.min((diff ? speedCap : 1.7) + 0.2, gruntSpeed * 1.2), gold: Math.max(4, softWaveGold + 2), radius: 0.28, color: '#c62828', leak: 1 },
       brute: { hp: Math.round(gruntHp * 7.5), speed: gruntSpeed * 0.52, gold: 8 + softWaveGold * 2, radius: 0.44, color: '#8d6bff', leak: 3 },
     };
     var spec = table[type] || table.grunt;
     if (goldMul !== 1) spec.gold = Math.max(2, Math.round(spec.gold * goldMul));
     var kind = type === 'hopper'
       ? { id: 'hopper', name: '跳躍怪', color: '#4ec6e8' }
-      : pickMinion(type === 'swift' ? 'swift' : 'grunt');
-    var resist = type === 'hopper' ? '' : rollResist(wave);
+      : (type === 'devil'
+        ? { id: 'devil', name: '小惡魔', color: '#c62828' }
+        : pickMinion(type === 'swift' ? 'swift' : 'grunt'));
+    var resist = (type === 'hopper' || type === 'devil') ? '' : rollResist(wave);
     return {
       id: state.nextId++,
       type: type,
@@ -1596,6 +1612,7 @@ function selectedTower() {
       lastNum: 0,
       jumpCd: type === 'hopper' ? 2.8 : 0,
       jumping: null,
+      hexCd: type === 'devil' ? 1.6 + Math.random() * 0.8 : 0,
     };
   }
 
@@ -1702,6 +1719,28 @@ function selectedTower() {
     while (state.particles.length > 180) state.particles.shift();
   }
 
+  function shatterShieldFx(x, y) {
+    for (var i = 0; i < 12; i++) {
+      var angle = (Math.PI * 2 * i) / 12 + Math.random() * 0.25;
+      var speed = 1.1 + Math.random() * 2.2;
+      var life = 0.32 + Math.random() * 0.28;
+      state.particles.push({
+        x: x, y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.4,
+        life: life,
+        max: life,
+        color: i % 2 ? '#67e8f9' : '#ffffff',
+        size: 0.1 + Math.random() * 0.12,
+        shard: true,
+        spin: (Math.random() - 0.5) * 10,
+        ang: angle,
+      });
+    }
+    burst(x, y, '#67e8f9', 8);
+    while (state.particles.length > 180) state.particles.shift();
+  }
+
   function spawnFloater(x, y, text, color) {
     state.floaters.push({ x: x, y: y, text: text, color: color, life: 0.75, vy: -0.85 });
     if (state.floaters.length > 36) state.floaters.shift();
@@ -1784,6 +1823,7 @@ function selectedTower() {
         enemy.dist += step;
         if (enemy.type === 'hopper') tryHopperJump(enemy);
       }
+      if (enemy.type === 'devil') tickDevilHex(enemy, dt);
       triggerTrap(enemy);
       if (enemy.freeze > 0) enemy.freeze -= dt;
       if (enemy.slowTime > 0) {
@@ -1934,6 +1974,7 @@ function selectedTower() {
         enemy.shield = 0;
         var early = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
         spawnFloater(early.x, early.y - 0.55, '破盾', '#e02323');
+        shatterShieldFx(early.x, early.y);
       }
       return;
     }
@@ -1944,6 +1985,7 @@ function selectedTower() {
       enemy.shield = 0;
       triggered = true;
       spawnFloater(pos.x, pos.y - 0.55, '破盾', '#e02323');
+      shatterShieldFx(pos.x, pos.y);
     }
     if (enemy.bossId === 'armor') {
       enemy.firePierce = true;
@@ -2039,6 +2081,26 @@ function selectedTower() {
     }
   }
 
+  function tickDevilHex(enemy, dt) {
+    enemy.hexCd = (enemy.hexCd || 0) - dt;
+    if (enemy.hexCd > 0 || !state.towers.length) return;
+    enemy.hexCd = 3.0;
+    var pos = enemyPos(enemy);
+    var best = null;
+    var bestDist = 2.35;
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      var d = Math.hypot(tower.c + 0.5 - pos.x, tower.r + 0.5 - pos.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = tower;
+      }
+    }
+    if (!best) return;
+    best.chill = Math.max(best.chill || 0, 1.6);
+    spawnFloater(best.c + 0.5, best.r + 0.5 - 0.5, '惡咒', '#c62828');
+  }
+
   function leakEnemy(enemy) {
     if (enemy.dead || state.phase !== 'combat') return;
     enemy.dead = true;
@@ -2048,6 +2110,14 @@ function selectedTower() {
     addShake(8);
     var end = WAYPOINTS[WAYPOINTS.length - 1];
     spawnFloater(end.x, end.y - 0.25, '-' + enemy.leak, '#ff8b98');
+    if (enemy.type === 'devil') {
+      var steal = Math.min(state.gold, Math.max(4, 3 + Math.floor(state.wave / 3)));
+      if (steal > 0) {
+        state.gold -= steal;
+        spawnFloater(end.x, end.y - 0.55, '-' + steal + '金', '#c62828');
+        syncHud();
+      }
+    }
     burst(end.x, end.y, '#ff6b81', 12);
     Sfx.base();
     vibrate([36, 40, 36]);
@@ -3289,6 +3359,7 @@ function selectedTower() {
       if (enemy.shield <= 0) {
         var broken = pointAt(enemy.dist);
         spawnFloater(broken.x, broken.y - 0.6, '護盾破裂', '#67e8f9');
+        shatterShieldFx(broken.x, broken.y);
       }
       if (damage <= 0) return;
     }
@@ -3325,7 +3396,7 @@ function selectedTower() {
     }
     var hellSplit = hellDeffValue('split');
     if (hellSplit > 0 && !enemy.boss && !enemy.noSplit && enemy.type !== 'shard') {
-      var childType = enemy.type === 'hopper' || enemy.type === 'brute' ? 'grunt' : (enemy.type || 'grunt');
+      var childType = enemy.type === 'hopper' || enemy.type === 'brute' || enemy.type === 'devil' ? 'grunt' : (enemy.type || 'grunt');
       var childHp = Math.max(1, Math.round(enemy.maxHp * hellSplit));
       var spdBonus = hellDeffValue('speed');
       for (var h = 0; h < 2; h++) {
@@ -3493,6 +3564,7 @@ function selectedTower() {
       particle.x += particle.vx * dt;
       particle.y += particle.vy * dt;
       particle.vy += 1.5 * dt;
+      if (particle.spin) particle.ang = (particle.ang || 0) + particle.spin * dt;
     }
     state.particles = state.particles.filter(function (particle) { return particle.life > 0; });
     for (var i = 0; i < state.floaters.length; i++) {
@@ -4123,8 +4195,11 @@ function selectedTower() {
         var resist = enemy.resist && RESISTS[enemy.resist] ? RESISTS[enemy.resist] : null;
         var colors = enemyBodyColors(enemy, resist);
         var rad = spec.bossId ? 30 : 26;
-        if (spec.bossId) drawBossBody(enemy, rad, colors, 0);
-        else if (spec.type === 'hopper') drawHopperBody(rad, colors, 0, false);
+        if (spec.bossId) {
+          enemy.boss = true;
+          drawBossBody(enemy, rad, colors, 0);
+        } else if (spec.type === 'hopper') drawHopperBody(rad, colors, 0, false);
+        else if (spec.type === 'devil') drawDevilBody(rad, colors, 0);
         else if (spec.type === 'swift') drawSwiftBody(rad, colors, 0);
         else if (spec.type === 'brute') drawBruteBody(rad, colors, 0);
         else drawGruntBody(rad, colors, 0);
@@ -4285,7 +4360,7 @@ function selectedTower() {
     var entries = [
       {
         tag: '小怪', title: '普通怪', paint: { kind: 'enemy', type: 'grunt', color: '#e25b4a' },
-        desc: '圓潤史萊姆型，最常見的基礎敵人。',
+        desc: '手繪史萊姆，最常見的基礎怪。',
         stats: [
           '<strong>血量</strong>：約 32 × 波次成長（依難度倍率）',
           '<strong>移速</strong>：基準約 1.0，隨波次緩升',
@@ -4295,7 +4370,7 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '快怪', paint: { kind: 'enemy', type: 'swift', color: '#f0a202' },
-        desc: '箭形體型，擅長衝線。',
+        desc: '手繪蝙蝠，擅長衝線。',
         stats: [
           '<strong>血量</strong>：普通怪 ×0.62',
           '<strong>移速</strong>：普通怪 ×1.55（較快）',
@@ -4305,7 +4380,7 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '精英怪', paint: { kind: 'enemy', type: 'brute', color: '#8d6bff' },
-        desc: '厚甲方塊，肉盾型。',
+        desc: '手繪石怪，厚重肉盾。',
         stats: [
           '<strong>血量</strong>：普通怪 ×7.5',
           '<strong>移速</strong>：普通怪 ×0.52（很慢）',
@@ -4315,13 +4390,24 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '跳躍怪', paint: { kind: 'enemy', type: 'hopper', color: '#4ec6e8' },
-        desc: '可抄捷徑跳躍，干擾佈陣。',
+        desc: '手繪彈簧蛙，可抄捷徑跳躍。',
         stats: [
           '<strong>血量</strong>：普通怪 ×0.8',
           '<strong>移速</strong>：略快於普通怪',
           '<strong>跳躍</strong>：同時最多 3 隻、有冷卻',
           '<strong>金幣</strong>：略高於普通怪',
           '<strong>漏關</strong>：扣 1 生命',
+        ],
+      },
+      {
+        tag: '小怪', title: '小惡魔', paint: { kind: 'enemy', type: 'devil', color: '#c62828' },
+        desc: '手繪小惡魔。近塔會惡咒鎖塔，漏關還會偷金幣。',
+        stats: [
+          '<strong>血量</strong>：普通怪 ×0.95',
+          '<strong>移速</strong>：略快於普通怪',
+          '<strong>惡咒</strong>：約每 3 秒鎖附近一座塔',
+          '<strong>漏關</strong>：扣 1 生命，並偷走部分金幣',
+          '<strong>出現</strong>：約第 8 波起',
         ],
       },
       {
@@ -4336,7 +4422,7 @@ function selectedTower() {
       },
       {
         tag: '首領', title: '再生王', paint: { kind: 'enemy', type: 'grunt', color: '#3ecf8e', bossId: 'regen' },
-        desc: '持續回復生命。',
+        desc: '葉形王體＋黃冠，外框會泛綠光回血光環。',
         stats: [
           '<strong>特性</strong>：戰鬥中持續回血',
           '<strong>克制</strong>：毒塔毒蝕（持續扣總血 %）',
@@ -4345,37 +4431,37 @@ function selectedTower() {
       },
       {
         tag: '首領', title: '狂暴王', paint: { kind: 'enemy', type: 'grunt', color: '#ff5a36', bossId: 'rush' },
-        desc: '殘血時爆發衝刺。',
+        desc: '尖刺王體＋黃冠。殘血爆發時出現衝刺殘影。',
         stats: ['<strong>觸發</strong>：血量低於 50%', '<strong>效果</strong>：大幅加速'],
       },
       {
         tag: '首領', title: '召喚王', paint: { kind: 'enemy', type: 'grunt', color: '#f2c14e', bossId: 'summon' },
-        desc: '沿路叫出步兵。',
+        desc: '多瓣王體＋黃冠，周圍有召喚點環繞。',
         stats: ['<strong>特性</strong>：週期召喚小怪', '<strong>壓力</strong>：增加漏關與干擾火力'],
       },
       {
         tag: '首領', title: '護盾王', paint: { kind: 'enemy', type: 'grunt', color: '#67e8f9', bossId: 'ward' },
-        desc: '週期張開護盾。',
+        desc: '盾形王體＋黃冠。護盾時有八角邊框，破盾有粉碎感。',
         stats: ['<strong>特性</strong>：護盾期間減傷／擋彈', '<strong>克制</strong>：火塔破盾並打血量 10%'],
       },
       {
         tag: '首領', title: '分裂王', paint: { kind: 'enemy', type: 'grunt', color: '#c084fc', bossId: 'split' },
-        desc: '死後分裂成多隻。',
+        desc: '三瓣重疊王體＋黃冠，外框有紫環特效。',
         stats: ['<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：分裂體金幣較低'],
       },
       {
         tag: '首領', title: '治癒王', paint: { kind: 'enemy', type: 'grunt', color: '#ff8fab', bossId: 'mend' },
-        desc: '治療附近敵人。',
+        desc: '柔圓王體＋黃冠，粉紅治癒光環包覆外框。',
         stats: ['<strong>特性</strong>：範圍治療友軍', '<strong>克制</strong>：毒塔毒蝕'],
       },
       {
         tag: '首領', title: '冰封王', paint: { kind: 'enemy', type: 'grunt', color: '#9bd4ff', bossId: 'frost' },
-        desc: '凍結整場防禦塔。',
+        desc: '冰晶王體＋黃冠，外框有冰刺光環。',
         stats: ['<strong>技能</strong>：定期凍結所有塔', '<strong>應對</strong>：預留輸出與節奏'],
       },
       {
         tag: '首領', title: '鐵甲王', paint: { kind: 'enemy', type: 'grunt', color: '#8aa0b8', bossId: 'armor' },
-        desc: '高減傷肉盾。',
+        desc: '鐵板王體＋黃冠，外框有鐵甲邊。',
         stats: ['<strong>減傷</strong>：受到傷害減半', '<strong>克制</strong>：火塔破甲並打血量 10%'],
       },
       {
@@ -6623,20 +6709,21 @@ function selectedTower() {
     };
   }
 
-  function drawEnemyEyes(rad, ink, open) {
-    var eye = Math.max(1.4, rad * 0.13);
-    var gap = rad * 0.28;
-    var ey = -rad * 0.08;
+  function drawEnemyEyes(rad, ink, opts) {
+    opts = opts || {};
+    var eye = Math.max(1.5, rad * (opts.size || 0.14));
+    var gap = rad * (opts.gap || 0.3);
+    var ey = rad * (opts.y || -0.06);
     ctx.fillStyle = ink;
-    ctx.beginPath();
-    ctx.arc(-gap, ey, eye, 0, Math.PI * 2);
-    ctx.arc(gap, ey, eye, 0, Math.PI * 2);
+    inkCircle(-gap, ey, eye, 10);
     ctx.fill();
-    if (open !== false) {
+    inkCircle(gap, ey, eye, 10);
+    ctx.fill();
+    if (opts.shine) {
       ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(-gap - eye * 0.25, ey - eye * 0.25, eye * 0.35, 0, Math.PI * 2);
-      ctx.arc(gap - eye * 0.25, ey - eye * 0.25, eye * 0.35, 0, Math.PI * 2);
+      inkCircle(-gap - eye * 0.2, ey - eye * 0.25, eye * 0.28, 6);
+      ctx.fill();
+      inkCircle(gap - eye * 0.2, ey - eye * 0.25, eye * 0.28, 6);
       ctx.fill();
     }
   }
@@ -6649,178 +6736,521 @@ function selectedTower() {
   }
 
   function drawGruntBody(rad, colors, bob) {
+    // slime: soft blob + drip + cheek highlight
+    inkSeed = Math.round(rad * 40 + 11);
     ctx.translate(0, bob);
-    ctx.beginPath();
-    ctx.moveTo(-rad * 0.92, rad * 0.15);
-    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.55, -rad * 0.35, -rad * 0.95);
-    ctx.quadraticCurveTo(0, -rad * 1.18, rad * 0.35, -rad * 0.95);
-    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.55, rad * 0.92, rad * 0.15);
-    ctx.quadraticCurveTo(rad * 0.55, rad * 0.95, 0, rad * 0.82);
-    ctx.quadraticCurveTo(-rad * 0.55, rad * 0.95, -rad * 0.92, rad * 0.15);
-    ctx.closePath();
+    inkSetup(Math.max(2.2, rad * 0.17));
     ctx.fillStyle = colors.fill;
-    ctx.fill();
     ctx.strokeStyle = colors.rim;
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
-    ctx.fillStyle = colors.accent;
-    ctx.globalAlpha = 0.28;
     ctx.beginPath();
-    ctx.ellipse(0, rad * 0.28, rad * 0.55, rad * 0.28, 0, 0, Math.PI * 2);
+    ctx.moveTo(-rad * 0.85 + inkJitter(1, 0.4), rad * 0.15);
+    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.55, -rad * 0.35, -rad * 0.95);
+    ctx.quadraticCurveTo(0, -rad * 1.12, rad * 0.35, -rad * 0.95);
+    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.55, rad * 0.85 + inkJitter(2, 0.4), rad * 0.15);
+    ctx.quadraticCurveTo(rad * 0.55, rad * 0.95, 0, rad * 0.88);
+    ctx.quadraticCurveTo(-rad * 0.55, rad * 0.95, -rad * 0.85, rad * 0.15);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    // drip
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.18, rad * 0.72);
+    ctx.quadraticCurveTo(-rad * 0.05, rad * 1.18, rad * 0.12, rad * 0.78);
+    inkStroke();
+    ctx.fillStyle = colors.accent;
+    ctx.globalAlpha = 0.2;
+    inkCircle(-rad * 0.22, rad * 0.18, rad * 0.28, 10);
     ctx.fill();
     ctx.globalAlpha = 1;
-    drawEnemyEyes(rad, colors.ink, true);
+    drawEnemyEyes(rad, colors.ink, { size: 0.15, gap: 0.28, y: -0.12, shine: true });
     ctx.strokeStyle = colors.ink;
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = Math.max(1.5, rad * 0.1);
     ctx.beginPath();
-    ctx.arc(0, rad * 0.22, rad * 0.22, 0.15, Math.PI - 0.15);
-    ctx.stroke();
+    ctx.arc(0, rad * 0.18, rad * 0.22, 0.25, Math.PI - 0.25);
+    inkStroke();
   }
 
   function drawSwiftBody(rad, colors, bob) {
-    ctx.translate(0, bob * 0.6);
-    ctx.beginPath();
-    ctx.moveTo(rad * 1.15, 0);
-    ctx.quadraticCurveTo(rad * 0.2, -rad * 0.85, -rad * 0.95, -rad * 0.35);
-    ctx.lineTo(-rad * 0.55, 0);
-    ctx.lineTo(-rad * 0.95, rad * 0.35);
-    ctx.quadraticCurveTo(rad * 0.2, rad * 0.85, rad * 1.15, 0);
-    ctx.closePath();
+    // bat: body + ear tips + wing arcs
+    inkSeed = Math.round(rad * 37 + 22);
+    ctx.translate(0, bob * 0.5);
+    inkSetup(Math.max(2.1, rad * 0.16));
     ctx.fillStyle = colors.fill;
-    ctx.fill();
     ctx.strokeStyle = colors.rim;
-    ctx.lineWidth = 2.3;
-    ctx.stroke();
-    ctx.strokeStyle = colors.accent;
-    ctx.lineWidth = 2;
+    // left wing
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.15, -rad * 0.45);
-    ctx.lineTo(rad * 0.55, -rad * 0.12);
-    ctx.moveTo(-rad * 0.15, rad * 0.45);
-    ctx.lineTo(rad * 0.55, rad * 0.12);
-    ctx.stroke();
-    ctx.fillStyle = colors.ink;
-    ctx.beginPath();
-    ctx.arc(rad * 0.35, -rad * 0.08, Math.max(1.5, rad * 0.12), 0, Math.PI * 2);
+    ctx.moveTo(-rad * 0.15, -rad * 0.1);
+    ctx.quadraticCurveTo(-rad * 0.85, -rad * 0.85, -rad * 1.35, -rad * 0.15);
+    ctx.quadraticCurveTo(-rad * 0.95, rad * 0.05, -rad * 1.2, rad * 0.45);
+    ctx.quadraticCurveTo(-rad * 0.55, rad * 0.1, -rad * 0.15, rad * 0.2);
+    ctx.closePath();
     ctx.fill();
+    inkStroke();
+    // right wing
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.15, -rad * 0.1);
+    ctx.quadraticCurveTo(rad * 0.85, -rad * 0.85, rad * 1.35, -rad * 0.15);
+    ctx.quadraticCurveTo(rad * 0.95, rad * 0.05, rad * 1.2, rad * 0.45);
+    ctx.quadraticCurveTo(rad * 0.55, rad * 0.1, rad * 0.15, rad * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    // body
+    inkCircle(0, rad * 0.08, rad * 0.55, 14);
+    ctx.fill();
+    inkStroke();
+    // ears
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.28, -rad * 0.35);
+    ctx.lineTo(-rad * 0.38, -rad * 0.85);
+    ctx.lineTo(-rad * 0.05, -rad * 0.48);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.28, -rad * 0.35);
+    ctx.lineTo(rad * 0.38, -rad * 0.85);
+    ctx.lineTo(rad * 0.05, -rad * 0.48);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    drawEnemyEyes(rad * 0.7, colors.ink, { size: 0.16, gap: 0.28, y: -0.02 });
+    ctx.strokeStyle = colors.accent;
+    ctx.lineWidth = Math.max(1.4, rad * 0.1);
+    inkLine(-rad * 0.12, rad * 0.28, rad * 0.12, rad * 0.28, 2);
+    inkStroke();
   }
 
   function drawBruteBody(rad, colors, bob) {
-    ctx.translate(0, bob * 0.4);
-    roundRect(-rad * 0.95, -rad * 0.85, rad * 1.9, rad * 1.7, rad * 0.28);
+    // stone golem: irregular rock + crack
+    inkSeed = Math.round(rad * 29 + 7);
+    ctx.translate(0, bob * 0.35);
+    inkSetup(Math.max(2.4, rad * 0.18));
     ctx.fillStyle = colors.fill;
-    ctx.fill();
     ctx.strokeStyle = colors.rim;
-    ctx.lineWidth = 2.6;
-    ctx.stroke();
-    ctx.fillStyle = colors.accent;
-    ctx.globalAlpha = 0.22;
-    roundRect(-rad * 0.7, -rad * 0.55, rad * 1.4, rad * 0.55, rad * 0.12);
+    ctx.beginPath();
+    var rock = [
+      [-0.78, -0.72], [-0.2, -0.98], [0.55, -0.78], [0.95, -0.2],
+      [0.78, 0.62], [0.15, 0.95], [-0.55, 0.82], [-0.98, 0.15],
+    ];
+    for (var i = 0; i < rock.length; i++) {
+      var rx = rock[i][0] * rad + inkJitter(i + 1, rad * 0.04);
+      var ry = rock[i][1] * rad + inkJitter(i + 9, rad * 0.04);
+      if (i === 0) ctx.moveTo(rx, ry);
+      else ctx.lineTo(rx, ry);
+    }
+    ctx.closePath();
     ctx.fill();
-    ctx.globalAlpha = 1;
+    inkStroke();
+    ctx.strokeStyle = colors.accent;
+    ctx.lineWidth = Math.max(1.8, rad * 0.12);
+    inkLine(-rad * 0.35, -rad * 0.15, rad * 0.2, rad * 0.05, 3);
+    inkStroke();
+    inkLine(rad * 0.05, -rad * 0.45, rad * 0.35, rad * 0.25, 3);
+    inkStroke();
+    // block eyes
+    ctx.fillStyle = colors.ink;
+    inkRect(-rad * 0.42, -rad * 0.28, rad * 0.22, rad * 0.18);
+    ctx.fill();
+    inkRect(rad * 0.18, -rad * 0.28, rad * 0.22, rad * 0.18);
+    ctx.fill();
     ctx.strokeStyle = colors.ink;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.moveTo(-rad * 0.55, -rad * 0.85);
-    ctx.lineTo(-rad * 0.72, -rad * 1.25);
-    ctx.lineTo(-rad * 0.2, -rad * 0.95);
-    ctx.moveTo(rad * 0.55, -rad * 0.85);
-    ctx.lineTo(rad * 0.72, -rad * 1.25);
-    ctx.lineTo(rad * 0.2, -rad * 0.95);
-    ctx.stroke();
-    drawEnemyEyes(rad * 0.95, colors.ink, true);
-    ctx.strokeStyle = colors.ink;
-    ctx.beginPath();
-    ctx.moveTo(-rad * 0.28, rad * 0.28);
-    ctx.lineTo(rad * 0.28, rad * 0.28);
-    ctx.stroke();
+    inkLine(-rad * 0.22, rad * 0.35, rad * 0.22, rad * 0.35, 2);
+    inkStroke();
   }
 
   function drawHopperBody(rad, colors, bob, jumping) {
-    var stretch = jumping ? 1.18 : 1;
+    // spring frog: round body + coil legs + big eyes
+    var stretch = jumping ? 1.14 : 1;
+    inkSeed = Math.round(rad * 33 + 15);
     ctx.translate(0, bob);
     ctx.scale(1 / Math.sqrt(stretch), stretch);
-    ctx.beginPath();
-    ctx.moveTo(0, -rad * 1.05);
-    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.15, rad * 0.78, rad * 0.7);
-    ctx.quadraticCurveTo(0, rad * 0.95, -rad * 0.78, rad * 0.7);
-    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.15, 0, -rad * 1.05);
-    ctx.closePath();
+    inkSetup(Math.max(2.1, rad * 0.16));
     ctx.fillStyle = colors.fill;
-    ctx.fill();
     ctx.strokeStyle = colors.rim;
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
-    ctx.fillStyle = colors.accent;
-    ctx.globalAlpha = 0.3;
+    // spring legs
+    ctx.lineWidth = Math.max(1.8, rad * 0.14);
     ctx.beginPath();
-    ctx.ellipse(0, rad * 0.2, rad * 0.42, rad * 0.28, 0, 0, Math.PI * 2);
+    ctx.moveTo(-rad * 0.35, rad * 0.35);
+    ctx.lineTo(-rad * 0.55, rad * 0.55);
+    ctx.lineTo(-rad * 0.3, rad * 0.7);
+    ctx.lineTo(-rad * 0.62, rad * 0.95);
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.35, rad * 0.35);
+    ctx.lineTo(rad * 0.55, rad * 0.55);
+    ctx.lineTo(rad * 0.3, rad * 0.7);
+    ctx.lineTo(rad * 0.62, rad * 0.95);
+    inkStroke();
+    // feet
+    inkLine(-rad * 0.78, rad * 0.95, -rad * 0.42, rad * 0.95, 2);
+    inkStroke();
+    inkLine(rad * 0.42, rad * 0.95, rad * 0.78, rad * 0.95, 2);
+    inkStroke();
+    // body
+    inkCircle(0, -rad * 0.05, rad * 0.72, 16);
+    ctx.fill();
+    inkStroke();
+    // belly
+    ctx.fillStyle = colors.accent;
+    ctx.globalAlpha = 0.18;
+    inkCircle(0, rad * 0.18, rad * 0.38, 12);
     ctx.fill();
     ctx.globalAlpha = 1;
-    drawEnemyEyes(rad, colors.ink, true);
-    ctx.strokeStyle = colors.ink;
-    ctx.lineWidth = 2;
+    // eye bumps
+    ctx.fillStyle = colors.fill;
+    ctx.strokeStyle = colors.rim;
+    inkCircle(-rad * 0.32, -rad * 0.62, rad * 0.28, 10);
+    ctx.fill();
+    inkStroke();
+    inkCircle(rad * 0.32, -rad * 0.62, rad * 0.28, 10);
+    ctx.fill();
+    inkStroke();
+    ctx.fillStyle = colors.ink;
+    inkCircle(-rad * 0.32, -rad * 0.62, rad * 0.12, 8);
+    ctx.fill();
+    inkCircle(rad * 0.32, -rad * 0.62, rad * 0.12, 8);
+    ctx.fill();
+  }
+
+  function drawDevilBody(rad, colors, bob) {
+    // tidy little devil: oval + curved horns + tiny wings + pointed tail
+    inkSeed = Math.round(rad * 41 + 9);
+    ctx.translate(0, bob);
+    inkSetup(Math.max(2.1, rad * 0.16));
+    ctx.fillStyle = colors.fill;
+    ctx.strokeStyle = colors.rim;
+    // tiny wings
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.35, rad * 0.55);
-    ctx.quadraticCurveTo(-rad * 0.85, rad * 1.05, -rad * 0.15, rad * 1.15);
-    ctx.moveTo(rad * 0.35, rad * 0.55);
-    ctx.quadraticCurveTo(rad * 0.85, rad * 1.05, rad * 0.15, rad * 1.15);
-    ctx.stroke();
+    ctx.moveTo(-rad * 0.55, -rad * 0.05);
+    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.45, -rad * 1.15, rad * 0.15);
+    ctx.quadraticCurveTo(-rad * 0.75, rad * 0.05, -rad * 0.5, rad * 0.25);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.55, -rad * 0.05);
+    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.45, rad * 1.15, rad * 0.15);
+    ctx.quadraticCurveTo(rad * 0.75, rad * 0.05, rad * 0.5, rad * 0.25);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    // body oval
+    ctx.beginPath();
+    ctx.ellipse(0, rad * 0.08, rad * 0.72, rad * 0.82, 0, 0, Math.PI * 2);
+    ctx.fill();
+    inkStroke();
+    // curved horns (stroke only, cleaner)
+    ctx.strokeStyle = colors.accent;
+    ctx.lineWidth = Math.max(2.2, rad * 0.16);
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.28, -rad * 0.55);
+    ctx.quadraticCurveTo(-rad * 0.55, -rad * 0.95, -rad * 0.22, -rad * 1.18);
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.28, -rad * 0.55);
+    ctx.quadraticCurveTo(rad * 0.55, -rad * 0.95, rad * 0.22, -rad * 1.18);
+    inkStroke();
+    drawEnemyEyes(rad * 0.85, colors.ink, { size: 0.13, gap: 0.26, y: -0.08, shine: true });
+    // small smile
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = Math.max(1.5, rad * 0.1);
+    ctx.beginPath();
+    ctx.arc(0, rad * 0.18, rad * 0.22, 0.15, Math.PI - 0.15);
+    inkStroke();
+    // pointed tail
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.45, rad * 0.55);
+    ctx.quadraticCurveTo(rad * 0.95, rad * 0.7, rad * 1.05, rad * 1.05);
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.95, rad * 0.95);
+    ctx.lineTo(rad * 1.22, rad * 0.88);
+    ctx.lineTo(rad * 1.08, rad * 1.2);
+    ctx.closePath();
+    ctx.fillStyle = colors.accent;
+    ctx.fill();
+    inkStroke();
   }
 
   function drawShardBody(rad, colors) {
-    ctx.strokeStyle = colors.rim;
+    inkSeed = Math.round(rad * 25 + 3);
+    inkSetup(Math.max(2.2, rad * 0.18));
     ctx.fillStyle = colors.fill;
-    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = colors.rim;
     ctx.beginPath();
-    ctx.moveTo(0, -rad);
-    ctx.lineTo(rad * 0.7, 0);
-    ctx.lineTo(0, rad);
-    ctx.lineTo(-rad * 0.7, 0);
+    ctx.moveTo(inkJitter(1, 0.3), -rad);
+    ctx.lineTo(rad * 0.7, inkJitter(2, 0.3));
+    ctx.lineTo(inkJitter(3, 0.3), rad);
+    ctx.lineTo(-rad * 0.7, inkJitter(4, 0.3));
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
+    inkStroke();
     ctx.strokeStyle = colors.accent;
-    inkX(0, 0, rad * 0.45);
+    inkX(0, 0, rad * 0.4);
+  }
+
+  function drawBossSilhouette(id, rad, colors) {
+    if (id === 'split') {
+      for (var s = 0; s < 3; s++) {
+        var sa = -Math.PI / 2 + s * (Math.PI * 2 / 3);
+        var sx = Math.cos(sa) * rad * 0.42;
+        var sy = Math.sin(sa) * rad * 0.42;
+        inkCircle(sx, sy, rad * 0.62, 14);
+        ctx.fillStyle = colors.fill;
+        ctx.strokeStyle = colors.rim;
+        ctx.fill();
+        inkStroke();
+      }
+      return;
+    }
+    ctx.beginPath();
+    if (id === 'rush') {
+      for (var i = 0; i < 8; i++) {
+        var a = -Math.PI / 2 + i * Math.PI / 4;
+        var rr = (i % 2 === 0 ? 1.08 : 0.72) * rad;
+        var px = Math.cos(a) * rr * (1 + inkJitter(i + 1, 0.03));
+        var py = Math.sin(a) * rr * (1 + inkJitter(i + 2, 0.03));
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    } else if (id === 'ward') {
+      ctx.moveTo(inkJitter(1, 0.3), -rad * 1.05);
+      ctx.lineTo(rad * 0.92, -rad * 0.45);
+      ctx.lineTo(rad * 0.82, rad * 0.25);
+      ctx.quadraticCurveTo(0, rad * 1.2, -rad * 0.82, rad * 0.25);
+      ctx.lineTo(-rad * 0.92, -rad * 0.45);
+      ctx.closePath();
+    } else if (id === 'frost') {
+      for (var f = 0; f < 6; f++) {
+        var fa = -Math.PI / 2 + f * Math.PI / 3;
+        var fx = Math.cos(fa) * rad * 1.12;
+        var fy = Math.sin(fa) * rad * 1.12;
+        var ix = Math.cos(fa + Math.PI / 6) * rad * 0.52;
+        var iy = Math.sin(fa + Math.PI / 6) * rad * 0.52;
+        if (f === 0) ctx.moveTo(fx, fy);
+        else ctx.lineTo(fx, fy);
+        ctx.lineTo(ix, iy);
+      }
+      ctx.closePath();
+    } else if (id === 'armor') {
+      inkRect(-rad * 0.95, -rad * 0.85, rad * 1.9, rad * 1.7);
+    } else if (id === 'summon') {
+      for (var m = 0; m < 12; m++) {
+        var ma = -Math.PI / 2 + m * Math.PI / 6;
+        var mr = (m % 4 === 0 ? 1.12 : 0.88) * rad;
+        var mx = Math.cos(ma) * mr * (1 + inkJitter(m + 1, 0.03));
+        var my = Math.sin(ma) * mr * (1 + inkJitter(m + 2, 0.03));
+        if (m === 0) ctx.moveTo(mx, my);
+        else ctx.lineTo(mx, my);
+      }
+      ctx.closePath();
+    } else if (id === 'mend') {
+      for (var h = 0; h <= 16; h++) {
+        var ha = (h / 16) * Math.PI * 2;
+        var hr = rad * (0.92 + 0.1 * Math.sin(ha * 2));
+        var hx = Math.cos(ha) * hr * (1 + inkJitter(h + 1, 0.03));
+        var hy = Math.sin(ha) * hr * 1.05 * (1 + inkJitter(h + 2, 0.03));
+        if (h === 0) ctx.moveTo(hx, hy);
+        else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath();
+    } else {
+      for (var r = 0; r <= 16; r++) {
+        var ra = -Math.PI / 2 + (r / 16) * Math.PI * 2;
+        var rr2 = rad * (1 + 0.08 * Math.sin(ra * 3));
+        var rx2 = Math.cos(ra) * rr2 * (1 + inkJitter(r + 1, 0.03));
+        var ry2 = Math.sin(ra) * rr2 * (1 + inkJitter(r + 2, 0.03));
+        if (r === 0) ctx.moveTo(rx2, ry2);
+        else ctx.lineTo(rx2, ry2);
+      }
+      ctx.closePath();
+    }
+    ctx.fillStyle = colors.fill;
+    ctx.strokeStyle = colors.rim;
+    ctx.fill();
+    inkStroke();
+  }
+
+  function drawBossCrown(rad) {
+    ctx.fillStyle = '#f2c14e';
+    ctx.strokeStyle = '#161616';
+    ctx.lineWidth = Math.max(1.6, rad * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.52, -rad * 0.92);
+    ctx.lineTo(-rad * 0.3, -rad * 1.35);
+    ctx.lineTo(-rad * 0.06, -rad * 0.98);
+    ctx.lineTo(0, -rad * 1.42);
+    ctx.lineTo(rad * 0.06, -rad * 0.98);
+    ctx.lineTo(rad * 0.3, -rad * 1.35);
+    ctx.lineTo(rad * 0.52, -rad * 0.92);
+    ctx.lineTo(rad * 0.58, -rad * 0.72);
+    ctx.lineTo(-rad * 0.58, -rad * 0.72);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
   }
 
   function drawBossBody(enemy, rad, colors, bob) {
-    ctx.translate(0, bob * 0.35);
+    inkSeed = (enemy.bossId || 'x').charCodeAt(0) * 17 + Math.round(rad * 12);
+    ctx.translate(0, bob * 0.3);
+    inkSetup(Math.max(2.6, rad * 0.18));
+    drawBossSilhouette(enemy.bossId, rad, colors);
+    if (enemy.bossId === 'armor') {
+      ctx.strokeStyle = colors.accent;
+      ctx.lineWidth = Math.max(1.8, rad * 0.1);
+      inkRect(-rad * 0.55, -rad * 0.4, rad * 1.1, rad * 0.85);
+      inkStroke();
+      inkCircle(-rad * 0.55, -rad * 0.4, rad * 0.08, 6);
+      ctx.fillStyle = colors.ink;
+      ctx.fill();
+      inkCircle(rad * 0.55, -rad * 0.4, rad * 0.08, 6);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = colors.accent;
+      ctx.globalAlpha = 0.16;
+      inkCircle(0, rad * 0.05, rad * 0.48, 12);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = colors.ink;
+    ctx.fillStyle = colors.ink;
+    drawBossSymbol(enemy.bossId, rad * 0.92);
+    drawBossCrown(rad);
+  }
+
+  function drawInkAuraRing(x, y, rad, color, phase, wobble) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(2, rad * 0.12);
+    ctx.globalAlpha = 0.35 + Math.sin(phase) * 0.15;
     ctx.beginPath();
-    for (var i = 0; i < 6; i++) {
-      var a = -Math.PI / 2 + i * Math.PI / 3;
-      var px = Math.cos(a) * rad * 1.05;
-      var py = Math.sin(a) * rad * 1.05;
+    var steps = 18;
+    var r = rad + 6 + Math.sin(phase * 1.4) * 2;
+    for (var i = 0; i <= steps; i++) {
+      var a = (i / steps) * Math.PI * 2 + phase * 0.2;
+      var rr = r * (1 + Math.sin(a * 3 + phase) * (wobble || 0.04));
+      var px = Math.cos(a) * rr;
+      var py = Math.sin(a) * rr;
       if (i === 0) ctx.moveTo(px, py);
       else ctx.lineTo(px, py);
     }
     ctx.closePath();
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-    ctx.strokeStyle = colors.rim;
-    ctx.lineWidth = 3;
     ctx.stroke();
-    ctx.fillStyle = colors.accent;
-    ctx.globalAlpha = 0.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, rad * 0.62, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = colors.ink;
-    ctx.fillStyle = colors.ink;
-    drawBossSymbol(enemy.bossId, rad);
-    ctx.fillStyle = '#f2c14e';
-    ctx.beginPath();
-    ctx.moveTo(-rad * 0.55, -rad * 1.05);
-    ctx.lineTo(-rad * 0.28, -rad * 1.42);
-    ctx.lineTo(0, -rad * 1.08);
-    ctx.lineTo(rad * 0.28, -rad * 1.42);
-    ctx.lineTo(rad * 0.55, -rad * 1.05);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = colors.ink;
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawEnemyStatusFx(enemy, x, y, rad) {
+    inkSeed = Math.round((enemy.id || 1) * 17 + rad * 3);
+    var t = state.time + (enemy.id || 0) * 0.37;
+    var healing = enemy.bossId === 'regen' || enemy.bossId === 'mend' || (hasHellDeff('regen') && !enemy.boss);
+    if (healing) {
+      var healColor = enemy.bossId === 'mend' ? '#ff8fab' : '#3ecf8e';
+      drawInkAuraRing(x, y, rad, healColor, t * 3, 0.05);
+      if (enemy.bossId === 'mend' || enemy.regenShow > 0) {
+        drawInkAuraRing(x, y, rad + 4, healColor, t * 3 + 1.2, 0.03);
+      }
+    }
+    var raging = (enemy.bossId === 'rush' && enemy.enraged) || enemy.hellEnraged;
+    var swiftDebuff = hasHellDeff('speed') && !enemy.boss;
+    if (raging || swiftDebuff) {
+      ctx.save();
+      ctx.strokeStyle = raging ? '#ff5a36' : '#f0a202';
+      ctx.lineWidth = Math.max(1.8, rad * 0.1);
+      ctx.globalAlpha = 0.55 + Math.sin(t * 10) * 0.2;
+      for (var s = 0; s < 3; s++) {
+        var ox = -rad * (0.85 + s * 0.28) - Math.sin(t * 8 + s) * 2;
+        var oy = (s - 1) * rad * 0.35 + Math.cos(t * 7 + s) * 2;
+        ctx.beginPath();
+        ctx.moveTo(x + ox, y + oy - rad * 0.2);
+        ctx.lineTo(x + ox + rad * 0.35, y + oy);
+        ctx.lineTo(x + ox, y + oy + rad * 0.2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (enemy.shield > 0) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = '#67e8f9';
+      ctx.lineWidth = Math.max(2.4, rad * 0.14);
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      for (var i = 0; i < 8; i++) {
+        var a = -Math.PI / 2 + i * Math.PI / 4 + t * 0.4;
+        var rr = rad + 8 + Math.sin(t * 5 + i) * 1.2;
+        var px = Math.cos(a) * rr;
+        var py = Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.lineWidth = Math.max(1.4, rad * 0.08);
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      ctx.arc(0, 0, rad + 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (enemy.bossId === 'armor' && !enemy.firePierce) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = '#8aa0b8';
+      ctx.lineWidth = Math.max(2.2, rad * 0.12);
+      ctx.globalAlpha = 0.7;
+      inkRect(-rad - 5, -rad - 5, (rad + 5) * 2, (rad + 5) * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (enemy.bossId === 'summon') {
+      ctx.save();
+      ctx.fillStyle = '#f2c14e';
+      for (var d = 0; d < 3; d++) {
+        var da = t * 2.2 + d * (Math.PI * 2 / 3);
+        var dx = x + Math.cos(da) * (rad + 10);
+        var dy = y + Math.sin(da) * (rad + 10);
+        ctx.globalAlpha = 0.75;
+        ctx.beginPath();
+        ctx.arc(dx, dy, Math.max(2.5, rad * 0.14), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    if (enemy.bossId === 'split') {
+      drawInkAuraRing(x, y, rad, '#c084fc', t * 2.5, 0.06);
+      ctx.save();
+      ctx.strokeStyle = '#c084fc';
+      ctx.lineWidth = 1.6;
+      ctx.globalAlpha = 0.5;
+      for (var p = 0; p < 3; p++) {
+        var pa = t * 1.8 + p * (Math.PI * 2 / 3);
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(pa) * (rad * 0.35), y + Math.sin(pa) * (rad * 0.35), rad * 0.45, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (enemy.bossId === 'frost') {
+      ctx.save();
+      ctx.strokeStyle = '#9bd4ff';
+      ctx.lineWidth = Math.max(1.6, rad * 0.08);
+      ctx.globalAlpha = 0.55 + Math.sin(t * 4) * 0.15;
+      for (var c = 0; c < 3; c++) {
+        var ca = c * Math.PI / 3 + t * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(ca) * (rad + 4), y + Math.sin(ca) * (rad + 4));
+        ctx.lineTo(x + Math.cos(ca) * (rad + 12), y + Math.sin(ca) * (rad + 12));
+        ctx.stroke();
+      }
+      drawInkAuraRing(x, y, rad, '#9bd4ff', t * 2, 0.03);
+      ctx.restore();
+    }
+    if (enemy.bossId === 'rush' && !enemy.enraged) {
+      drawInkAuraRing(x, y, rad, '#ff5a36', t * 2, 0.04);
+    }
   }
 
   function drawEnemy(enemy) {
@@ -6839,22 +7269,17 @@ function selectedTower() {
     ctx.lineCap = 'round';
     drawEnemyShadow(rad);
     ctx.save();
-    if (enemy.type === 'swift' || enemy.type === 'hopper') ctx.rotate(ang);
+    if (enemy.type === 'swift') ctx.rotate(ang);
     if (enemy.boss) drawBossBody(enemy, rad, colors, bob);
     else if (enemy.type === 'shard') drawShardBody(rad, colors);
     else if (enemy.type === 'hopper') drawHopperBody(rad, colors, bob, !!enemy.jumping);
+    else if (enemy.type === 'devil') drawDevilBody(rad, colors, bob);
     else if (enemy.type === 'swift') drawSwiftBody(rad, colors, bob);
     else if (enemy.type === 'brute') drawBruteBody(rad, colors, bob);
     else drawGruntBody(rad, colors, bob);
     ctx.restore();
     ctx.restore();
-    if (enemy.bossId === 'ward' && enemy.shield > 0) {
-      ctx.strokeStyle = '#67e8f9';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(x, y, rad + 7, 0, Math.PI * 2);
-      ctx.stroke();
-    }
+    drawEnemyStatusFx(enemy, x, y, rad);
     if (enemy.freeze > 0) {
       ctx.strokeStyle = '#2f7bff';
       ctx.lineWidth = 3;
@@ -6918,68 +7343,59 @@ function selectedTower() {
 
   function drawBossSymbol(id, rad) {
     var s = rad * 0.42;
-    ctx.lineWidth = Math.max(2, rad * 0.16);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    inkSetup(Math.max(2.2, rad * 0.16));
     if (id === 'regen') {
       ctx.beginPath();
       ctx.arc(0, 0, s * 0.72, 0.5, Math.PI * 1.75);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(s * 0.15, -s * 0.85);
-      ctx.lineTo(s * 0.55, -s * 0.35);
+      inkStroke();
+      inkLine(s * 0.15, -s * 0.85, s * 0.55, -s * 0.35, 2);
       ctx.lineTo(s * 0.05, -s * 0.2);
-      ctx.stroke();
+      inkStroke();
     } else if (id === 'rush') {
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.55, -s * 0.05);
-      ctx.lineTo(0, -s * 0.7);
+      inkLine(-s * 0.55, -s * 0.05, 0, -s * 0.7, 2);
       ctx.lineTo(s * 0.55, -s * 0.05);
-      ctx.moveTo(-s * 0.55, s * 0.55);
-      ctx.lineTo(0, -s * 0.1);
+      inkStroke();
+      inkLine(-s * 0.55, s * 0.55, 0, -s * 0.1, 2);
       ctx.lineTo(s * 0.55, s * 0.55);
-      ctx.stroke();
+      inkStroke();
     } else if (id === 'summon') {
       var dots = [[0, -s * 0.45], [-s * 0.48, s * 0.32], [s * 0.48, s * 0.32]];
       for (var i = 0; i < dots.length; i++) {
-        ctx.beginPath();
-        ctx.arc(dots[i][0], dots[i][1], s * 0.22, 0, Math.PI * 2);
+        inkCircle(dots[i][0], dots[i][1], s * 0.22, 10);
         ctx.fill();
+        inkStroke();
       }
     } else if (id === 'ward') {
       ctx.beginPath();
-      ctx.moveTo(0, -s);
+      ctx.moveTo(inkJitter(1, 0.3), -s);
       ctx.lineTo(s * 0.78, -s * 0.45);
       ctx.lineTo(s * 0.78, s * 0.15);
       ctx.quadraticCurveTo(0, s * 1.15, -s * 0.78, s * 0.15);
       ctx.lineTo(-s * 0.78, -s * 0.45);
       ctx.closePath();
-      ctx.stroke();
+      inkStroke();
     } else if (id === 'split') {
       var parts = [[0, -s * 0.42], [-s * 0.46, s * 0.34], [s * 0.46, s * 0.34]];
       for (var p = 0; p < parts.length; p++) {
-        ctx.beginPath();
-        ctx.arc(parts[p][0], parts[p][1], s * 0.28, 0, Math.PI * 2);
-        ctx.stroke();
+        inkCircle(parts[p][0], parts[p][1], s * 0.28, 10);
+        inkStroke();
       }
     } else if (id === 'mend') {
-      ctx.beginPath();
-      ctx.moveTo(0, -s * 0.75);
-      ctx.lineTo(0, s * 0.75);
-      ctx.moveTo(-s * 0.75, 0);
-      ctx.lineTo(s * 0.75, 0);
-      ctx.stroke();
+      inkLine(0, -s * 0.75, 0, s * 0.75, 3);
+      inkStroke();
+      inkLine(-s * 0.75, 0, s * 0.75, 0, 3);
+      inkStroke();
     } else if (id === 'frost') {
-      ctx.beginPath();
       for (var a = 0; a < 3; a++) {
         var ang = a * Math.PI / 3;
-        ctx.moveTo(Math.cos(ang) * s, Math.sin(ang) * s);
-        ctx.lineTo(-Math.cos(ang) * s, -Math.sin(ang) * s);
+        inkLine(Math.cos(ang) * s, Math.sin(ang) * s, -Math.cos(ang) * s, -Math.sin(ang) * s, 3);
+        inkStroke();
       }
-      ctx.stroke();
     } else {
-      ctx.strokeRect(-s * 0.62, -s * 0.62, s * 1.24, s * 1.24);
-      ctx.strokeRect(-s * 0.32, -s * 0.32, s * 0.64, s * 0.64);
+      inkRect(-s * 0.62, -s * 0.62, s * 1.24, s * 1.24);
+      inkStroke();
+      inkRect(-s * 0.32, -s * 0.32, s * 0.64, s * 0.64);
+      inkStroke();
     }
   }
 
@@ -7173,7 +7589,25 @@ function selectedTower() {
       ctx.globalAlpha = Math.max(0, particle.life / particle.max);
       ctx.fillStyle = particle.color;
       var size = particle.size * view.tile;
-      ctx.fillRect(worldX(particle.x) - size / 2, worldY(particle.y) - size / 2, size, size);
+      var px = worldX(particle.x);
+      var py = worldY(particle.y);
+      if (particle.shard) {
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(particle.ang || 0);
+        ctx.strokeStyle = '#161616';
+        ctx.lineWidth = Math.max(1.2, size * 0.18);
+        ctx.beginPath();
+        ctx.moveTo(0, -size * 0.7);
+        ctx.lineTo(size * 0.55, size * 0.45);
+        ctx.lineTo(-size * 0.55, size * 0.45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.fillRect(px - size / 2, py - size / 2, size, size);
+      }
     }
     ctx.restore();
   }
