@@ -291,6 +291,7 @@
     difficultyMode: 'infinite',
     clearCountdown: 0,
     clearKind: '',
+    editCountdown: 0,
     towers: [],
     enemies: [],
     projectiles: [],
@@ -347,6 +348,7 @@
     items: { wall: 0, push: 0 },
     pickMode: '',
     cardWave: 0,
+    pendingChoices: null,
     meteor: null,
     pendingHero: '',
     freeSpec: false,
@@ -354,6 +356,7 @@
 
   var pointer = null;
   var toastTimer = 0;
+  var muteToast = false;
   var lastVibrate = 0;
   var lastTs = 0;
 
@@ -1010,16 +1013,17 @@
   }
 
   function buildWaves(chapter, stage) {
-    var count = [4, 5, 6, 8, 10][stage - 1];
+    var count = [12, 15, 18, 22, 25][stage - 1];
     var waves = [];
     for (var w = 1; w <= count; w++) {
       var boss = stage === 5 && w === count;
-      var grunts = 4 + w + (chapter >= 5 ? 1 : 0);
+      var beat = Math.max(1, Math.ceil((w / count) * 10));
+      var grunts = 4 + beat + (chapter >= 5 ? 1 : 0);
       var swifts = 1;
-      if (stage >= 2 && w >= 2) swifts += Math.floor(w / 3);
-      if (stage >= 4 && w >= 4) swifts += 1;
+      if (stage >= 2 && beat >= 2) swifts += Math.floor(beat / 3);
+      if (stage >= 4 && beat >= 4) swifts += 1;
       var brutes = 0;
-      if (!boss && stage >= 3 && w % 4 === 0) brutes = 1;
+      if (!boss && stage >= 3 && w % 5 === 0) brutes = 1;
       if (!boss && chapter >= 6 && stage >= 4 && w === count - 1) brutes += 1;
       waves.push({ grunts: grunts, swifts: swifts, brutes: brutes, boss: boss });
     }
@@ -2065,6 +2069,7 @@ function selectedTower() {
   }
 
   function toast(message) {
+    if (muteToast) return;
     toastEl.textContent = message;
     toastEl.classList.add('is-on');
     window.clearTimeout(toastTimer);
@@ -3004,10 +3009,11 @@ function selectedTower() {
     var cleared = state.cardWave;
     state.pickMode = '';
     state.freeSpec = false;
+    state.pendingCard = null;
+    state.pendingChoices = null;
     state.banner = null;
     syncHud();
-    if (state.mode === 'custom' && cleared % 10 === 0) enterEdit();
-    else requestStartWave(cleared + 1);
+    requestStartWave(cleared + 1);
   }
 
   function applyLevelCard(tower) {
@@ -3187,22 +3193,49 @@ function selectedTower() {
     }
   }
 
+  function shuffleInPlace(list) {
+    for (var i = list.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = list[i];
+      list[i] = list[j];
+      list[j] = tmp;
+    }
+    return list;
+  }
+
+  function pickCardChoices(count, exceptIds) {
+    var ban = {};
+    (exceptIds || []).forEach(function (id) { ban[id] = true; });
+    var pool = cardPool().filter(function (card) { return !ban[card.id]; });
+    if (pool.length < count) pool = cardPool().slice();
+    shuffleInPlace(pool);
+    var picks = [];
+    var seen = {};
+    for (var i = 0; i < pool.length && picks.length < count; i++) {
+      if (seen[pool[i].id]) continue;
+      seen[pool[i].id] = true;
+      picks.push(pool[i]);
+    }
+    while (picks.length < count) picks.push(pickRandomCard());
+    return picks;
+  }
+
   function showRandomCardModal() {
-    var card = state.pendingCard;
-    if (!card) return;
+    var choices = state.pendingChoices;
+    if (!choices || !choices.length) return;
     openModal({
       tone: 'reward',
       kicker: '第 ' + state.cardWave + ' 波',
-      title: '隨機獎勵',
-      desc: '抽到「' + card.name + '」。' + card.desc + (state.cardRerolled ? '' : ' 不滿意可看廣告再抽一次。'),
-      actions: [
-        {
-          label: '接受 ' + card.name,
+      title: '三選一',
+      desc: '選一張帶走。' + (state.cardRerolled ? '' : '不滿意可看廣告重抽三張。'),
+      actions: choices.map(function (card) {
+        return {
+          label: card.name + '　' + card.desc,
           className: 'btn-mint',
           onClick: function () { chooseCard(card.id); },
-        },
-      ].concat(state.cardRerolled ? [] : [{
-        label: '觀看廣告更換獎勵',
+        };
+      }).concat(state.cardRerolled ? [] : [{
+        label: '觀看廣告重抽三張',
         className: 'btn-gold',
         ad: true,
         onClick: rerollCardAd,
@@ -3215,12 +3248,13 @@ function selectedTower() {
     state.paused = true;
     state.cardWave = cleared;
     state.cardRerolled = false;
-    state.pendingCard = pickRandomCard();
+    state.pendingChoices = pickCardChoices(3);
+    state.pendingCard = state.pendingChoices[0];
     showRandomCardModal();
   }
 
   function rerollCardAd() {
-    if (state.adBusy || state.cardRerolled || !state.pendingCard) return;
+    if (state.adBusy || state.cardRerolled || !state.pendingChoices) return;
     state.adBusy = true;
     setModalBusy(true);
     Ads.showRewarded({ placement: 'card_reroll' }).then(function (result) {
@@ -3231,10 +3265,12 @@ function selectedTower() {
         return;
       }
       state.cardRerolled = true;
-      state.pendingCard = pickRandomCard(state.pendingCard.id);
+      var oldIds = state.pendingChoices.map(function (card) { return card.id; });
+      state.pendingChoices = pickCardChoices(3, oldIds);
+      state.pendingCard = state.pendingChoices[0];
       Sfx.unlock();
       Sfx.ui();
-      toast('已更換為 ' + state.pendingCard.name);
+      toast('已重抽三張');
       showRandomCardModal();
     });
   }
@@ -3816,9 +3852,9 @@ function selectedTower() {
     var title = kind === 'victory' ? '關卡通過' : ('第 ' + state.wave + ' 波守住了');
     var sub = kind === 'victory'
       ? (nextStage(state.stagePlan) && stageUnlocked(nextStage(state.stagePlan)) ? '5 秒後下一關' : '5 秒後返回關卡')
-      : (cardWaveDue(state.wave)
-        ? '5 秒後隨機獎勵（可點提前）'
-        : (state.mode === 'custom' && state.wave % 10 === 0 ? '5 秒後改道（可點提前）' : '5 秒後下一波（可點提前）'));
+      : (state.mode === 'custom' && state.wave % 10 === 0
+        ? '5 秒後改道（可點提前）'
+        : (cardWaveDue(state.wave) ? '5 秒後三選一（可點提前）' : '5 秒後下一波（可點提前）'));
     state.banner = { text: title, sub: sub, life: 5.2, countdown: true };
   }
 
@@ -3831,8 +3867,8 @@ function selectedTower() {
       if (state.clearKind === 'victory') {
         var upcoming = nextStage(state.stagePlan);
         state.banner.sub = (upcoming && stageUnlocked(upcoming) ? '下一關 ' : '返回關卡 ') + left + '（可點提前）';
-      } else if (cardWaveDue(state.wave)) state.banner.sub = '隨機獎勵 ' + left + '（可點提前）';
-      else if (state.mode === 'custom' && state.wave % 10 === 0) state.banner.sub = '改道 ' + left + '（可點提前）';
+      } else if (state.mode === 'custom' && state.wave % 10 === 0) state.banner.sub = '改道 ' + left + '（可點提前）';
+      else if (cardWaveDue(state.wave)) state.banner.sub = '三選一 ' + left + '（可點提前）';
       else state.banner.sub = '下一波 ' + left + '（可點提前）';
     }
     syncHud();
@@ -3841,6 +3877,20 @@ function selectedTower() {
     state.banner = null;
     if (state.clearKind === 'victory') finishVictoryAdvance();
     else goNextWave();
+  }
+
+  function tickEditCountdown(dt) {
+    if (state.phase !== 'edit' || !(state.editCountdown > 0)) return;
+    state.editCountdown -= dt;
+    var left = Math.max(0, Math.ceil(state.editCountdown));
+    if (state.banner && state.banner.countdown) {
+      state.banner.life = Math.max(state.banner.life, state.editCountdown + 0.05);
+      state.banner.sub = '還有 ' + left + ' 秒 · 可點隨機填入或完成';
+    }
+    syncHud();
+    if (state.editCountdown > 0) return;
+    state.editCountdown = 0;
+    finishEdit();
   }
 
   function finishVictoryAdvance() {
@@ -3916,6 +3966,7 @@ function selectedTower() {
     state.shake = Math.max(0, state.shake - dt * 16);
     state.hurt = Math.max(0, state.hurt - dt);
     tickClearCountdown(dt);
+    tickEditCountdown(dt);
     if (state.banner) {
       if (!state.banner.countdown) state.banner.life -= dt;
       if (state.banner.life <= 0) state.banner = null;
@@ -3966,7 +4017,8 @@ function selectedTower() {
   function rewardDesc() {
     var text = '本波 +' + state.waveGoldEarned + ' 金幣';
     if (state.tileGainText) text += ' · 路線圖 ' + state.tileGainText;
-    if (state.mode === 'custom' && state.wave % 10 === 0) text += ' · 可改道';
+    if (state.mode === 'custom' && state.wave % 10 === 0) text += ' · 先改道再三選一';
+    else if (cardWaveDue(state.wave)) text += ' · 三選一';
     if (giftWaveDue(state.wave)) text += ' · 可看廣告送塔';
     return text;
   }
@@ -4069,9 +4121,8 @@ function selectedTower() {
   }
 
   function continueAfterWaveAds(cleared) {
-    if (cardWaveDue(cleared)) {
-      openCardDraft(cleared);
-    } else if (state.mode === 'custom' && cleared % 10 === 0) enterEdit();
+    if (state.mode === 'custom' && cleared % 10 === 0) enterEdit();
+    else if (cardWaveDue(cleared)) openCardDraft(cleared);
     else requestStartWave(cleared + 1);
   }
 
@@ -4264,16 +4315,27 @@ function selectedTower() {
     state.buildSite = null;
     state.selectedId = null;
     state.sellArmed = false;
-    state.banner = { text: '修改路線', sub: '直線拉長或平移，轉彎改道', life: 2.4 };
-    toast('塔不能移動。要換位子請出售，返還 8 成');
+    state.editCountdown = 20;
+    state.banner = {
+      text: '修改路線',
+      sub: '還有 20 秒 · 可點隨機填入或完成',
+      life: 20.2,
+      countdown: true,
+    };
+    toast('先排路：可手動點格，或按隨機彎／直／全部。塔不能搬，出售返還 8 成');
     renderInspector();
     syncHud();
     syncRouteBar();
   }
 
   function finishEdit() {
+    if (state.phase !== 'edit') return;
     state.editTool = null;
-    requestStartWave(state.wave + 1);
+    state.editCountdown = 0;
+    state.banner = null;
+    syncRouteBar();
+    if (cardWaveDue(state.wave)) openCardDraft(state.wave);
+    else requestStartWave(state.wave + 1);
   }
 
   function skipClearCountdown() {
@@ -4509,20 +4571,97 @@ function selectedTower() {
     return marks;
   }
 
+  function uniqueCells(list) {
+    var seen = {};
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var key = list[i].c + ',' + list[i].r;
+      if (seen[key]) continue;
+      seen[key] = true;
+      out.push(list[i]);
+    }
+    return out;
+  }
+
+  function routeAddCandidates(kind) {
+    var prev = state.editTool;
+    state.editTool = kind;
+    var marks = routeMarks().filter(function (mark) { return mark.kind === 'add'; });
+    state.editTool = prev;
+    return uniqueCells(marks);
+  }
+
+  function tryAutoPlace(kind) {
+    var cands = routeAddCandidates(kind);
+    if (!cands.length) return false;
+    shuffleInPlace(cands);
+    var before = kind === 'turn' ? state.tiles.turn : state.tiles.straight;
+    if (before <= 0) return false;
+    for (var i = 0; i < cands.length; i++) {
+      var ok = kind === 'turn'
+        ? applyTurn(cands[i])
+        : (applyStraight(cands[i]) || shiftStraight(cands[i]));
+      var after = kind === 'turn' ? state.tiles.turn : state.tiles.straight;
+      if (ok && after < before) return true;
+    }
+    return false;
+  }
+
+  function autoFillRoute(mode) {
+    if (state.phase !== 'edit') return;
+    var usedTurn = 0;
+    var usedStraight = 0;
+    muteToast = true;
+    var guard = 64;
+    while (guard-- > 0) {
+      var options = [];
+      if ((mode === 'turn' || mode === 'all') && state.tiles.turn > 0) options.push('turn');
+      if ((mode === 'straight' || mode === 'all') && state.tiles.straight > 0) options.push('straight');
+      if (!options.length) break;
+      shuffleInPlace(options);
+      var placed = false;
+      for (var o = 0; o < options.length; o++) {
+        if (!tryAutoPlace(options[o])) continue;
+        if (options[o] === 'turn') usedTurn += 1;
+        else usedStraight += 1;
+        placed = true;
+        break;
+      }
+      if (!placed) break;
+    }
+    muteToast = false;
+    var total = usedTurn + usedStraight;
+    if (!total) {
+      toast('目前沒有可鋪的位置');
+      Sfx.bad();
+    } else {
+      var parts = [];
+      if (usedTurn) parts.push('轉彎 ×' + usedTurn);
+      if (usedStraight) parts.push('直線 ×' + usedStraight);
+      toast('隨機填入：' + parts.join(' · '));
+      Sfx.build();
+    }
+    syncRouteBar();
+    syncHud();
+  }
+
   function syncRouteBar() {
     var show = state.mode === 'custom' && state.phase !== 'menu' && state.phase !== 'gameover';
     routeBar.hidden = !show;
     tileStraightEl.textContent = String(state.tiles.straight);
     tileTurnEl.textContent = String(state.tiles.turn);
+    var editing = state.phase === 'edit';
     var buttons = routeBar.querySelectorAll('[data-tile]');
     for (var i = 0; i < buttons.length; i++) {
       var kind = buttons[i].getAttribute('data-tile');
-      buttons[i].disabled = state.phase !== 'edit';
-      buttons[i].classList.toggle('is-selected', state.phase === 'edit' && state.editTool === kind);
+      buttons[i].disabled = !editing;
+      buttons[i].classList.toggle('is-selected', editing && state.editTool === kind);
     }
-    routeHint.textContent = state.phase === 'edit'
-      ? '點亮格鋪路，再點同一段可拆回圖檔。塔不能搬，出售返還 8 成。'
-      : '每 5 波隨機 +3 張，每 10 波可改道';
+    var autos = routeBar.querySelectorAll('[data-autofill]');
+    for (var a = 0; a < autos.length; a++) autos[a].disabled = !editing;
+    routeHint.textContent = editing
+      ? '限時改道：手動點格，或按隨機彎／直／全部。排完按完成改道，再三選一。'
+      : '每 5 波隨機 +3 張，每 10 波先改道再三選一';
   }
 
   function selectTile(kind) {
@@ -5227,6 +5366,7 @@ function selectedTower() {
     state.sellArmed = false;
     state.tiles = { straight: 0, turn: 0 };
     state.editTool = null;
+    state.editCountdown = 0;
     state.outcome = '';
     state.tileGainText = '';
     state.reviveUsed = false;
@@ -5234,6 +5374,7 @@ function selectedTower() {
     state.waveDoubled = false;
     state.waveGiftDone = false;
     state.pendingCard = null;
+    state.pendingChoices = null;
     state.cardRerolled = false;
     state.banner = null;
     state.rangePing = null;
@@ -5306,10 +5447,14 @@ function selectedTower() {
     state.hurt = 0;
     state.clearCountdown = 0;
     state.clearKind = '';
+    state.editCountdown = 0;
+    state.editTool = null;
+    state.pendingChoices = null;
     clearRunExtras();
     closeModal();
     renderInspector();
     syncHud();
+    syncRouteBar();
   }
 
   function placeChosen(type) {
@@ -5620,7 +5765,9 @@ function selectedTower() {
     } else if (state.phase === 'edit') {
       waveBtn.disabled = false;
       waveBtnLabel.textContent = '完成改道';
-      waveBtnSub.textContent = '接著第 ' + (state.wave + 1) + ' 波';
+      waveBtnSub.textContent = state.editCountdown > 0
+        ? Math.ceil(state.editCountdown) + ' 秒 · 接著三選一'
+        : '接著三選一';
     } else if (state.clearCountdown > 0 && (state.phase === 'reward' || state.phase === 'victory')) {
       waveBtn.disabled = false;
       waveBtnLabel.textContent = '提前開始';
@@ -8272,6 +8419,11 @@ function selectedTower() {
     });
     itemPushBtn.addEventListener('click', usePush);
     routeBar.addEventListener('click', function (event) {
+      var auto = event.target.closest('[data-autofill]');
+      if (auto && !auto.disabled) {
+        autoFillRoute(auto.getAttribute('data-autofill'));
+        return;
+      }
       var tile = event.target.closest('[data-tile]');
       if (!tile || tile.disabled) return;
       selectTile(tile.getAttribute('data-tile'));

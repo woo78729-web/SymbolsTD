@@ -1052,6 +1052,18 @@ canvas {
 }
 .tile-btn b { color: var(--gold); }
 .tile-btn.is-selected { outline: 2px solid var(--gold); outline-offset: -2px; }
+.tile-btn--auto {
+  min-height: 36px;
+  font-size: 13px;
+  background: #efe8dc;
+}
+.tile-btn:disabled { opacity: 0.45; }
+.route-auto {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
 .route-hint {
   grid-column: 1 / -1;
   margin: 0;
