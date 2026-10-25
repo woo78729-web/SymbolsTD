@@ -1,5 +1,5 @@
 /**
- * 幻想 TD — portrait tower defense.
+ * SymbolsTD — portrait tower defense.
  * Grid map, BFS route, two towers, waves, projectiles, economy.
  * Ads go through window.AdManager (see admob-bridge.js).
  */
