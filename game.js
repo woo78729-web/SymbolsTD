@@ -289,6 +289,7 @@
     hellDeffs: [],
     hellDeffHalf: false,
     hellLockCd: 0,
+    pathRerolled: false,
     sellArmed: false,
     hover: null,
     mode: 'menu',
@@ -887,13 +888,67 @@
     renderInspector();
   }
 
-  function reshuffleInfinitePath() {
+  function reshuffleInfinitePath(opts) {
+    opts = opts || {};
     setRoute(buildRandomInfinitePath());
     refundTowersOnPath();
     state.selectedId = null;
     state.buildSite = null;
-    toast('路線已更換（起點終點不變）');
+    if (!opts.silent) toast('路線已更換（起點終點不變）');
     syncHud();
+  }
+
+  function openPathRerollOffer(cleared) {
+    state.phase = 'reward';
+    state.paused = true;
+    state.cardWave = cleared;
+    var actions = [
+      {
+        label: '接受這條路線',
+        className: 'btn-mint',
+        onClick: function () {
+          closeModal();
+          openCardDraft(cleared);
+        },
+      },
+    ];
+    if (!state.pathRerolled) {
+      actions.push({
+        label: '觀看廣告再換一次',
+        className: 'btn-gold',
+        ad: true,
+        onClick: function () { rerollPathAd(cleared); },
+      });
+    }
+    openModal({
+      tone: 'reward',
+      kicker: '第 ' + cleared + ' 波',
+      title: state.pathRerolled ? '新路線已就緒' : '路線已更換',
+      desc: state.pathRerolled
+        ? '這是廣告換來的新路線（起點終點不變）。確認後繼續抽獎勵。'
+        : '起點終點不變，中間路線已重新隨機。若新路線讓塔守不住，可看廣告再換一次（僅一次）。',
+      actions: actions,
+    });
+  }
+
+  function rerollPathAd(cleared) {
+    if (state.adBusy || state.pathRerolled) return;
+    state.adBusy = true;
+    setModalBusy(true);
+    Ads.showRewarded({ placement: 'path_reroll' }).then(function (result) {
+      state.adBusy = false;
+      if (!result || !result.rewarded) {
+        setModalBusy(false);
+        toast(result && result.error ? '廣告載入失敗' : '未看完廣告，路線未更換');
+        return;
+      }
+      state.pathRerolled = true;
+      reshuffleInfinitePath({ silent: true });
+      Sfx.unlock();
+      Sfx.ui();
+      toast('已換新路線');
+      openPathRerollOffer(cleared);
+    });
   }
 
   var CHAPTERS = [
@@ -1132,18 +1187,31 @@
     return pointAt(enemy.dist);
   }
 
+  var HOPPER_JUMP_MAX = 3;
+  var HOPPER_JUMP_CD = 5.2;
+
+  function hoppingCount() {
+    var n = 0;
+    for (var i = 0; i < state.enemies.length; i++) {
+      var e = state.enemies[i];
+      if (!e.dead && e.type === 'hopper' && e.jumping) n += 1;
+    }
+    return n;
+  }
+
   function tryHopperJump(enemy) {
     if (!PATH_JUMPS.length || enemy.jumpCd > 0 || enemy.jumping || enemy.freeze > 0) return;
+    if (hoppingCount() >= HOPPER_JUMP_MAX) return;
     var best = null;
     for (var i = 0; i < PATH_JUMPS.length; i++) {
       var jump = PATH_JUMPS[i];
-      if (enemy.dist < jump.from - 0.15 || enemy.dist > jump.from + 0.55) continue;
-      if (jump.to <= enemy.dist + 2) continue;
+      if (enemy.dist < jump.from - 0.1 || enemy.dist > jump.from + 0.35) continue;
+      if (jump.to <= enemy.dist + 2.5) continue;
       if (!best || jump.to - jump.from > best.to - best.from) best = jump;
     }
     if (!best) return;
-    enemy.jumping = { from: best.from, to: best.to, t: 0, dur: 0.38 };
-    enemy.jumpCd = 2.2;
+    enemy.jumping = { from: best.from, to: best.to, t: 0, dur: 0.4 };
+    enemy.jumpCd = HOPPER_JUMP_CD;
   }
 
   function worldX(x) { return view.originX + x * view.tile; }
@@ -1408,10 +1476,11 @@ function selectedTower() {
       jobs.push({ type: 'grunt', gap: gap });
     }
     var hoppers = 0;
-    if (wave >= 4) {
-      hoppers = 1 + Math.floor((wave - 4) / 5);
-      if (diff.id === 'hell') hoppers += 1;
-      for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: gap * 0.9 });
+    if (wave >= 6) {
+      hoppers = 1 + Math.floor((wave - 6) / 9);
+      if (diff.id === 'hell' && wave >= 12) hoppers += 1;
+      hoppers = Math.min(diff.id === 'hell' ? 3 : 2, hoppers);
+      for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: Math.max(1.35, gap * 2.2) });
     }
     var brutes = 0;
     var boss = bossForWave(wave);
@@ -1450,9 +1519,9 @@ function selectedTower() {
       jobs.push({ type: 'grunt', gap: gap });
     }
     var hoppers = 0;
-    if (wave >= 4) {
-      hoppers = 1 + Math.floor((wave - 4) / 6);
-      for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: gap * 0.88 });
+    if (wave >= 6) {
+      hoppers = Math.min(2, 1 + Math.floor((wave - 6) / 10));
+      for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: Math.max(1.4, gap * 2.1) });
     }
     var brutes = 0;
     var boss = bossForWave(wave);
@@ -1566,7 +1635,7 @@ function selectedTower() {
       dead: false,
       hitFlash: 0,
       lastNum: 0,
-      jumpCd: type === 'hopper' ? 0.6 : 0,
+      jumpCd: type === 'hopper' ? 2.8 : 0,
       jumping: null,
     };
   }
@@ -1747,6 +1816,7 @@ function selectedTower() {
         if (enemy.jumping.t >= 1) {
           enemy.dist = enemy.jumping.to;
           enemy.jumping = null;
+          enemy.jumpCd = Math.max(enemy.jumpCd || 0, HOPPER_JUMP_CD);
         }
       } else {
         var step = moveSpeed(enemy) * dt;
@@ -2142,6 +2212,7 @@ function selectedTower() {
     state.hellDeffs = [];
     state.hellDeffHalf = false;
     state.hellLockCd = 0;
+    state.pathRerolled = false;
   }
 
   function pathIndex(c, r) {
@@ -3393,27 +3464,46 @@ function selectedTower() {
     return near.length ? near : all;
   }
 
+  function giftTowerInvested(type, level) {
+    var def = TOWERS[type];
+    if (!def) return 0;
+    var invested = def.cost || 0;
+    for (var i = 0; i < level; i++) {
+      invested += def.upgradeCost && def.upgradeCost[i] ? def.upgradeCost[i] : 0;
+    }
+    return invested;
+  }
+
   function placeFreeTower(type, cell) {
     var def = TOWERS[type];
     if (!def || !cell) return false;
-    state.towers.push({
+    var level = Math.floor(Math.random() * 3);
+    var spec = null;
+    if (def.specs && level >= 2) {
+      var ids = Object.keys(def.specs);
+      spec = ids[Math.floor(Math.random() * ids.length)];
+    }
+    var invested = giftTowerInvested(type, level);
+    var tower = {
       id: state.nextId++,
       type: type,
       c: cell.c,
       r: cell.r,
-      level: 0,
+      level: level,
       cooldown: 0.15,
       aim: -Math.PI / 2,
       flash: 0,
       chill: 0,
-      spec: null,
-      invested: 0,
-    });
+      spec: spec,
+      invested: invested,
+    };
+    state.towers.push(tower);
     flashCell(cell.c, cell.r, true);
-    state.rangePing = { c: cell.c, r: cell.r, range: def.levels[0].range, color: def.color, t: 0.9 };
-    burst(cell.c + 0.5, cell.r + 0.5, def.color, 8);
+    var stats = towerStats(tower);
+    state.rangePing = { c: cell.c, r: cell.r, range: stats.range, color: towerColor(tower), t: 0.9 };
+    burst(cell.c + 0.5, cell.r + 0.5, towerColor(tower), 8);
     Sfx.build();
-    return true;
+    return tower;
   }
 
   function grantAdTower() {
@@ -3433,16 +3523,24 @@ function selectedTower() {
     }
     var pool = ['basic', 'basic', 'poison', 'fire', 'ice', 'bolt'];
     var type = pool[Math.floor(Math.random() * pool.length)];
-    placeFreeTower(type, cell);
-    toast('廣告贈送 ' + TOWERS[type].name);
+    var tower = placeFreeTower(type, cell);
+    if (tower) {
+      var refund = Math.floor(tower.invested * sellRatio());
+      toast('廣告贈送 ' + towerLabel(tower) + ' Lv.' + (tower.level + 1) + '（可出售約 ' + refund + '）');
+    }
     syncHud();
-    return true;
+    return !!tower;
   }
 
   function continueAfterWaveAds(cleared) {
     if (cardWaveDue(cleared)) {
-      if (state.mode === 'infinite') reshuffleInfinitePath();
-      openCardDraft(cleared);
+      if (state.mode === 'infinite') {
+        state.pathRerolled = false;
+        reshuffleInfinitePath({ silent: true });
+        openPathRerollOffer(cleared);
+      } else {
+        openCardDraft(cleared);
+      }
     } else if (state.mode === 'custom' && cleared % 10 === 0) enterEdit();
     else startWave(cleared + 1);
   }
