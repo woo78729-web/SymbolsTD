@@ -4401,7 +4401,7 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '小惡魔', paint: { kind: 'enemy', type: 'devil', color: '#c62828' },
-        desc: '手繪小惡魔。近塔會惡咒鎖塔，漏關還會偷金幣。',
+        desc: '塗鴉風圓臉小惡魔。近塔會惡咒鎖塔，漏關還會偷金幣。',
         stats: [
           '<strong>血量</strong>：普通怪 ×0.95',
           '<strong>移速</strong>：略快於普通怪',
@@ -6914,62 +6914,47 @@ function selectedTower() {
   }
 
   function drawDevilBody(rad, colors, bob) {
-    // tidy little devil: oval + curved horns + tiny wings + pointed tail
+    // doodle imp: round face + sharp triangle horns (match welcome bg)
     inkSeed = Math.round(rad * 41 + 9);
     ctx.translate(0, bob);
-    inkSetup(Math.max(2.1, rad * 0.16));
+    inkSetup(Math.max(2.2, rad * 0.17));
     ctx.fillStyle = colors.fill;
     ctx.strokeStyle = colors.rim;
-    // tiny wings
+    // sharp horns (filled triangles, slight outward tilt)
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.55, -rad * 0.05);
-    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.45, -rad * 1.15, rad * 0.15);
-    ctx.quadraticCurveTo(-rad * 0.75, rad * 0.05, -rad * 0.5, rad * 0.25);
+    ctx.moveTo(-rad * 0.42, -rad * 0.55);
+    ctx.lineTo(-rad * 0.58, -rad * 1.12);
+    ctx.lineTo(-rad * 0.12, -rad * 0.68);
     ctx.closePath();
     ctx.fill();
     inkStroke();
     ctx.beginPath();
-    ctx.moveTo(rad * 0.55, -rad * 0.05);
-    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.45, rad * 1.15, rad * 0.15);
-    ctx.quadraticCurveTo(rad * 0.75, rad * 0.05, rad * 0.5, rad * 0.25);
+    ctx.moveTo(rad * 0.42, -rad * 0.55);
+    ctx.lineTo(rad * 0.58, -rad * 1.12);
+    ctx.lineTo(rad * 0.12, -rad * 0.68);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    // body oval
-    ctx.beginPath();
-    ctx.ellipse(0, rad * 0.08, rad * 0.72, rad * 0.82, 0, 0, Math.PI * 2);
+    // round head
+    inkCircle(0, rad * 0.06, rad * 0.82, 16);
     ctx.fill();
     inkStroke();
-    // curved horns (stroke only, cleaner)
-    ctx.strokeStyle = colors.accent;
-    ctx.lineWidth = Math.max(2.2, rad * 0.16);
-    ctx.beginPath();
-    ctx.moveTo(-rad * 0.28, -rad * 0.55);
-    ctx.quadraticCurveTo(-rad * 0.55, -rad * 0.95, -rad * 0.22, -rad * 1.18);
-    inkStroke();
-    ctx.beginPath();
-    ctx.moveTo(rad * 0.28, -rad * 0.55);
-    ctx.quadraticCurveTo(rad * 0.55, -rad * 0.95, rad * 0.22, -rad * 1.18);
-    inkStroke();
-    drawEnemyEyes(rad * 0.85, colors.ink, { size: 0.13, gap: 0.26, y: -0.08, shine: true });
-    // small smile
+    // dot eyes
+    ctx.fillStyle = colors.ink;
+    inkCircle(-rad * 0.28, -rad * 0.06, Math.max(1.8, rad * 0.12), 8);
+    ctx.fill();
+    inkCircle(rad * 0.28, -rad * 0.06, Math.max(1.8, rad * 0.12), 8);
+    ctx.fill();
+    // angry brows (bg style)
     ctx.strokeStyle = colors.ink;
-    ctx.lineWidth = Math.max(1.5, rad * 0.1);
-    ctx.beginPath();
-    ctx.arc(0, rad * 0.18, rad * 0.22, 0.15, Math.PI - 0.15);
+    ctx.lineWidth = Math.max(1.8, rad * 0.12);
+    inkLine(-rad * 0.48, -rad * 0.28, -rad * 0.12, -rad * 0.18, 2);
     inkStroke();
-    // pointed tail
-    ctx.beginPath();
-    ctx.moveTo(rad * 0.45, rad * 0.55);
-    ctx.quadraticCurveTo(rad * 0.95, rad * 0.7, rad * 1.05, rad * 1.05);
+    inkLine(rad * 0.48, -rad * 0.28, rad * 0.12, -rad * 0.18, 2);
     inkStroke();
+    // mischievous grin
     ctx.beginPath();
-    ctx.moveTo(rad * 0.95, rad * 0.95);
-    ctx.lineTo(rad * 1.22, rad * 0.88);
-    ctx.lineTo(rad * 1.08, rad * 1.2);
-    ctx.closePath();
-    ctx.fillStyle = colors.accent;
-    ctx.fill();
+    ctx.arc(0, rad * 0.22, rad * 0.32, 0.15, Math.PI - 0.15);
     inkStroke();
   }
 
