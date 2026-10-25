@@ -15,23 +15,85 @@
 <body>
   <div id="app">
     <h1 class="sr-only">幻想 TD</h1>
-    <section id="screen-menu" class="screen">
-      <div class="game-logo" role="img" aria-label="幻想塔防"></div>
-      <p class="screen-kicker">幻想 TD</p>
-      <h2>選擇模式</h2>
-      <button type="button" class="mode-card" id="btn-mode-campaign">
-        <span class="mode-name">關卡爬塔</span>
-        <span class="mode-desc">8 個章節、40 個小關。每關固定兩種小怪。守住得星，看廣告復活最多一星。</span>
-      </button>
-      <button type="button" class="mode-card" id="btn-mode-custom">
-        <span class="mode-name">自訂路線</span>
-        <span class="mode-desc">預設一條直線，小怪隨機出現。可選普通或地獄。每 5 波隨機獲得 3 張路線圖（直線、轉彎），每 10 波可改道。塔不能移動，要換位子只能出售，返還 8 成。</span>
-      </button>
-      <button type="button" class="mode-card" id="btn-mode-infinite">
-        <span class="mode-name">無限隨機模式</span>
-        <span class="mode-desc">地圖隨機產生，波次沒有上限。每 10 波自動更換路線（起點終點不變）。可選普通或地獄，地獄的怪更厚、更密。</span>
-      </button>
+
+    <section id="screen-welcome" class="screen screen-welcome">
+      <div class="welcome-stage">
+        <div class="welcome-art">
+          <img class="welcome-bg" src="assets/ui/bg-welcome-v7.jpg?v=8" alt="" aria-hidden="true" draggable="false" />
+          <img class="welcome-logo" src="assets/ui/logo-symbols-td.png?v=8" alt="SymbolsTD" />
+          <button type="button" class="welcome-start" id="btn-welcome-start" aria-label="開始遊戲">
+            <img src="assets/ui/btn-start.png?v=8" alt="開始遊戲" />
+          </button>
+        </div>
+      </div>
     </section>
+
+    <section id="screen-menu" class="screen screen-menu" hidden>
+      <div class="screen-head menu-head">
+        <button type="button" class="icon-btn" id="btn-menu-back" aria-label="返回歡迎頁">‹</button>
+        <div>
+          <p class="screen-kicker">幻想 TD</p>
+          <h2>目錄</h2>
+        </div>
+      </div>
+      <div class="menu-actions">
+        <button type="button" class="doodle-btn" id="btn-mode-campaign" aria-label="關卡爬塔">
+          <img src="assets/ui/btn-mode-campaign.png" alt="關卡爬塔" />
+        </button>
+        <button type="button" class="doodle-btn" id="btn-mode-custom" aria-label="自訂路線">
+          <img src="assets/ui/btn-mode-custom.png" alt="自訂路線" />
+        </button>
+        <button type="button" class="doodle-btn" id="btn-mode-infinite" aria-label="無限隨機">
+          <img src="assets/ui/btn-mode-infinite.png" alt="無限隨機" />
+        </button>
+        <button type="button" class="doodle-btn" id="btn-open-codex" aria-label="怪圖鑑">
+          <img src="assets/ui/btn-codex.png" alt="怪圖鑑" />
+        </button>
+        <button type="button" class="doodle-btn" id="btn-open-towers" aria-label="塔明細">
+          <img src="assets/ui/btn-towers.png" alt="塔明細" />
+        </button>
+        <button type="button" class="doodle-btn" id="btn-open-hell" aria-label="地獄詞綴">
+          <img src="assets/ui/btn-hell-deff.png?v=4" alt="地獄詞綴" />
+        </button>
+      </div>
+    </section>
+
+    <section id="screen-hell" class="screen screen-info" hidden>
+      <div class="screen-head">
+        <button type="button" class="icon-btn" id="btn-hell-back" aria-label="返回">‹</button>
+        <div>
+          <p class="screen-kicker">圖鑑</p>
+          <h2>地獄詞綴</h2>
+        </div>
+      </div>
+      <p class="screen-note">地獄難度會疊加詞綴。毒克制回血，火克制厚皮。</p>
+      <div id="hell-info-list" class="info-list"></div>
+    </section>
+
+    <section id="screen-codex" class="screen screen-info" hidden>
+      <div class="screen-head">
+        <button type="button" class="icon-btn" id="btn-codex-back" aria-label="返回">‹</button>
+        <div>
+          <p class="screen-kicker">圖鑑</p>
+          <h2>怪圖鑑</h2>
+        </div>
+      </div>
+      <p class="screen-note">先看清楚怪的特性與克制，再開戰。</p>
+      <div id="codex-list" class="info-list"></div>
+    </section>
+
+    <section id="screen-towers" class="screen screen-info" hidden>
+      <div class="screen-head">
+        <button type="button" class="icon-btn" id="btn-towers-back" aria-label="返回">‹</button>
+        <div>
+          <p class="screen-kicker">圖鑑</p>
+          <h2>塔明細</h2>
+        </div>
+      </div>
+      <p class="screen-note">各塔效果、分支與克制一覽。</p>
+      <div id="tower-info-list" class="info-list"></div>
+    </section>
+
     <section id="screen-difficulty" class="screen" hidden>
       <div class="screen-head">
         <button type="button" class="icon-btn" id="btn-difficulty-back" aria-label="返回選單">‹</button>
@@ -40,7 +102,7 @@
           <h2>選擇難度</h2>
         </div>
       </div>
-      <p class="screen-note" id="difficulty-note">地圖隨機，每 10 波改一次路線。普通與地獄分開記錄最遠波次。</p>
+      <p class="screen-note" id="difficulty-note">開局隨機地圖後固定路線。普通與地獄分開記錄最遠波次。</p>
       <div id="difficulty-list"></div>
     </section>
     <section id="screen-chapters" class="screen" hidden>
@@ -79,6 +141,9 @@
         <span class="stat-value" id="hud-gold">140</span>
         <span class="stat-label">金幣</span>
       </div>
+      <button type="button" class="icon-btn" id="btn-pause" aria-pressed="false" aria-label="暫停">
+        <img class="hud-ico" src="assets/ui/btn-pause.png" alt="" />
+      </button>
       <button type="button" class="icon-btn" id="btn-sound" aria-pressed="false" aria-label="關閉音效">♪</button>
     </header>
 

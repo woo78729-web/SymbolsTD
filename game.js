@@ -127,7 +127,7 @@
     },
     poison: {
       name: '毒塔',
-      blurb: '單體毒液 · 持續傷害高 · 會傳染',
+      blurb: '單體毒液 · 克制再生／治療／地獄回血 · 觸發後持續扣總血%',
       cost: 80,
       color: '#3cbf4a',
       category: 'element',
@@ -143,7 +143,7 @@
     },
     fire: {
       name: '火塔',
-      blurb: '紅色炸彈 · 群傷 · 灼燒會傳染',
+      blurb: '紅色炸彈 · 破盾／克制鐵甲／地獄厚皮 · 觸發時打血量%',
       cost: 90,
       color: '#ff7a45',
       category: 'element',
@@ -189,6 +189,22 @@
         { damage: 84, range: 2.7, cooldown: 0.38, splash: 0, targets: 1, chain: 4, chainRange: 2.15 },
       ],
     },
+    mint: {
+      name: '產錢塔',
+      blurb: '不攻擊 · 定期產出金幣',
+      cost: 70,
+      color: '#f2c14e',
+      category: 'economy',
+      upgradeCost: [50, 80, 115, 155, 200],
+      levels: [
+        { damage: 0, range: 0, cooldown: 5.0, goldGen: 6 },
+        { damage: 0, range: 0, cooldown: 4.6, goldGen: 8 },
+        { damage: 0, range: 0, cooldown: 4.2, goldGen: 11 },
+        { damage: 0, range: 0, cooldown: 3.8, goldGen: 14 },
+        { damage: 0, range: 0, cooldown: 3.4, goldGen: 18 },
+        { damage: 0, range: 0, cooldown: 3.0, goldGen: 22 },
+      ],
+    },
   };
 
   var BOSSES = [
@@ -227,6 +243,11 @@
   var waveBtnLabel = document.getElementById('wave-btn-label');
   var waveBtnSub = document.getElementById('wave-btn-sub');
   var soundBtn = document.getElementById('btn-sound');
+  var pauseBtn = document.getElementById('btn-pause');
+  var screenWelcome = document.getElementById('screen-welcome');
+  var screenCodex = document.getElementById('screen-codex');
+  var screenTowersInfo = document.getElementById('screen-towers');
+  var screenHell = document.getElementById('screen-hell');
   var inspector = document.getElementById('inspector');
   var inspectTitle = document.getElementById('inspect-title');
   var inspectMeta = document.getElementById('inspect-meta');
@@ -264,6 +285,7 @@
     wave: 0,
     phase: 'prep',
     paused: false,
+    userPaused: false,
     best: loadNumber('fantasia-td-best'),
     difficulty: 'normal',
     difficultyMode: 'infinite',
@@ -289,7 +311,6 @@
     hellDeffs: [],
     hellDeffHalf: false,
     hellLockCd: 0,
-    pathRerolled: false,
     sellArmed: false,
     hover: null,
     mode: 'menu',
@@ -886,69 +907,6 @@
     }
     state.selectedId = null;
     renderInspector();
-  }
-
-  function reshuffleInfinitePath(opts) {
-    opts = opts || {};
-    setRoute(buildRandomInfinitePath());
-    refundTowersOnPath();
-    state.selectedId = null;
-    state.buildSite = null;
-    if (!opts.silent) toast('路線已更換（起點終點不變）');
-    syncHud();
-  }
-
-  function openPathRerollOffer(cleared) {
-    state.phase = 'reward';
-    state.paused = true;
-    state.cardWave = cleared;
-    var actions = [
-      {
-        label: '接受這條路線',
-        className: 'btn-mint',
-        onClick: function () {
-          closeModal();
-          openCardDraft(cleared);
-        },
-      },
-    ];
-    if (!state.pathRerolled) {
-      actions.push({
-        label: '觀看廣告再換一次',
-        className: 'btn-gold',
-        ad: true,
-        onClick: function () { rerollPathAd(cleared); },
-      });
-    }
-    openModal({
-      tone: 'reward',
-      kicker: '第 ' + cleared + ' 波',
-      title: state.pathRerolled ? '新路線已就緒' : '路線已更換',
-      desc: state.pathRerolled
-        ? '這是廣告換來的新路線（起點終點不變）。確認後繼續抽獎勵。'
-        : '起點終點不變，中間路線已重新隨機。若新路線讓塔守不住，可看廣告再換一次（僅一次）。',
-      actions: actions,
-    });
-  }
-
-  function rerollPathAd(cleared) {
-    if (state.adBusy || state.pathRerolled) return;
-    state.adBusy = true;
-    setModalBusy(true);
-    Ads.showRewarded({ placement: 'path_reroll' }).then(function (result) {
-      state.adBusy = false;
-      if (!result || !result.rewarded) {
-        setModalBusy(false);
-        toast(result && result.error ? '廣告載入失敗' : '未看完廣告，路線未更換');
-        return;
-      }
-      state.pathRerolled = true;
-      reshuffleInfinitePath({ silent: true });
-      Sfx.unlock();
-      Sfx.ui();
-      toast('已換新路線');
-      openPathRerollOffer(cleared);
-    });
   }
 
   var CHAPTERS = [
@@ -1606,11 +1564,12 @@ function selectedTower() {
     }
     var gruntHp = Math.round(32 * Math.pow(growth, scaledWave - 1) * hpMul);
     var gruntSpeed = Math.min(speedCap, (1.0 + (scaledWave - 1) * speedGrow) * speedMul);
+    var softWaveGold = wave <= 20 ? wave : Math.round(20 + (wave - 20) * 0.4);
     var table = {
-      grunt: { hp: gruntHp, speed: gruntSpeed, gold: Math.max(2, wave), radius: 0.3, color: '#e25b4a', leak: 1 },
-      swift: { hp: Math.round(gruntHp * 0.62), speed: Math.min(diff ? speedCap + 0.45 : 2.1, gruntSpeed * 1.55), gold: Math.max(2, wave - 1), radius: 0.23, color: '#f0a202', leak: 1 },
-      hopper: { hp: Math.round(gruntHp * 0.8), speed: Math.min((diff ? speedCap : 1.7) + 0.15, gruntSpeed * 1.25), gold: Math.max(3, wave + 1), radius: 0.26, color: '#4ec6e8', leak: 1 },
-      brute: { hp: Math.round(gruntHp * 7.5), speed: gruntSpeed * 0.52, gold: 8 + wave * 2, radius: 0.44, color: '#8d6bff', leak: 3 },
+      grunt: { hp: gruntHp, speed: gruntSpeed, gold: Math.max(2, softWaveGold), radius: 0.3, color: '#e25b4a', leak: 1 },
+      swift: { hp: Math.round(gruntHp * 0.62), speed: Math.min(diff ? speedCap + 0.45 : 2.1, gruntSpeed * 1.55), gold: Math.max(2, softWaveGold - 1), radius: 0.23, color: '#f0a202', leak: 1 },
+      hopper: { hp: Math.round(gruntHp * 0.8), speed: Math.min((diff ? speedCap : 1.7) + 0.15, gruntSpeed * 1.25), gold: Math.max(3, softWaveGold + 1), radius: 0.26, color: '#4ec6e8', leak: 1 },
+      brute: { hp: Math.round(gruntHp * 7.5), speed: gruntSpeed * 0.52, gold: 8 + softWaveGold * 2, radius: 0.44, color: '#8d6bff', leak: 3 },
     };
     var spec = table[type] || table.grunt;
     if (goldMul !== 1) spec.gold = Math.max(2, Math.round(spec.gold * goldMul));
@@ -1835,9 +1794,27 @@ function selectedTower() {
         leakEnemy(enemy);
         continue;
       }
+      if (enemy.poisonRuinTime > 0) {
+        enemy.poisonRuinTime -= dt;
+        enemy.poisonRuinAcc = (enemy.poisonRuinAcc || 0) + enemy.maxHp * (enemy.poisonRuinRate || 0.03) * dt;
+        if (enemy.poisonRuinAcc >= 1) {
+          var ruinDmg = Math.floor(enemy.poisonRuinAcc);
+          enemy.poisonRuinAcc -= ruinDmg;
+          hurtEnemy(enemy, ruinDmg, null, { pierce: true, ignoreShield: true });
+          if (enemy.dead) continue;
+        }
+        if (enemy.poisonRuinTime <= 0) {
+          enemy.poisonRuin = false;
+          enemy.poisonRuinAcc = 0;
+        }
+      }
       var regenRate = hellDeffValue('regen');
       if (regenRate > 0 && enemy.hp < enemy.maxHp) {
-        enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * regenRate * dt);
+        if (enemy.poisonTime > 0 || enemy.poisonRuin) {
+          triggerPoisonCounter(enemy);
+        } else {
+          enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * regenRate * dt);
+        }
       }
       var enrageMul = hellDeffValue('enrage');
       if (enrageMul > 0 && !enemy.hellEnraged && enemy.hp <= enemy.maxHp * 0.1) {
@@ -1910,6 +1887,7 @@ function selectedTower() {
     other.burnEvery = from.burnEvery || 0.5;
     other.burnTick = other.burnEvery;
     spawnFloater(pos.x, pos.y - 0.45, '灼燒', '#e02323');
+    if (isFireCounterTarget(other)) triggerFireCounter(other);
   }
 
   function passPoison(from, other, pos) {
@@ -1922,18 +1900,80 @@ function selectedTower() {
     other.poisonEvery = from.poisonEvery || 0.4;
     other.poisonTick = other.poisonEvery;
     spawnFloater(pos.x, pos.y - 0.7, '中毒', '#3cbf4a');
+    if (isPoisonCounterTarget(other) || from.poisonRuin) triggerPoisonCounter(other);
+  }
+
+  function isHealRegenEnemy(enemy) {
+    return !!(enemy && (enemy.bossId === 'regen' || enemy.bossId === 'mend'));
+  }
+
+  function isPoisonCounterTarget(enemy) {
+    return !!(enemy && (isHealRegenEnemy(enemy) || hasHellDeff('regen')));
+  }
+
+  function isFireCounterTarget(enemy) {
+    return !!(enemy && (enemy.shield > 0 || enemy.bossId === 'armor' || hasHellDeff('thick')));
+  }
+
+  function triggerPoisonCounter(enemy) {
+    if (!enemy || enemy.dead) return;
+    var fresh = !enemy.poisonRuin;
+    enemy.poisonRuin = true;
+    enemy.poisonRuinRate = 0.03;
+    enemy.poisonRuinTime = Math.max(enemy.poisonRuinTime || 0, 4.5);
+    if (fresh) {
+      var pos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+      spawnFloater(pos.x, pos.y - 0.7, hasHellDeff('regen') && !isHealRegenEnemy(enemy) ? '克制回血' : '毒蝕', '#3cbf4a');
+    }
+  }
+
+  function triggerFireCounter(enemy) {
+    if (!enemy || enemy.dead) return;
+    if (enemy.fireCounterAt && state.time - enemy.fireCounterAt < 0.85) {
+      if (enemy.shield > 0) {
+        enemy.shield = 0;
+        var early = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+        spawnFloater(early.x, early.y - 0.55, '破盾', '#e02323');
+      }
+      return;
+    }
+    enemy.fireCounterAt = state.time;
+    var pos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+    var triggered = false;
+    if (enemy.shield > 0) {
+      enemy.shield = 0;
+      triggered = true;
+      spawnFloater(pos.x, pos.y - 0.55, '破盾', '#e02323');
+    }
+    if (enemy.bossId === 'armor') {
+      enemy.firePierce = true;
+      triggered = true;
+      spawnFloater(pos.x, pos.y - 0.75, '破甲', '#e02323');
+    }
+    if (hasHellDeff('thick')) {
+      triggered = true;
+      spawnFloater(pos.x, pos.y - 0.95, '克制厚皮', '#e02323');
+    }
+    if (!triggered) return;
+    var pct = Math.max(1, Math.round(enemy.maxHp * 0.1));
+    hurtEnemy(enemy, pct, null, { pierce: true, ignoreShield: true });
   }
 
   function tickBoss(enemy, dt) {
     enemy.pulse += dt;
     var pos = pointAt(enemy.dist);
     if (enemy.bossId === 'regen') {
-      var before = enemy.hp;
-      enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.025 * dt);
-      enemy.regenShow = (enemy.regenShow || 0) - dt;
-      if (enemy.hp > before && enemy.hp < enemy.maxHp && enemy.regenShow <= 0) {
-        enemy.regenShow = 1.15;
-        spawnFloater(pos.x, pos.y - 0.6, '回復', '#3ecf8e');
+      if (enemy.poisonTime > 0 || enemy.poisonRuin) {
+        triggerPoisonCounter(enemy);
+        enemy.regenShow = (enemy.regenShow || 0) - dt;
+      } else {
+        var before = enemy.hp;
+        enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.025 * dt);
+        enemy.regenShow = (enemy.regenShow || 0) - dt;
+        if (enemy.hp > before && enemy.hp < enemy.maxHp && enemy.regenShow <= 0) {
+          enemy.regenShow = 1.15;
+          spawnFloater(pos.x, pos.y - 0.6, '回復', '#3ecf8e');
+        }
       }
     } else if (enemy.bossId === 'rush') {
       if (!enemy.enraged && enemy.hp <= enemy.maxHp * 0.5) {
@@ -1972,11 +2012,23 @@ function selectedTower() {
       enemy.mendAcc += dt;
       if (enemy.mendAcc < 0.5) return;
       enemy.mendAcc = 0;
+      if (enemy.poisonTime > 0 || enemy.poisonRuin) {
+        triggerPoisonCounter(enemy);
+        return;
+      }
       for (var i = 0; i < state.enemies.length; i++) {
         var other = state.enemies[i];
         if (other === enemy || other.dead || other.hp >= other.maxHp) continue;
         var otherPos = pointAt(other.dist);
         if (Math.hypot(otherPos.x - pos.x, otherPos.y - pos.y) > 1.8) continue;
+        if (other.poisonTime > 0 || other.poisonRuin) {
+          triggerPoisonCounter(other);
+          if (state.time - (other.lastMend || 0) > 0.9) {
+            other.lastMend = state.time;
+            spawnFloater(otherPos.x, otherPos.y - 0.35, '治療失敗', '#3cbf4a');
+          }
+          continue;
+        }
         var heal = Math.min(other.maxHp - other.hp, enemy.mendPower);
         other.hp += heal;
         if (state.time - (other.lastMend || 0) > 0.9) {
@@ -2027,6 +2079,7 @@ function selectedTower() {
     if (copy.chainRange) copy.chainRange = Math.round(copy.chainRange * 1.4 * 100) / 100;
     if (copy.poison) copy.poison = Math.max(1, Math.round(copy.poison * 1.4));
     if (copy.burn) copy.burn = Math.max(1, Math.round(copy.burn * 1.4));
+    if (copy.goldGen) copy.goldGen = Math.max(1, Math.round(copy.goldGen * 1.4));
     return copy;
   }
 
@@ -2102,6 +2155,10 @@ function selectedTower() {
     var bonus = supportBonus(tower);
     if (bonus <= 0) return stats;
     var copy = cloneStats(stats);
+    if (tower.type === 'mint') {
+      if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + bonus * 0.5);
+      return copy;
+    }
     copy.damage = Math.max(1, Math.round((copy.damage || 0) * (1 + bonus)));
     if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + bonus);
     return copy;
@@ -2212,7 +2269,6 @@ function selectedTower() {
     state.hellDeffs = [];
     state.hellDeffHalf = false;
     state.hellLockCd = 0;
-    state.pathRerolled = false;
   }
 
   function pathIndex(c, r) {
@@ -2760,6 +2816,18 @@ function selectedTower() {
       }
       var stats = towerStats(tower);
       tower.cooldown -= dt;
+      if (tower.type === 'mint') {
+        if (tower.cooldown <= 0) {
+          var gain = Math.max(1, stats.goldGen || 0);
+          state.gold += gain;
+          state.waveGoldEarned += gain;
+          spawnFloater(tower.c + 0.5, tower.r + 0.15, '+' + gain, '#f2c14e');
+          tower.cooldown = stats.cooldown;
+          tower.flash = 1;
+          syncHud();
+        }
+        continue;
+      }
       var want = isCannonPath(tower) ? Math.min(3, stats.shots || 1) : (stats.targets || 1);
       var targets = targetsInRange(tower, stats.range, want);
       if (!targets.length) continue;
@@ -2771,6 +2839,15 @@ function selectedTower() {
         tower.cooldown = stats.cooldown;
       }
     }
+  }
+
+  function scaledKillGold(base) {
+    var gold = Math.max(1, base || 1);
+    if (state.wave <= 20) return gold;
+    var over = state.wave - 20;
+    // 後期擊殺金幣遞減，避免無限模式錢淹；產錢塔補經濟
+    var mul = Math.max(0.26, 1 - over * 0.032);
+    return Math.max(1, Math.round(gold * mul));
   }
 
   function targetsInRange(tower, range, limit) {
@@ -3049,6 +3126,7 @@ function selectedTower() {
       enemy.poisonTick = enemy.poisonEvery;
       spawnFloater(pointAt(enemy.dist).x, pointAt(enemy.dist).y - 0.45, '中毒', '#3cbf4a');
     }
+    if (isPoisonCounterTarget(enemy)) triggerPoisonCounter(enemy);
   }
 
   function updateShell(shot, dt) {
@@ -3131,6 +3209,7 @@ function selectedTower() {
         enemy.burnTick = enemy.burnEvery || 0.5;
         spawnFloater(pos.x, pos.y - 0.45, '灼燒', '#e02323');
       }
+      if (isFireCounterTarget(enemy)) triggerFireCounter(enemy);
     }
   }
 
@@ -3192,15 +3271,17 @@ function selectedTower() {
     return best;
   }
 
-  function hurtEnemy(enemy, amount, ownerId) {
+  function hurtEnemy(enemy, amount, ownerId, opts) {
     if (!enemy || enemy.dead || state.phase !== 'combat') return;
+    opts = opts || {};
     if (ownerId) {
       var owner = towerById(ownerId);
       if (owner && owner.type === 'hero') enemy.heroTag = owner.id;
     }
     var damage = Math.max(1, Math.round(amount));
-    if (enemy.bossId === 'armor') damage = Math.max(1, Math.round(damage * 0.5));
-    if (enemy.shield > 0) {
+    var pierceArmor = opts.pierce || enemy.firePierce || (enemy.burnTime > 0 && enemy.bossId === 'armor');
+    if (enemy.bossId === 'armor' && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.5));
+    if (enemy.shield > 0 && !opts.ignoreShield) {
       var blocked = Math.min(enemy.shield, damage);
       enemy.shield -= blocked;
       damage -= blocked;
@@ -3264,8 +3345,10 @@ function selectedTower() {
       var hellPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(hellPos.x, hellPos.y - 0.45, '裂殖', '#ff8fab');
     }
-    state.gold += enemy.gold;
-    state.waveGoldEarned += enemy.gold;
+    var gain = scaledKillGold(enemy.gold);
+    state.gold += gain;
+    state.waveGoldEarned += gain;
+    enemy.gold = gain;
     rewardHeroKill(enemy);
     var pos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
     spawnFloater(pos.x, pos.y - 0.1, '+' + enemy.gold, '#f2c14e');
@@ -3287,7 +3370,7 @@ function selectedTower() {
     var sub = kind === 'victory'
       ? (nextStage(state.stagePlan) && stageUnlocked(nextStage(state.stagePlan)) ? '5 秒後下一關' : '5 秒後返回關卡')
       : (cardWaveDue(state.wave)
-        ? (state.mode === 'infinite' ? '5 秒後改道並抽獎勵' : '5 秒後隨機獎勵')
+        ? '5 秒後隨機獎勵'
         : (state.mode === 'custom' && state.wave % 10 === 0 ? '5 秒後改道' : '5 秒後下一波'));
     state.banner = { text: title, sub: sub, life: 5.2, countdown: true };
   }
@@ -3301,7 +3384,7 @@ function selectedTower() {
       if (state.clearKind === 'victory') {
         var upcoming = nextStage(state.stagePlan);
         state.banner.sub = (upcoming && stageUnlocked(upcoming) ? '下一關 ' : '返回關卡 ') + left;
-      } else if (cardWaveDue(state.wave)) state.banner.sub = (state.mode === 'infinite' ? '改道抽獎 ' : '隨機獎勵 ') + left;
+      } else if (cardWaveDue(state.wave)) state.banner.sub = '隨機獎勵 ' + left;
       else if (state.mode === 'custom' && state.wave % 10 === 0) state.banner.sub = '改道 ' + left;
       else state.banner.sub = '下一波 ' + left;
     }
@@ -3521,7 +3604,7 @@ function selectedTower() {
       toast('廣告贈送英雄：' + heroName(heroId));
       return true;
     }
-    var pool = ['basic', 'basic', 'poison', 'fire', 'ice', 'bolt'];
+    var pool = ['basic', 'basic', 'poison', 'fire', 'ice', 'bolt', 'mint'];
     var type = pool[Math.floor(Math.random() * pool.length)];
     var tower = placeFreeTower(type, cell);
     if (tower) {
@@ -3534,13 +3617,7 @@ function selectedTower() {
 
   function continueAfterWaveAds(cleared) {
     if (cardWaveDue(cleared)) {
-      if (state.mode === 'infinite') {
-        state.pathRerolled = false;
-        reshuffleInfinitePath({ silent: true });
-        openPathRerollOffer(cleared);
-      } else {
-        openCardDraft(cleared);
-      }
+      openCardDraft(cleared);
     } else if (state.mode === 'custom' && cleared % 10 === 0) enterEdit();
     else startWave(cleared + 1);
   }
@@ -3608,7 +3685,7 @@ function selectedTower() {
     if (state.mode === 'campaign') {
       actions.push({ label: '返回關卡選擇', className: 'btn-ghost', onClick: function () { closeModal(); openStages(state.chapter); } });
     }
-    actions.push({ label: '返回選單', className: 'btn-ghost', onClick: function () { closeModal(); showMenu(); } });
+    actions.push({ label: '返回選單', className: 'btn-ghost', onClick: function () { closeModal(); showWelcome(); } });
     var record = (state.mode === 'infinite' || state.mode === 'custom') && state.best > 0
       ? (state.difficulty === 'hell' ? '地獄' : '普通') + '最遠第 ' + state.best + ' 波。'
       : '';
@@ -4007,10 +4084,80 @@ function selectedTower() {
   }
 
   function hideStoryScreens() {
+    if (screenWelcome) screenWelcome.hidden = true;
+    if (screenCodex) screenCodex.hidden = true;
+    if (screenTowersInfo) screenTowersInfo.hidden = true;
+    if (screenHell) screenHell.hidden = true;
     screenMenu.hidden = true;
     screenChapters.hidden = true;
     screenStages.hidden = true;
     screenDifficulty.hidden = true;
+  }
+
+  function paintCodexThumb(spec) {
+    var canvas = document.createElement('canvas');
+    canvas.width = 96;
+    canvas.height = 96;
+    canvas.className = 'info-art';
+    canvas.setAttribute('aria-hidden', 'true');
+    var g = canvas.getContext('2d');
+    if (!g) return canvas;
+    var prev = ctx;
+    ctx = g;
+    try {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, 96, 96);
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, 96, 96);
+      g.save();
+      g.translate(48, 50);
+      inkSetup(2.8);
+      if (spec.kind === 'enemy') {
+        var enemy = {
+          type: spec.type || 'grunt',
+          color: spec.color || '#e25b4a',
+          boss: !!spec.bossId,
+          bossId: spec.bossId || '',
+          resist: spec.resist || '',
+        };
+        var resist = enemy.resist && RESISTS[enemy.resist] ? RESISTS[enemy.resist] : null;
+        var colors = enemyBodyColors(enemy, resist);
+        var rad = spec.bossId ? 30 : 26;
+        if (spec.bossId) drawBossBody(enemy, rad, colors, 0);
+        else if (spec.type === 'hopper') drawHopperBody(rad, colors, 0, false);
+        else if (spec.type === 'swift') drawSwiftBody(rad, colors, 0);
+        else if (spec.type === 'brute') drawBruteBody(rad, colors, 0);
+        else drawGruntBody(rad, colors, 0);
+        if (resist) {
+          g.font = '800 11px ' + FONT;
+          g.textAlign = 'center';
+          g.textBaseline = 'middle';
+          g.lineWidth = 3;
+          g.strokeStyle = '#fff';
+          g.fillStyle = resist.color;
+          g.strokeText(resist.name, 0, -rad - 10);
+          g.fillText(resist.name, 0, -rad - 10);
+        }
+      } else if (spec.kind === 'tower') {
+        drawTowerGlyph(spec.type || 'basic', 22, -0.35);
+      } else if (spec.kind === 'hero') {
+        drawHeroGlyph(spec.hero || 'sword', 26);
+      } else if (spec.kind === 'hell') {
+        inkCircle(0, -2, 18);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        inkStroke();
+        ctx.fillStyle = '#161616';
+        g.font = '800 16px ' + FONT;
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText(spec.mark || '!', 0, -1);
+      }
+      g.restore();
+    } finally {
+      ctx = prev;
+    }
+    return canvas;
   }
 
   function renderDifficulties() {
@@ -4056,10 +4203,22 @@ function selectedTower() {
     if (note) {
       note.textContent = state.difficultyMode === 'custom'
         ? '普通與地獄分開記錄最遠波次。第 3 波起會出現抗性怪。'
-        : '地圖隨機產生，每 10 波自動更換路線（起點終點不變）。普通與地獄分開記錄最遠波次。第 3 波起會出現抗性怪。';
+        : '開局隨機地圖後固定路線。普通與地獄分開記錄最遠波次。第 3 波起會出現抗性怪。';
     }
     screenDifficulty.hidden = false;
     renderDifficulties();
+  }
+
+  function showWelcome() {
+    state.phase = 'menu';
+    state.paused = true;
+    state.editTool = null;
+    closeModal();
+    hideStoryScreens();
+    if (screenDifficulty) screenDifficulty.hidden = true;
+    if (screenStages) screenStages.hidden = true;
+    if (screenWelcome) screenWelcome.hidden = false;
+    syncRouteBar();
   }
 
   function showMenu() {
@@ -4068,8 +4227,363 @@ function selectedTower() {
     state.editTool = null;
     closeModal();
     hideStoryScreens();
+    if (screenDifficulty) screenDifficulty.hidden = true;
+    if (screenStages) screenStages.hidden = true;
     screenMenu.hidden = false;
     syncRouteBar();
+  }
+
+  function appendInfoCard(list, entry) {
+    var card = document.createElement('article');
+    card.className = 'info-card' + (entry.cardClass ? (' ' + entry.cardClass) : '');
+    var thumb = entry.paint ? paintCodexThumb(entry.paint) : document.createElement('div');
+    if (!entry.paint) {
+      thumb.className = 'info-art';
+      thumb.setAttribute('aria-hidden', 'true');
+    }
+    var body = document.createElement('div');
+    body.className = 'info-body';
+    var tag = document.createElement('span');
+    tag.className = 'info-tag';
+    tag.textContent = entry.tag;
+    var title = document.createElement('h3');
+    title.textContent = entry.title;
+    body.appendChild(tag);
+    body.appendChild(title);
+    if (entry.desc) {
+      var desc = document.createElement('p');
+      desc.textContent = entry.desc;
+      body.appendChild(desc);
+    }
+    if (entry.stats && entry.stats.length) {
+      var ul = document.createElement('ul');
+      ul.className = 'info-stats';
+      for (var s = 0; s < entry.stats.length; s++) {
+        var li = document.createElement('li');
+        li.innerHTML = entry.stats[s];
+        ul.appendChild(li);
+      }
+      body.appendChild(ul);
+    }
+    card.appendChild(thumb);
+    card.appendChild(body);
+    list.appendChild(card);
+    return card;
+  }
+
+  function appendInfoBanner(list, text) {
+    var ban = document.createElement('div');
+    ban.className = 'info-banner';
+    ban.textContent = text;
+    list.appendChild(ban);
+  }
+
+  function renderCodex() {
+    var list = document.getElementById('codex-list');
+    if (!list) return;
+    list.replaceChildren();
+    var entries = [
+      {
+        tag: '小怪', title: '普通怪', paint: { kind: 'enemy', type: 'grunt', color: '#e25b4a' },
+        desc: '圓潤史萊姆型，最常見的基礎敵人。',
+        stats: [
+          '<strong>血量</strong>：約 32 × 波次成長（依難度倍率）',
+          '<strong>移速</strong>：基準約 1.0，隨波次緩升',
+          '<strong>金幣</strong>：約等於波次（20 波後軟上限）',
+          '<strong>漏關</strong>：扣 1 生命',
+        ],
+      },
+      {
+        tag: '小怪', title: '快怪', paint: { kind: 'enemy', type: 'swift', color: '#f0a202' },
+        desc: '箭形體型，擅長衝線。',
+        stats: [
+          '<strong>血量</strong>：普通怪 ×0.62',
+          '<strong>移速</strong>：普通怪 ×1.55（較快）',
+          '<strong>金幣</strong>：略低於普通怪',
+          '<strong>漏關</strong>：扣 1 生命',
+        ],
+      },
+      {
+        tag: '小怪', title: '精英怪', paint: { kind: 'enemy', type: 'brute', color: '#8d6bff' },
+        desc: '厚甲方塊，肉盾型。',
+        stats: [
+          '<strong>血量</strong>：普通怪 ×7.5',
+          '<strong>移速</strong>：普通怪 ×0.52（很慢）',
+          '<strong>金幣</strong>：8 + 波次×2（後期軟上限）',
+          '<strong>漏關</strong>：扣 3 生命',
+        ],
+      },
+      {
+        tag: '小怪', title: '跳躍怪', paint: { kind: 'enemy', type: 'hopper', color: '#4ec6e8' },
+        desc: '可抄捷徑跳躍，干擾佈陣。',
+        stats: [
+          '<strong>血量</strong>：普通怪 ×0.8',
+          '<strong>移速</strong>：略快於普通怪',
+          '<strong>跳躍</strong>：同時最多 3 隻、有冷卻',
+          '<strong>金幣</strong>：略高於普通怪',
+          '<strong>漏關</strong>：扣 1 生命',
+        ],
+      },
+      {
+        tag: '抗性', title: '屬性抗性', paint: { kind: 'enemy', type: 'grunt', color: '#e25b4a', resist: 'burn' },
+        desc: '第 3 波起有機率掛抗性標籤。',
+        stats: [
+          '<strong>種類</strong>：抗凍／抗電／抗燒／抗毒／抗緩',
+          '<strong>效果</strong>：對應屬性幾乎無效',
+          '<strong>顯示</strong>：邊緣會標抗性名',
+          '<strong>出現率</strong>：約 16% 起，隨波次上升（上限約 40%）',
+        ],
+      },
+      {
+        tag: '首領', title: '再生王', paint: { kind: 'enemy', type: 'grunt', color: '#3ecf8e', bossId: 'regen' },
+        desc: '持續回復生命。',
+        stats: [
+          '<strong>特性</strong>：戰鬥中持續回血',
+          '<strong>克制</strong>：毒塔毒蝕（持續扣總血 %）',
+          '<strong>血量</strong>：首領倍率（遠高於小怪）',
+        ],
+      },
+      {
+        tag: '首領', title: '狂暴王', paint: { kind: 'enemy', type: 'grunt', color: '#ff5a36', bossId: 'rush' },
+        desc: '殘血時爆發衝刺。',
+        stats: ['<strong>觸發</strong>：血量低於 50%', '<strong>效果</strong>：大幅加速'],
+      },
+      {
+        tag: '首領', title: '召喚王', paint: { kind: 'enemy', type: 'grunt', color: '#f2c14e', bossId: 'summon' },
+        desc: '沿路叫出步兵。',
+        stats: ['<strong>特性</strong>：週期召喚小怪', '<strong>壓力</strong>：增加漏關與干擾火力'],
+      },
+      {
+        tag: '首領', title: '護盾王', paint: { kind: 'enemy', type: 'grunt', color: '#67e8f9', bossId: 'ward' },
+        desc: '週期張開護盾。',
+        stats: ['<strong>特性</strong>：護盾期間減傷／擋彈', '<strong>克制</strong>：火塔破盾並打血量 10%'],
+      },
+      {
+        tag: '首領', title: '分裂王', paint: { kind: 'enemy', type: 'grunt', color: '#c084fc', bossId: 'split' },
+        desc: '死後分裂成多隻。',
+        stats: ['<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：分裂體金幣較低'],
+      },
+      {
+        tag: '首領', title: '治癒王', paint: { kind: 'enemy', type: 'grunt', color: '#ff8fab', bossId: 'mend' },
+        desc: '治療附近敵人。',
+        stats: ['<strong>特性</strong>：範圍治療友軍', '<strong>克制</strong>：毒塔毒蝕'],
+      },
+      {
+        tag: '首領', title: '冰封王', paint: { kind: 'enemy', type: 'grunt', color: '#9bd4ff', bossId: 'frost' },
+        desc: '凍結整場防禦塔。',
+        stats: ['<strong>技能</strong>：定期凍結所有塔', '<strong>應對</strong>：預留輸出與節奏'],
+      },
+      {
+        tag: '首領', title: '鐵甲王', paint: { kind: 'enemy', type: 'grunt', color: '#8aa0b8', bossId: 'armor' },
+        desc: '高減傷肉盾。',
+        stats: ['<strong>減傷</strong>：受到傷害減半', '<strong>克制</strong>：火塔破甲並打血量 10%'],
+      },
+      {
+        tag: '地獄', title: '地獄詞綴', paint: { kind: 'hell', mark: '獄' },
+        desc: '地獄難度額外詞綴，可疊加壓力。',
+        stats: [
+          '<strong>疾行</strong>：移速 +10%',
+          '<strong>鎖塔</strong>：週期鎖住防禦塔',
+          '<strong>亂王／分裂</strong>：干擾與增殖',
+          '<strong>回血</strong>：被毒克制',
+          '<strong>殘暴</strong>：血到 10% 加速 15%',
+          '<strong>厚皮</strong>：加血；被火克制',
+        ],
+      },
+    ];
+    for (var i = 0; i < entries.length; i++) appendInfoCard(list, entries[i]);
+  }
+
+  function renderTowerInfo() {
+    var list = document.getElementById('tower-info-list');
+    if (!list) return;
+    list.replaceChildren();
+
+    appendInfoBanner(list, '無屬／分支');
+    appendInfoCard(list, {
+      tag: '無屬', title: '無屬性塔', paint: { kind: 'tower', type: 'basic' },
+      desc: '便宜起步。3 等分支為箭塔或砲塔。金幣最高 5 等，卡牌可到 6 等×1.4。',
+      stats: [
+        '<strong>造價</strong>：40',
+        '<strong>1→2 等</strong>：傷 16→26 · 射程 2.35→2.5',
+        '<strong>升級金</strong>：35 → 60 →（分支）',
+      ],
+    });
+    appendInfoCard(list, {
+      tag: '分支', title: '箭塔', paint: { kind: 'tower', type: 'arrow' },
+      desc: '高傷高攻速；滿等打 2 隻。',
+      stats: [
+        '<strong>傷</strong>：42→58→78→100',
+        '<strong>攻速</strong>：0.28→0.16 秒／發',
+        '<strong>滿等</strong>：2 目標 · 單體 DPS 最高',
+      ],
+    });
+    appendInfoCard(list, {
+      tag: '分支', title: '砲塔', paint: { kind: 'tower', type: 'cannon' },
+      desc: '擴散清群；中心傷高、外圍遞減、不疊加。',
+      stats: [
+        '<strong>傷</strong>：44→58→74→92（中心）',
+        '<strong>彈數</strong>：2→3 · 擴散 1.05→1.5',
+        '<strong>定位</strong>：清群、壓線',
+      ],
+    });
+
+    appendInfoBanner(list, '屬性塔');
+    var attrWrap = document.createElement('div');
+    attrWrap.className = 'info-attr-grid';
+    list.appendChild(attrWrap);
+    var attrs = [
+      {
+        tag: '毒', title: '毒塔', cardClass: 'info-card--attr info-card--poison',
+        paint: { kind: 'tower', type: 'poison' },
+        desc: '傳染毒 · 克制回血',
+        stats: [
+          '<strong>造價</strong> 80',
+          '<strong>毒</strong> 22→54／0.4秒',
+          '<strong>克制</strong> 再生／治療／回血',
+        ],
+      },
+      {
+        tag: '火', title: '火塔', cardClass: 'info-card--attr info-card--fire',
+        paint: { kind: 'tower', type: 'fire' },
+        desc: '爆炸灼燒 · 破盾破甲',
+        stats: [
+          '<strong>造價</strong> 90',
+          '<strong>爆</strong> 48→114',
+          '<strong>克制</strong> 護盾／鐵甲／厚皮 +10%血',
+        ],
+      },
+      {
+        tag: '冰', title: '冰塔', cardClass: 'info-card--attr info-card--ice',
+        paint: { kind: 'tower', type: 'ice' },
+        desc: '緩速 · 第 3 次凍結',
+        stats: [
+          '<strong>造價</strong> 85',
+          '<strong>緩</strong> 35%→45%',
+          '<strong>擴散</strong> 1.1→1.62',
+        ],
+      },
+      {
+        tag: '雷', title: '雷塔', cardClass: 'info-card--attr info-card--bolt',
+        paint: { kind: 'tower', type: 'bolt' },
+        desc: '串連跳電 · 清多隻',
+        stats: [
+          '<strong>造價</strong> 85',
+          '<strong>傷</strong> 24→84',
+          '<strong>串連</strong> 2→4 跳',
+        ],
+      },
+    ];
+    for (var a = 0; a < attrs.length; a++) appendInfoCard(attrWrap, attrs[a]);
+
+    appendInfoBanner(list, '經濟／英雄');
+    appendInfoCard(list, {
+      tag: '經濟', title: '產錢塔', paint: { kind: 'tower', type: 'mint' },
+      desc: '不攻擊，定期產金。後期擊殺金遞減時補經濟。',
+      stats: [
+        '<strong>造價</strong>：70',
+        '<strong>產金</strong>：6→22／次 · 間隔 5.0→3.0 秒',
+        '<strong>滿等卡</strong>：產金 ×1.4',
+      ],
+    });
+    appendInfoCard(list, {
+      tag: '英雄', title: '劍士', paint: { kind: 'hero', hero: 'sword' },
+      desc: '近戰。每三下劍氣；主動：劍神附體。',
+      stats: ['<strong>傷</strong>：約 22+等×8', '<strong>主動</strong>：附體加成攻速與傷'],
+    });
+    appendInfoCard(list, {
+      tag: '英雄', title: '弓箭手', paint: { kind: 'hero', hero: 'archer' },
+      desc: '三箭遠程。每三輪陷阱；主動：毒性連鎖。',
+      stats: ['<strong>目標</strong>：3 箭', '<strong>射程</strong>：約 2.6 起'],
+    });
+    appendInfoCard(list, {
+      tag: '英雄', title: '法師', paint: { kind: 'hero', hero: 'mage' },
+      desc: '火／冰／風輪換；主動：隕石術。',
+      stats: ['<strong>傷</strong>：約 18+等×4', '<strong>主動</strong>：隕石範圍'],
+    });
+    appendInfoCard(list, {
+      tag: '英雄', title: '祝念', paint: { kind: 'hero', hero: 'priest' },
+      desc: '光環提升附近塔的攻擊與攻速。',
+      stats: ['<strong>定位</strong>：不輸出', '<strong>光環</strong>：攻／攻速加成'],
+    });
+  }
+
+  function renderHellInfo() {
+    var list = document.getElementById('hell-info-list');
+    if (!list) return;
+    list.replaceChildren();
+    appendInfoCard(list, {
+      tag: '說明', title: '地獄模式', cardClass: 'info-card--hell',
+      paint: { kind: 'hell', mark: '獄' },
+      desc: '無限／自訂選地獄時啟用。詞綴會隨波次疊加，怪更厚、更密。',
+      stats: [
+        '<strong>克制</strong>：毒塔克制「回血」',
+        '<strong>克制</strong>：火塔克制「厚皮」',
+        '<strong>建議</strong>：先看清楚詞綴再調陣容',
+      ],
+    });
+    for (var h = 0; h < HELL_DEFFS.length; h++) {
+      var def = HELL_DEFFS[h];
+      var detail = '';
+      if (def.id === 'speed') detail = '<strong>數值</strong>：移速 +' + Math.round(def.full * 100) + '%';
+      else if (def.id === 'lock') detail = '<strong>數值</strong>：隨機鎖塔 ' + def.full + ' 秒';
+      else if (def.id === 'boss') detail = '<strong>效果</strong>：每波額外隨機出一支王';
+      else if (def.id === 'split') detail = '<strong>數值</strong>：死後裂成兩隻，各帶 ' + Math.round(def.full * 100) + '% 血';
+      else if (def.id === 'regen') detail = '<strong>數值</strong>：每秒回復 ' + Math.round(def.full * 100) + '% 血 · 毒克制';
+      else if (def.id === 'enrage') detail = '<strong>觸發</strong>：血量 ≤10% 時加速 ' + Math.round(def.full * 100) + '%';
+      else if (def.id === 'thick') detail = '<strong>數值</strong>：血量 +' + Math.round(def.full * 100) + '% · 火克制';
+      appendInfoCard(list, {
+        tag: '詞綴',
+        title: def.name,
+        cardClass: 'info-card--hell',
+        paint: { kind: 'hell', mark: def.name.charAt(0) },
+        desc: def.blurb,
+        stats: [detail],
+      });
+    }
+  }
+
+  function openCodex() {
+    hideStoryScreens();
+    renderCodex();
+    if (screenCodex) screenCodex.hidden = false;
+  }
+
+  function openHellInfo() {
+    hideStoryScreens();
+    renderHellInfo();
+    if (screenHell) screenHell.hidden = false;
+  }
+
+  function openTowerInfo() {
+    hideStoryScreens();
+    renderTowerInfo();
+    if (screenTowersInfo) screenTowersInfo.hidden = false;
+  }
+
+  function togglePause() {
+    if (state.phase === 'menu' || state.phase === 'gameover' || state.phase === 'victory') return;
+    if (modal.classList.contains('is-open') && !state.userPaused) return;
+    if (state.userPaused) {
+      state.userPaused = false;
+      state.paused = false;
+      if (pauseBtn) pauseBtn.setAttribute('aria-pressed', 'false');
+      closeModal();
+      return;
+    }
+    state.userPaused = true;
+    state.paused = true;
+    if (pauseBtn) pauseBtn.setAttribute('aria-pressed', 'true');
+    openModal({
+      tone: 'reward',
+      kicker: '暫停',
+      title: '遊戲暫停',
+      desc: '戰鬥已暫停。可繼續，或返回選單（本局進度不保留）。',
+      actions: [
+        { label: '繼續遊戲', className: 'btn-mint', onClick: function () { togglePause(); } },
+        { label: '返回選單', className: 'btn-ghost', onClick: function () { state.userPaused = false; if (pauseBtn) pauseBtn.setAttribute('aria-pressed', 'false'); closeModal(); showWelcome(); } },
+      ],
+    });
   }
 
   function openChapters() {
@@ -4214,6 +4728,8 @@ function selectedTower() {
     state.wave = 0;
     state.phase = 'prep';
     state.paused = false;
+    state.userPaused = false;
+    if (pauseBtn) pauseBtn.setAttribute('aria-pressed', 'false');
     state.adBusy = false;
     state.towers = [];
     state.enemies = [];
@@ -4512,8 +5028,9 @@ function selectedTower() {
     if (stats.targets > 1) bits.push('目標 ' + stats.targets);
     if (tower && tower.level >= 5) bits.push('滿等×1.4');
     if (stats.effect === 'slow') bits.push('緩速 ' + Math.round(stats.slow * 100) + '%', '3次凍結');
-    if (stats.effect === 'burn') bits.push('灼燒 ' + Math.round(stats.burn / stats.burnEvery) + '/秒', '傳染3秒');
-    if (stats.effect === 'poison') bits.push('中毒 ' + Math.round(stats.poison / stats.poisonEvery) + '/秒', '單體', '傳染3秒');
+    if (stats.effect === 'burn') bits.push('灼燒 ' + Math.round(stats.burn / stats.burnEvery) + '/秒', '破盾／破甲／厚皮+10%血', '傳染3秒');
+    if (stats.effect === 'poison') bits.push('中毒 ' + Math.round(stats.poison / stats.poisonEvery) + '/秒', '克制再生／治療／回血', '傳染3秒');
+    if (stats.goldGen) bits = ['產金 ' + stats.goldGen + '/次', '間隔 ' + fmt(stats.cooldown) + '秒', '不攻擊'];
     return bits.join(' · ');
   }
 
@@ -4787,190 +5304,290 @@ function selectedTower() {
 
   function drawPossess(tower, s) {
     var hero = tower.hero;
-    var pulse = 1 + Math.sin(state.time * 4.5 + tower.id) * 0.04;
-    var fill = hero === 'archer' ? 'rgba(46, 158, 72, 0.28)' : (hero === 'mage' ? 'rgba(224, 35, 35, 0.26)' : 'rgba(124, 58, 237, 0.32)');
-    var stroke = hero === 'archer' ? '#1c7a34' : (hero === 'mage' ? '#c81e1e' : '#6d28d9');
-    var headY = -s * 3.15;
+    var pulse = 1 + (reduceMotion ? 0 : Math.sin(state.time * 5 + tower.id) * 0.06);
+    var stroke = hero === 'archer' ? '#1c7a34' : (hero === 'mage' ? '#c81e1e' : (hero === 'priest' ? '#c9a227' : '#6d28d9'));
     ctx.save();
-    ctx.translate(0, -s * 0.85);
-    ctx.scale(pulse * 1.85, pulse * 1.85);
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.lineWidth = Math.max(2, s * 0.11);
-    ctx.fillStyle = fill;
     ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(2, s * 0.12);
+    ctx.globalAlpha = 0.55;
     ctx.beginPath();
-    ctx.arc(0, headY, s * 0.92, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.arc(0, 0, s * 1.15 * pulse, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.fillStyle = '#ffe56a';
-    ctx.beginPath();
-    ctx.ellipse(-s * 0.3, headY - s * 0.02, s * 0.15, s * 0.22, 0, 0, Math.PI * 2);
-    ctx.ellipse(s * 0.3, headY - s * 0.02, s * 0.15, s * 0.22, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    ctx.moveTo(-s * 1.55, headY + s * 0.75);
-    ctx.lineTo(-s * 2.05, headY + s * 1.45);
-    ctx.lineTo(-s * 1.05, headY + s * 3.35);
-    ctx.lineTo(s * 1.05, headY + s * 3.35);
-    ctx.lineTo(s * 2.05, headY + s * 1.45);
-    ctx.lineTo(s * 1.55, headY + s * 0.75);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, headY + s * 1.05);
-    ctx.lineTo(0, headY + s * 2.9);
-    for (var rib = 0; rib < 4; rib++) {
-      var ry = headY + s * (1.25 + rib * 0.4);
-      ctx.moveTo(-s * 0.68, ry);
-      ctx.quadraticCurveTo(0, ry + s * 0.18, s * 0.68, ry);
-    }
-    ctx.stroke();
-    var lift = Math.sin(state.time * 3 + tower.id) * s * 0.18;
-    ctx.beginPath();
-    ctx.moveTo(-s * 1.45, headY + s * 1.05);
-    ctx.quadraticCurveTo(-s * 2.55, headY + s * 1.7, -s * 2.35, headY + s * 2.85 + lift);
-    ctx.moveTo(s * 1.45, headY + s * 1.05);
-    ctx.quadraticCurveTo(s * 2.45, headY + s * 0.35, s * 2.85, headY - s * 0.15 - lift);
-    ctx.stroke();
-    if (hero === 'sword') {
-      ctx.beginPath();
-      ctx.moveTo(s * 2.7, headY);
-      ctx.lineTo(s * 3.35, headY - s * 1.55);
-      ctx.moveTo(s * 2.95, headY - s * 0.35);
-      ctx.lineTo(s * 3.35, headY - s * 0.35);
-      ctx.stroke();
-    } else if (hero === 'archer') {
-      ctx.beginPath();
-      ctx.arc(s * 2.15, headY + s * 1.35, s * 1.05, -1.15, 1.15);
-      ctx.moveTo(s * 2.15, headY + s * 0.35);
-      ctx.lineTo(s * 2.15, headY + s * 2.35);
-      ctx.stroke();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(s * 2.55, headY + s * 1.6);
-      ctx.lineTo(s * 3.25, headY - s * 0.85);
-      ctx.stroke();
-      ctx.fillStyle = '#ffd36a';
-      ctx.beginPath();
-      ctx.arc(s * 3.25, headY - s * 0.85, s * 0.22, 0, Math.PI * 2);
-      ctx.fill();
-    }
     ctx.restore();
   }
 
-  function drawStick(tower, s) {
-    var t = state.time * 2.4 + tower.id * 0.8;
-    var bob = reduceMotion ? 0 : Math.sin(t) * s * 0.06;
-    var swing = tower.swing || 0;
-    var step = reduceMotion ? 0 : Math.sin(t) * s * 0.1;
+  var inkSeed = 1;
+
+  function inkSetup(width) {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#161616';
+    ctx.lineWidth = width || 2.4;
+  }
+
+  function inkNoise(i) {
+    var n = Math.sin(inkSeed * 12.9898 + i * 78.233) * 43758.5453;
+    return n - Math.floor(n);
+  }
+
+  function inkJitter(i, amp) {
+    return (inkNoise(i) - 0.5) * 2 * (amp || 1);
+  }
+
+  function inkStroke() {
+    var lw = ctx.lineWidth;
+    var alpha = ctx.globalAlpha;
     ctx.save();
-    ctx.translate(0, bob);
-    ctx.beginPath();
-    ctx.moveTo(0, s * 0.22);
-    ctx.lineTo(-s * 0.28 - step, s * 0.82);
-    ctx.moveTo(0, s * 0.22);
-    ctx.lineTo(s * 0.28 + step, s * 0.82);
-    ctx.moveTo(0, -s * 0.36);
-    ctx.lineTo(0, s * 0.22);
+    ctx.globalAlpha = alpha * 0.22;
+    ctx.lineWidth = lw * 1.55;
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, -s * 0.64, s * 0.26, 0, Math.PI * 2);
-    ctx.stroke();
-    if (tower.hero === 'sword') {
-      var arm = swing > 0.02 ? (-2.35 + (1 - swing) * 3.15) : (-0.7 + Math.sin(t) * 0.06);
-      ctx.beginPath();
-      ctx.moveTo(0, -s * 0.16);
-      ctx.lineTo(-s * 0.46, s * 0.02 + step * 0.4);
-      ctx.stroke();
-      ctx.save();
-      ctx.translate(0, -s * 0.16);
-      ctx.rotate(arm);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(s * 0.34, 0);
-      ctx.moveTo(s * 0.28, -s * 0.14);
-      ctx.lineTo(s * 0.28, s * 0.14);
-      ctx.moveTo(s * 0.34, 0);
-      ctx.lineTo(s * 1.15, -s * 0.08);
-      ctx.stroke();
-      ctx.restore();
-    } else if (tower.hero === 'archer') {
-      var pull = swing > 0.02 ? (1 - swing) : (0.35 + Math.sin(t) * 0.08);
-      ctx.beginPath();
-      ctx.arc(s * 0.05, -s * 0.05, s * 0.5, -1.25, 1.25);
-      ctx.moveTo(s * 0.05, -s * 0.52);
-      ctx.lineTo(-s * 0.08 - pull * s * 0.35, -s * 0.05);
-      ctx.lineTo(s * 0.05, s * 0.42);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.08 - pull * s * 0.35, -s * 0.05);
-      ctx.lineTo(s * 0.72, -s * 0.08);
-      ctx.moveTo(s * 0.5, -s * 0.16);
-      ctx.lineTo(s * 0.78, -s * 0.08);
-      ctx.lineTo(s * 0.5, 0);
-      ctx.stroke();
-    } else if (tower.hero === 'mage') {
-      var lean = swing > 0.02 ? (-0.35 - swing * 0.8) : (-0.45 + Math.sin(t) * 0.08);
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.08, -s * 0.1);
-      ctx.lineTo(-s * 0.4, s * 0.18);
-      ctx.stroke();
-      ctx.save();
-      ctx.translate(s * 0.08, -s * 0.05);
-      ctx.rotate(lean);
-      ctx.beginPath();
-      ctx.moveTo(0, s * 0.35);
-      ctx.lineTo(0, -s * 0.85);
-      ctx.moveTo(-s * 0.16, -s * 0.62);
-      ctx.lineTo(s * 0.16, -s * 0.62);
-      ctx.stroke();
-      ctx.fillStyle = '#161616';
-      ctx.beginPath();
-      ctx.arc(0, -s * 0.98, s * 0.12 + (reduceMotion ? 0 : Math.sin(t * 2) * s * 0.03), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    } else {
-      var halo = s * (1.05 + (reduceMotion ? 0 : Math.sin(t * 1.6) * 0.06));
-      ctx.beginPath();
-      ctx.arc(0, -s * 1.12, halo * 0.22, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.ellipse(0, -s * 1.12, halo * 0.55, halo * 0.16, state.time * 0.8, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, -s * 0.2);
-      ctx.lineTo(-s * 0.36, -s * 0.42);
-      ctx.moveTo(0, -s * 0.2);
-      ctx.lineTo(s * 0.36, -s * 0.42);
-      ctx.stroke();
-    }
     ctx.restore();
+    ctx.lineWidth = lw * (0.92 + inkNoise(3) * 0.16);
+    ctx.stroke();
+    ctx.lineWidth = lw;
+  }
+
+  function inkCircle(cx, cy, r, steps) {
+    steps = steps || 18;
+    ctx.beginPath();
+    for (var i = 0; i <= steps; i++) {
+      var a = (i / steps) * Math.PI * 2;
+      var wobble = 1 + inkJitter(i + 1, 0.045);
+      var x = cx + Math.cos(a) * r * wobble;
+      var y = cy + Math.sin(a) * r * wobble;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+
+  function inkRect(x, y, w, h) {
+    var j = Math.max(0.6, Math.min(w, h) * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(x + inkJitter(1, j), y + inkJitter(2, j));
+    ctx.lineTo(x + w + inkJitter(3, j), y + inkJitter(4, j));
+    ctx.lineTo(x + w + inkJitter(5, j), y + h + inkJitter(6, j));
+    ctx.lineTo(x + inkJitter(7, j), y + h + inkJitter(8, j));
+    ctx.closePath();
+  }
+
+  function inkLine(x1, y1, x2, y2, segs) {
+    segs = segs || 4;
+    ctx.beginPath();
+    ctx.moveTo(x1 + inkJitter(1, 0.35), y1 + inkJitter(2, 0.35));
+    for (var i = 1; i < segs; i++) {
+      var t = i / segs;
+      var amp = 0.55;
+      ctx.lineTo(
+        x1 + (x2 - x1) * t + inkJitter(i * 3, amp),
+        y1 + (y2 - y1) * t + inkJitter(i * 3 + 1, amp)
+      );
+    }
+    ctx.lineTo(x2 + inkJitter(20, 0.35), y2 + inkJitter(21, 0.35));
+  }
+
+  function drawGlyphPlate(shape, s) {
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#161616';
+    if (shape === 'circle') {
+      inkCircle(0, 0, s);
+      ctx.fill();
+      inkStroke();
+    } else {
+      inkRect(-s, -s, s * 2, s * 2);
+      ctx.fill();
+      inkStroke();
+    }
+  }
+
+  function markDroplet(s) {
+    ctx.beginPath();
+    ctx.moveTo(inkJitter(1, 0.3), -s + inkJitter(2, 0.3));
+    ctx.quadraticCurveTo(s * 0.85 + inkJitter(3, 0.4), -s * 0.15, inkJitter(4, 0.3), s);
+    ctx.quadraticCurveTo(-s * 0.85 + inkJitter(5, 0.4), -s * 0.15, inkJitter(6, 0.3), -s);
+    ctx.closePath();
+  }
+
+  function markFlame(s) {
+    ctx.beginPath();
+    ctx.moveTo(inkJitter(1, 0.3), s);
+    ctx.quadraticCurveTo(s * 0.95, s * 0.15, s * 0.35 + inkJitter(2, 0.4), -s * 0.35);
+    ctx.quadraticCurveTo(s * 0.12, -s * 0.78, inkJitter(3, 0.3), -s);
+    ctx.quadraticCurveTo(-s * 0.12, -s * 0.78, -s * 0.35 + inkJitter(4, 0.4), -s * 0.35);
+    ctx.quadraticCurveTo(-s * 0.95, s * 0.15, inkJitter(5, 0.3), s);
+    ctx.closePath();
+  }
+
+  function markSnowflake(s) {
+    for (var i = 0; i < 3; i++) {
+      ctx.save();
+      ctx.rotate((Math.PI / 3) * i + inkJitter(i, 0.04));
+      inkLine(0, -s, 0, s, 3);
+      inkStroke();
+      inkLine(-s * 0.28, -s * 0.55, 0, -s * 0.35, 2);
+      ctx.lineTo(s * 0.28, -s * 0.55);
+      inkStroke();
+      inkLine(-s * 0.28, s * 0.55, 0, s * 0.35, 2);
+      ctx.lineTo(s * 0.28, s * 0.55);
+      inkStroke();
+      ctx.restore();
+    }
+  }
+
+  function markBolt(s) {
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.15 + inkJitter(1, 0.4), -s);
+    ctx.lineTo(s * 0.35 + inkJitter(2, 0.4), -s * 0.08);
+    ctx.lineTo(s * 0.02, -s * 0.08 + inkJitter(3, 0.3));
+    ctx.lineTo(s * 0.2 + inkJitter(4, 0.4), s);
+    ctx.lineTo(-s * 0.35, s * 0.05 + inkJitter(5, 0.3));
+    ctx.lineTo(-s * 0.02 + inkJitter(6, 0.3), s * 0.05);
+    ctx.closePath();
+  }
+
+  function markArrow(s) {
+    inkLine(-s * 0.55, 0, s * 0.2, 0, 3);
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(s * 0.05 + inkJitter(1, 0.3), -s * 0.38);
+    ctx.lineTo(s * 0.7, inkJitter(2, 0.25));
+    ctx.lineTo(s * 0.05 + inkJitter(3, 0.3), s * 0.38);
+    inkStroke();
+  }
+
+  function markCannon(s) {
+    inkCircle(0, s * 0.12, s * 0.32, 14);
+    ctx.fill();
+    inkStroke();
+    var prev = ctx.lineWidth;
+    ctx.lineWidth = Math.max(3, s * 0.28);
+    inkLine(s * 0.1, 0, s * 0.85, -s * 0.18, 3);
+    inkStroke();
+    ctx.lineWidth = prev;
+  }
+
+  function drawTowerGlyph(type, s, aim) {
+    inkSeed = (type || 'x').length * 17 + (type ? type.charCodeAt(0) : 1) * 13 + Math.round((s || 1) * 10);
+    inkSetup(Math.max(2.2, s * 0.13));
+    if (type === 'arrow' || type === 'bolt' || type === 'basic') {
+      drawGlyphPlate('circle', s);
+      ctx.save();
+      ctx.rotate(aim || 0);
+      if (type === 'bolt') {
+        ctx.fillStyle = '#e0b000';
+        markBolt(s * 0.62);
+        ctx.fill();
+        inkStroke();
+      } else {
+        markArrow(s * 0.72);
+      }
+      ctx.restore();
+    } else if (type === 'mint') {
+      ctx.fillStyle = '#f2c14e';
+      inkCircle(0, 0, s * 0.92);
+      ctx.fill();
+      inkStroke();
+      inkCircle(0, 0, s * 0.62, 14);
+      inkStroke();
+      ctx.fillStyle = '#161616';
+      ctx.font = '800 ' + Math.max(10, Math.round(s * 0.95)) + 'px ' + FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('$', inkJitter(9, 0.4), 1 + inkJitter(10, 0.3));
+    } else {
+      drawGlyphPlate('square', s);
+      if (type === 'poison') {
+        ctx.fillStyle = '#3cbf4a';
+        markDroplet(s * 0.55);
+        ctx.fill();
+        inkStroke();
+      } else if (type === 'fire') {
+        ctx.fillStyle = '#e02323';
+        markFlame(s * 0.55);
+        ctx.fill();
+        inkStroke();
+      } else if (type === 'ice') {
+        ctx.strokeStyle = '#2f7bff';
+        ctx.lineWidth = Math.max(2.4, s * 0.14);
+        markSnowflake(s * 0.55);
+        ctx.strokeStyle = '#161616';
+        ctx.lineWidth = Math.max(2.2, s * 0.12);
+      } else if (type === 'cannon') {
+        ctx.fillStyle = '#161616';
+        markCannon(s);
+      } else {
+        inkCircle(0, 0, s * 0.36, 14);
+        inkStroke();
+      }
+    }
+  }
+
+  function drawHeroGlyph(hero, s) {
+    inkSeed = (hero || 'h').charCodeAt(0) * 19 + Math.round(s * 8);
+    inkSetup(Math.max(2.2, s * 0.12));
+    drawGlyphPlate('circle', s);
+    ctx.strokeStyle = '#161616';
+    ctx.fillStyle = '#161616';
+    if (hero === 'sword') {
+      inkLine(0, s * 0.72, 0, -s * 0.55, 4);
+      inkStroke();
+      inkLine(-s * 0.32, -s * 0.18, s * 0.32, -s * 0.18, 3);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.16, -s * 0.55);
+      ctx.lineTo(inkJitter(1, 0.3), -s * 0.78);
+      ctx.lineTo(s * 0.16, -s * 0.55);
+      inkStroke();
+    } else if (hero === 'archer') {
+      ctx.beginPath();
+      ctx.arc(s * 0.08, 0, s * 0.55, -1.2, 1.2);
+      inkStroke();
+      inkLine(s * 0.08, -s * 0.52, -s * 0.35, 0, 3);
+      ctx.lineTo(s * 0.08, s * 0.52);
+      inkStroke();
+      inkLine(-s * 0.35, 0, s * 0.72, 0, 3);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(s * 0.42, -s * 0.18);
+      ctx.lineTo(s * 0.78, 0);
+      ctx.lineTo(s * 0.42, s * 0.18);
+      inkStroke();
+    } else if (hero === 'mage') {
+      inkLine(0, s * 0.55, 0, -s * 0.15, 3);
+      inkStroke();
+      inkLine(-s * 0.28, -s * 0.05, s * 0.28, -s * 0.05, 3);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(inkJitter(1, 0.3), -s * 0.78);
+      ctx.lineTo(s * 0.28, -s * 0.32);
+      ctx.lineTo(0, -s * 0.42);
+      ctx.lineTo(-s * 0.28, -s * 0.32);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      inkCircle(0, -s * 0.55, s * 0.22, 12);
+      inkStroke();
+      inkLine(0, -s * 0.2, 0, s * 0.55, 3);
+      inkStroke();
+      inkLine(-s * 0.32, s * 0.05, s * 0.32, s * 0.05, 3);
+      inkStroke();
+    }
   }
 
   function drawBladeWave(scale, alpha) {
-    var r = view.tile * 0.95 * scale;
+    var r = view.tile * 0.85 * scale;
     ctx.save();
     ctx.globalAlpha *= alpha;
-    ctx.fillStyle = '#fff';
     ctx.strokeStyle = '#161616';
-    ctx.lineWidth = Math.max(2.4, view.tile * 0.05);
-    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(5, view.tile * 0.1);
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(-r * 0.05, -r);
-    ctx.quadraticCurveTo(r * 1.15, 0, -r * 0.05, r);
-    ctx.quadraticCurveTo(r * 0.42, 0, -r * 0.05, -r);
-    ctx.closePath();
-    ctx.fill();
+    ctx.arc(0, 0, r, -1.05, 1.05);
     ctx.stroke();
-    ctx.strokeStyle = '#e02323';
-    ctx.lineWidth = Math.max(2, view.tile * 0.04);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = Math.max(2.2, view.tile * 0.045);
     ctx.beginPath();
-    ctx.moveTo(r * 0.08, -r * 0.72);
-    ctx.quadraticCurveTo(r * 0.82, 0, r * 0.08, r * 0.72);
+    ctx.arc(0, 0, r, -1.05, 1.05);
     ctx.stroke();
     ctx.restore();
   }
@@ -5722,7 +6339,7 @@ function selectedTower() {
   }
 
   function buildMenuTypes() {
-    return ['basic', 'poison', 'fire', 'ice', 'bolt'];
+    return ['basic', 'poison', 'fire', 'ice', 'bolt', 'mint'];
   }
 
   function buildMenuLabel(type) {
@@ -5731,6 +6348,7 @@ function selectedTower() {
     if (type === 'fire') return '火';
     if (type === 'ice') return '冰';
     if (type === 'bolt') return '雷';
+    if (type === 'mint') return '錢';
     return TOWERS[type] ? TOWERS[type].name : type;
   }
 
@@ -5740,7 +6358,7 @@ function selectedTower() {
     var gap = 6;
     var types = buildMenuTypes();
     var cols = 3;
-    var rows = 2;
+    var rows = Math.ceil(types.length / cols);
     var btnW = Math.max(64, Math.min(88, tile * 1.45));
     var btnH = Math.max(72, Math.min(96, tile * 1.65));
     var panelW = btnW * cols + gap * (cols + 1);
@@ -5861,47 +6479,7 @@ function selectedTower() {
   }
 
   function drawBuildGlyph(type) {
-    if (type === 'basic') {
-      ctx.beginPath();
-      ctx.arc(0, 0, 12, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(-6, 0);
-      ctx.lineTo(6, 0);
-      ctx.moveTo(1, -4);
-      ctx.lineTo(8, 0);
-      ctx.lineTo(1, 4);
-      ctx.stroke();
-    } else if (type === 'poison') {
-      ctx.beginPath();
-      ctx.arc(0, 3, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(-4, -5, 3, 0, Math.PI * 2);
-      ctx.fill();
-    } else if (type === 'fire') {
-      inkX(0, 0, 8);
-    } else if (type === 'ice') {
-      ctx.beginPath();
-      ctx.arc(0, 0, 9, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, -8);
-      ctx.lineTo(0, 8);
-      ctx.moveTo(-7, -3);
-      ctx.lineTo(7, 3);
-      ctx.stroke();
-    } else if (type === 'bolt') {
-      ctx.beginPath();
-      ctx.moveTo(-3, -10);
-      ctx.lineTo(3, -1);
-      ctx.lineTo(-2, 1);
-      ctx.lineTo(4, 10);
-      ctx.lineTo(-4, 1);
-      ctx.lineTo(1, -1);
-      ctx.closePath();
-      ctx.stroke();
-    }
+    drawTowerGlyph(type, 11, -0.2);
   }
 
   function drawFlashes() {
@@ -5955,7 +6533,7 @@ function selectedTower() {
     var tile = view.tile;
     var x = worldX(tower.c + 0.5);
     var y = worldY(tower.r + 0.42);
-    var s = tower.type === 'hero' ? tile * 0.34 : tile * 0.26;
+    var s = tower.type === 'hero' ? tile * 0.3 : tile * 0.26;
     ctx.save();
     ctx.translate(x, y);
     ctx.lineWidth = 2.5;
@@ -5963,63 +6541,19 @@ function selectedTower() {
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#161616';
     ctx.fillStyle = '#fff';
+    ctx.fillStyle = 'rgba(22, 22, 22, 0.1)';
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.95, s * 0.7, s * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    inkSeed = (tower.id || 1) * 17 + (tower.level || 0) * 3;
     if (tower.type === 'hero') {
-      ctx.fillStyle = 'rgba(22, 22, 22, 0.08)';
-      ctx.beginPath();
-      ctx.ellipse(0, s * 0.95, s * 0.72, s * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      if (Math.cos(tower.aim || 0) < 0) ctx.scale(-1, 1);
       if (skillAuraOn(tower)) drawPossess(tower, s);
-      drawStick(tower, s);
-    } else if (isArrowPath(tower) || tower.type === 'bolt') {
-      ctx.beginPath();
-      ctx.arc(0, 0, s, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.save();
-      ctx.rotate(tower.aim);
-      if (tower.type === 'bolt') {
-        ctx.strokeStyle = '#e0b000';
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.5, s * 0.18);
-        ctx.lineTo(-s * 0.12, -s * 0.32);
-        ctx.lineTo(s * 0.08, s * 0.06);
-        ctx.lineTo(s * 0.55, -s * 0.36);
-        ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.35, 0);
-        ctx.lineTo(s * 0.45, 0);
-        ctx.moveTo(s * 0.08, -s * 0.28);
-        ctx.lineTo(s * 0.62, 0);
-        ctx.lineTo(s * 0.08, s * 0.28);
-        ctx.stroke();
-      }
-      ctx.restore();
+      drawHeroGlyph(tower.hero, s);
     } else {
-      ctx.fillRect(-s, -s, s * 2, s * 2);
-      ctx.strokeRect(-s, -s, s * 2, s * 2);
-      if (tower.type === 'fire') {
-        ctx.strokeStyle = '#e02323';
-        inkX(0, 0, s * 0.4);
-      } else if (tower.type === 'poison') {
-        ctx.fillStyle = '#3cbf4a';
-        ctx.beginPath();
-        ctx.arc(0, s * 0.08, s * 0.28, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(-s * 0.16, -s * 0.22, s * 0.1, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (tower.type === 'ice') {
-        ctx.strokeStyle = '#2f7bff';
-        ctx.beginPath();
-        ctx.arc(0, 0, s * 0.36, 0, Math.PI * 2);
-        ctx.stroke();
-      } else {
-        ctx.beginPath();
-        ctx.arc(0, 0, s * 0.36, 0, Math.PI * 2);
-        ctx.stroke();
-      }
+      var glyphType = tower.type;
+      if (isArrowPath(tower)) glyphType = 'arrow';
+      else if (isCannonPath(tower)) glyphType = 'cannon';
+      drawTowerGlyph(glyphType, s, tower.aim || 0);
     }
     ctx.restore();
     var shown = tower.level + 1;
@@ -6484,13 +7018,19 @@ function selectedTower() {
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#161616';
     for (var a = 0; a < state.arcs.length; a++) {
       var arc = state.arcs[a];
-      ctx.globalAlpha = Math.max(0.45, arc.life / arc.maxLife);
+      var x1 = worldX(arc.x1);
+      var y1 = worldY(arc.y1);
+      var x2 = worldX(arc.x2);
+      var y2 = worldY(arc.y2);
+      ctx.globalAlpha = Math.max(0.5, arc.life / arc.maxLife);
+      ctx.strokeStyle = '#161616';
+      ctx.lineWidth = Math.max(4, view.tile * 0.09);
+      strokeBolt(x1, y1, x2, y2);
       ctx.strokeStyle = '#e0b000';
-      ctx.lineWidth = Math.max(2, view.tile * 0.055);
-      strokeBolt(worldX(arc.x1), worldY(arc.y1), worldX(arc.x2), worldY(arc.y2));
+      ctx.lineWidth = Math.max(2.2, view.tile * 0.05);
+      strokeBolt(x1, y1, x2, y2);
     }
     ctx.restore();
   }
@@ -6530,42 +7070,45 @@ function selectedTower() {
     ctx.save();
     ctx.translate(worldX(shot.x), worldY(shot.y));
     ctx.rotate(shot.angle || 0);
-    ctx.strokeStyle = '#161616';
-    ctx.lineWidth = Math.max(2, view.tile * 0.045);
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-view.tile * 0.16, 0);
-    ctx.lineTo(view.tile * 0.12, 0);
-    ctx.moveTo(view.tile * 0.02, -view.tile * 0.06);
-    ctx.lineTo(view.tile * 0.14, 0);
-    ctx.lineTo(view.tile * 0.02, view.tile * 0.06);
-    ctx.stroke();
+    inkSeed = Math.round((shot.x || 0) * 40 + (shot.y || 0) * 17);
+    inkSetup(Math.max(2.2, view.tile * 0.05));
+    markArrow(view.tile * 0.14);
     ctx.restore();
   }
 
   function drawWave(shot) {
     var radius = Math.max(2, shot.radius * view.tile);
+    var x = worldX(shot.x);
+    var y = worldY(shot.y);
     ctx.save();
+    inkSeed = Math.round((shot.x || 0) * 21 + (shot.y || 0) * 13);
+    ctx.translate(x, y);
     ctx.strokeStyle = shot.color || '#2f7bff';
     ctx.lineCap = 'round';
-    ctx.globalAlpha = 0.35;
-    ctx.lineWidth = Math.max(8, view.tile * 0.16);
-    ctx.beginPath();
-    ctx.arc(worldX(shot.x), worldY(shot.y), radius, 0, Math.PI * 2);
+    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = Math.max(7, view.tile * 0.14);
+    inkCircle(0, 0, radius, 20);
     ctx.stroke();
     ctx.globalAlpha = 0.95;
-    ctx.lineWidth = Math.max(2, view.tile * 0.045);
-    ctx.stroke();
+    ctx.lineWidth = Math.max(2.2, view.tile * 0.045);
+    inkStroke();
+    ctx.lineWidth = Math.max(2, view.tile * 0.04);
+    markSnowflake(Math.max(4, view.tile * 0.1));
     ctx.restore();
   }
 
   function drawPoisonShot(shot) {
-    var x = worldX(shot.x);
-    var y = worldY(shot.y);
+    var s = Math.max(5, view.tile * 0.11);
+    ctx.save();
+    ctx.translate(worldX(shot.x), worldY(shot.y));
+    ctx.rotate(shot.angle || 0);
+    inkSeed = Math.round((shot.x || 0) * 33 + (shot.y || 0) * 19);
+    inkSetup(Math.max(1.8, view.tile * 0.035));
     ctx.fillStyle = shot.color || '#3cbf4a';
-    ctx.beginPath();
-    ctx.arc(x, y, Math.max(4, view.tile * 0.09), 0, Math.PI * 2);
+    markDroplet(s);
     ctx.fill();
+    inkStroke();
+    ctx.restore();
   }
 
   function drawShell(shot) {
@@ -6574,10 +7117,23 @@ function selectedTower() {
     var lift = Math.sin(Math.max(0, Math.min(1, t)) * Math.PI) * view.tile * 0.28;
     var x = worldX(shot.x);
     var y = worldY(shot.y) - lift;
-    ctx.fillStyle = shot.color || '#161616';
-    ctx.beginPath();
-    ctx.arc(x, y, Math.max(shot.bomb ? 5 : 3, view.tile * (shot.bomb ? 0.11 : 0.07)), 0, Math.PI * 2);
-    ctx.fill();
+    var s = Math.max(shot.bomb ? 5 : 3.5, view.tile * (shot.bomb ? 0.12 : 0.08));
+    ctx.save();
+    ctx.translate(x, y);
+    inkSeed = Math.round((shot.x || 0) * 29 + (shot.y || 0) * 11);
+    inkSetup(Math.max(1.8, view.tile * 0.035));
+    if (shot.bomb) {
+      ctx.fillStyle = shot.color || '#e02323';
+      markFlame(s);
+      ctx.fill();
+      inkStroke();
+    } else {
+      ctx.fillStyle = shot.color || '#161616';
+      inkCircle(0, 0, s, 12);
+      ctx.fill();
+      inkStroke();
+    }
+    ctx.restore();
   }
 
   function drawShocks() {
@@ -6801,6 +7357,23 @@ function selectedTower() {
       if (!tile || tile.disabled) return;
       selectTile(tile.getAttribute('data-tile'));
     });
+    var welcomeStart = document.getElementById('btn-welcome-start');
+    var openCodexBtn = document.getElementById('btn-open-codex');
+    var openTowersBtn = document.getElementById('btn-open-towers');
+    var openHellBtn = document.getElementById('btn-open-hell');
+    var menuBack = document.getElementById('btn-menu-back');
+    var codexBack = document.getElementById('btn-codex-back');
+    var towersBack = document.getElementById('btn-towers-back');
+    var hellBack = document.getElementById('btn-hell-back');
+    if (welcomeStart) welcomeStart.addEventListener('click', showMenu);
+    if (openCodexBtn) openCodexBtn.addEventListener('click', openCodex);
+    if (openTowersBtn) openTowersBtn.addEventListener('click', openTowerInfo);
+    if (openHellBtn) openHellBtn.addEventListener('click', openHellInfo);
+    if (menuBack) menuBack.addEventListener('click', showWelcome);
+    if (codexBack) codexBack.addEventListener('click', showMenu);
+    if (towersBack) towersBack.addEventListener('click', showMenu);
+    if (hellBack) hellBack.addEventListener('click', showMenu);
+    if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
     document.getElementById('btn-mode-campaign').addEventListener('click', openChapters);
     document.getElementById('btn-mode-custom').addEventListener('click', function () { openDifficulty('custom'); });
     document.getElementById('btn-mode-infinite').addEventListener('click', function () { openDifficulty('infinite'); });
@@ -6833,7 +7406,8 @@ function selectedTower() {
     });
     window.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
-        clearSelection();
+        if (state.userPaused || (state.phase !== 'menu' && !modal.classList.contains('is-open'))) togglePause();
+        else clearSelection();
         return;
       }
       if (event.target.closest && event.target.closest('button')) return;
@@ -6845,6 +7419,7 @@ function selectedTower() {
       else if (event.key === '3') placeChosen('fire');
       else if (event.key === '4') placeChosen('ice');
       else if (event.key === '5') placeChosen('bolt');
+      else if (event.key === '6') placeChosen('mint');
     });
     document.addEventListener('visibilitychange', function () { lastTs = 0; });
     window.addEventListener('resize', resize);
@@ -6874,7 +7449,7 @@ function selectedTower() {
 
   function requestMenu() {
     if (state.phase === 'menu') {
-      showMenu();
+      showWelcome();
       return;
     }
     if (state.mode === 'campaign') {
@@ -6885,7 +7460,7 @@ function selectedTower() {
         desc: '這一局的進度不會保留。星星只在通關時計入。',
         actions: [
           { label: '返回關卡選擇', className: 'btn-mint', onClick: function () { closeModal(); openStages(state.chapter); } },
-          { label: '回到主選單', className: 'btn-ghost', onClick: function () { closeModal(); showMenu(); } },
+          { label: '回到主選單', className: 'btn-ghost', onClick: function () { closeModal(); showWelcome(); } },
           { label: '繼續', className: 'btn-ghost', onClick: closeModal },
         ],
       });
@@ -6898,13 +7473,13 @@ function selectedTower() {
         title: '回到選單？',
         desc: '這一局的進度不會保留。',
         actions: [
-          { label: '回到選單', className: 'btn-mint', onClick: function () { closeModal(); showMenu(); } },
+          { label: '回到選單', className: 'btn-mint', onClick: function () { closeModal(); showWelcome(); } },
           { label: '繼續', className: 'btn-ghost', onClick: closeModal },
         ],
       });
       return;
     }
-    showMenu();
+    showWelcome();
   }
 
   function punchMinions() {
@@ -6925,7 +7500,7 @@ function selectedTower() {
     bindUi();
     setRoute(buildInfinitePath());
     resize();
-    showMenu();
+    showWelcome();
     syncSpeedButton();
     syncSoundButton();
     Ads.init().catch(function () {});
