@@ -249,14 +249,12 @@ canvas {
   min-width: 72px;
   min-height: 46px;
 }
-.spec-focus,
-.spec-twin,
+.spec-arrow,
+.spec-cannon,
 .spec-bolt,
-.spec-laser,
 .spec-ice,
 .spec-fire,
-.spec-poison,
-.spec-stone { background: #fff; color: #161616; border: 2px solid #161616; }
+.spec-poison { background: #fff; color: #161616; border: 2px solid #161616; }
 
 .item-bar {
   display: none;

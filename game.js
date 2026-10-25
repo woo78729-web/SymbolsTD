@@ -86,92 +86,108 @@
     goal: { dx: 148, dy: 184, sw: 72, sh: 58 },
   };
 
+  var ELEMENT_TYPES = ['poison', 'fire', 'ice', 'bolt'];
+
   var TOWERS = {
-    arrow: {
-      name: '箭塔',
-      blurb: '單體 · 高攻速 · 高傷害',
-      cost: 50,
-      color: '#7dcea0',
-      upgradeCost: [45, 75, 110, 160],
+    basic: {
+      name: '無屬性塔',
+      blurb: '3 等分支為箭塔或砲塔',
+      cost: 40,
+      color: '#9aa69a',
+      category: 'neutral',
+      upgradeCost: [35, 60, 95, 135, 180],
       levels: [
-        { damage: 15, range: 2.35, cooldown: 0.4, splash: 0, targets: 1 },
-        { damage: 24, range: 2.55, cooldown: 0.34, splash: 0, targets: 1 },
+        { damage: 16, range: 2.35, cooldown: 0.38, splash: 0, targets: 1 },
+        { damage: 26, range: 2.5, cooldown: 0.32, splash: 0, targets: 1 },
       ],
       specs: {
-        bolt: {
-          name: '電塔',
-          blurb: '一發串連。3等打2隻，4等3隻，5等4隻',
-          color: '#161616',
+        arrow: {
+          name: '箭塔',
+          blurb: '便宜高傷 · 攻速快 · 滿等打兩隻 · 單體輸出最高',
+          color: '#7dcea0',
           levels: [
-            { damage: 36, range: 2.65, cooldown: 0.48, splash: 0, targets: 1, chain: 2, chainRange: 1.85 },
-            { damage: 50, range: 2.7, cooldown: 0.44, splash: 0, targets: 1, chain: 3, chainRange: 1.95 },
-            { damage: 66, range: 2.75, cooldown: 0.4, splash: 0, targets: 1, chain: 4, chainRange: 2.05 },
+            { damage: 42, range: 2.6, cooldown: 0.28, splash: 0, targets: 1 },
+            { damage: 58, range: 2.7, cooldown: 0.24, splash: 0, targets: 1 },
+            { damage: 78, range: 2.8, cooldown: 0.2, splash: 0, targets: 1 },
+            { damage: 100, range: 2.9, cooldown: 0.16, splash: 0, targets: 2 },
           ],
         },
-        laser: {
-          name: '雷射塔',
-          blurb: '鎖定最前面的一隻，持續高傷直到死亡',
-          color: '#161616',
+        cannon: {
+          name: '砲塔',
+          blurb: '範圍擴散 · 一次最多 3 發 · 中心傷高外圍遞減 · 擴散不疊加',
+          color: '#e7a15a',
           levels: [
-            { damage: 52, range: 2.75, cooldown: 0.2, splash: 0, targets: 1, beam: true },
-            { damage: 76, range: 2.85, cooldown: 0.2, splash: 0, targets: 1, beam: true },
-            { damage: 104, range: 2.95, cooldown: 0.2, splash: 0, targets: 1, beam: true },
+            { damage: 44, range: 2.15, cooldown: 1.12, splash: 1.05, shots: 2 },
+            { damage: 58, range: 2.25, cooldown: 1.02, splash: 1.2, shots: 2 },
+            { damage: 74, range: 2.35, cooldown: 0.92, splash: 1.35, shots: 3 },
+            { damage: 92, range: 2.45, cooldown: 0.84, splash: 1.5, shots: 3 },
           ],
         },
       },
     },
-    cannon: {
-      name: '砲塔',
-      blurb: '攻速慢 · 範圍傷害',
-      cost: 90,
-      color: '#e7a15a',
-      upgradeCost: [70, 120, 170, 230],
+    poison: {
+      name: '毒塔',
+      blurb: '單體毒液 · 持續傷害高 · 會傳染',
+      cost: 80,
+      color: '#3cbf4a',
+      category: 'element',
+      upgradeCost: [55, 85, 120, 160, 210],
       levels: [
-        { damage: 30, range: 2.05, cooldown: 1.28, splash: 0.9 },
-        { damage: 48, range: 2.2, cooldown: 1.18, splash: 1 },
+        { damage: 12, range: 2.35, cooldown: 1.05, splash: 0, effect: 'poison', poison: 22, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 14, range: 2.4, cooldown: 0.95, splash: 0, effect: 'poison', poison: 28, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 16, range: 2.45, cooldown: 0.86, splash: 0, effect: 'poison', poison: 34, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 18, range: 2.5, cooldown: 0.78, splash: 0, effect: 'poison', poison: 40, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 20, range: 2.55, cooldown: 0.7, splash: 0, effect: 'poison', poison: 46, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 24, range: 2.6, cooldown: 0.62, splash: 0, effect: 'poison', poison: 54, poisonTime: 3.2, poisonEvery: 0.4 },
       ],
-      specs: {
-        ice: {
-          name: '冰塔',
-          blurb: '藍色光波。碰到就緩速，第 3 次凍結一下',
-          color: '#8fd4ff',
-          levels: [
-            { damage: 52, range: 2.4, cooldown: 1.05, splash: 1.2, effect: 'slow', slow: 0.4, slowTime: 1.8 },
-            { damage: 52, range: 2.4, cooldown: 0.9, splash: 1.42, effect: 'slow', slow: 0.4, slowTime: 1.8 },
-            { damage: 52, range: 2.4, cooldown: 0.76, splash: 1.62, effect: 'slow', slow: 0.4, slowTime: 1.8 },
-          ],
-        },
-        fire: {
-          name: '火塔',
-          blurb: '紅色炸彈。群傷為主，灼燒低，傳染從一開始最多 3 秒',
-          color: '#ff7a45',
-          levels: [
-            { damage: 84, range: 2.4, cooldown: 1.05, splash: 1, effect: 'burn', burn: 5, burnTime: 2.4, burnEvery: 0.5 },
-            { damage: 84, range: 2.4, cooldown: 0.9, splash: 1.12, effect: 'burn', burn: 6, burnTime: 2.4, burnEvery: 0.5 },
-            { damage: 84, range: 2.4, cooldown: 0.76, splash: 1.24, effect: 'burn', burn: 7, burnTime: 2.4, burnEvery: 0.5 },
-          ],
-        },
-        poison: {
-          name: '毒塔',
-          blurb: '綠色毒液。打一隻，持續傷害高，傳染從一開始最多 3 秒',
-          color: '#3cbf4a',
-          levels: [
-            { damage: 18, range: 2.4, cooldown: 1.05, splash: 0, effect: 'poison', poison: 26, poisonTime: 3.2, poisonEvery: 0.4 },
-            { damage: 18, range: 2.5, cooldown: 0.9, splash: 0, effect: 'poison', poison: 34, poisonTime: 3.2, poisonEvery: 0.4 },
-            { damage: 22, range: 2.55, cooldown: 0.76, splash: 0, effect: 'poison', poison: 42, poisonTime: 3.2, poisonEvery: 0.4 },
-          ],
-        },
-        stone: {
-          name: '石塔',
-          blurb: '咖啡色，傷害往外擴散',
-          color: '#d9c7a6',
-          levels: [
-            { damage: 66, range: 2.75, cooldown: 1.12, splash: 1.55 },
-            { damage: 66, range: 3, cooldown: 1.02, splash: 1.8 },
-            { damage: 66, range: 3.25, cooldown: 0.94, splash: 2.05 },
-          ],
-        },
-      },
+    },
+    fire: {
+      name: '火塔',
+      blurb: '紅色炸彈 · 群傷 · 灼燒會傳染',
+      cost: 90,
+      color: '#ff7a45',
+      category: 'element',
+      upgradeCost: [60, 95, 135, 180, 230],
+      levels: [
+        { damage: 48, range: 2.25, cooldown: 1.1, splash: 0.95, effect: 'burn', burn: 4, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 58, range: 2.3, cooldown: 1.0, splash: 1.02, effect: 'burn', burn: 5, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 70, range: 2.35, cooldown: 0.9, splash: 1.1, effect: 'burn', burn: 5, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 84, range: 2.4, cooldown: 0.82, splash: 1.18, effect: 'burn', burn: 6, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 98, range: 2.45, cooldown: 0.74, splash: 1.26, effect: 'burn', burn: 7, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 114, range: 2.5, cooldown: 0.66, splash: 1.34, effect: 'burn', burn: 8, burnTime: 2.4, burnEvery: 0.5 },
+      ],
+    },
+    ice: {
+      name: '冰塔',
+      blurb: '藍色光波 · 緩速 · 第 3 次凍結',
+      cost: 85,
+      color: '#8fd4ff',
+      category: 'element',
+      upgradeCost: [55, 90, 130, 175, 220],
+      levels: [
+        { damage: 28, range: 2.3, cooldown: 1.1, splash: 1.1, effect: 'slow', slow: 0.35, slowTime: 1.8 },
+        { damage: 34, range: 2.35, cooldown: 1.0, splash: 1.2, effect: 'slow', slow: 0.38, slowTime: 1.8 },
+        { damage: 40, range: 2.4, cooldown: 0.9, splash: 1.32, effect: 'slow', slow: 0.4, slowTime: 1.8 },
+        { damage: 46, range: 2.45, cooldown: 0.82, splash: 1.42, effect: 'slow', slow: 0.4, slowTime: 1.8 },
+        { damage: 52, range: 2.5, cooldown: 0.74, splash: 1.52, effect: 'slow', slow: 0.42, slowTime: 1.8 },
+        { damage: 60, range: 2.55, cooldown: 0.66, splash: 1.62, effect: 'slow', slow: 0.45, slowTime: 1.8 },
+      ],
+    },
+    bolt: {
+      name: '雷塔',
+      blurb: '一發串連跳電 · 打多隻',
+      cost: 85,
+      color: '#e0b000',
+      category: 'element',
+      upgradeCost: [55, 90, 130, 175, 220],
+      levels: [
+        { damage: 24, range: 2.45, cooldown: 0.72, splash: 0, targets: 1, chain: 2, chainRange: 1.75 },
+        { damage: 32, range: 2.5, cooldown: 0.64, splash: 0, targets: 1, chain: 2, chainRange: 1.85 },
+        { damage: 42, range: 2.55, cooldown: 0.56, splash: 0, targets: 1, chain: 3, chainRange: 1.9 },
+        { damage: 54, range: 2.6, cooldown: 0.5, splash: 0, targets: 1, chain: 3, chainRange: 2.0 },
+        { damage: 68, range: 2.65, cooldown: 0.44, splash: 0, targets: 1, chain: 4, chainRange: 2.05 },
+        { damage: 84, range: 2.7, cooldown: 0.38, splash: 0, targets: 1, chain: 4, chainRange: 2.15 },
+      ],
     },
   };
 
@@ -268,6 +284,8 @@
     selectedId: null,
     buildType: null,
     buildSite: null,
+    buildMenu: 'root',
+    splashLedger: {},
     sellArmed: false,
     hover: null,
     mode: 'menu',
@@ -1791,21 +1809,35 @@ function selectedTower() {
 
   function rankBoost(stats) {
     var copy = cloneStats(stats);
-    copy.damage = Math.max(1, Math.round(copy.damage * 1.35));
-    copy.cooldown = copy.cooldown * 0.85;
-    copy.range = Math.round(copy.range * 1.1 * 100) / 100;
-    if (copy.splash) copy.splash = Math.round(copy.splash * 1.1 * 100) / 100;
-    if (copy.chainRange) copy.chainRange = Math.round(copy.chainRange * 1.1 * 100) / 100;
+    copy.damage = Math.max(1, Math.round(copy.damage * 1.4));
+    if (copy.range) copy.range = Math.round(copy.range * 1.4 * 100) / 100;
+    if (copy.splash) copy.splash = Math.round(copy.splash * 1.4 * 100) / 100;
+    if (copy.chainRange) copy.chainRange = Math.round(copy.chainRange * 1.4 * 100) / 100;
+    if (copy.poison) copy.poison = Math.max(1, Math.round(copy.poison * 1.4));
+    if (copy.burn) copy.burn = Math.max(1, Math.round(copy.burn * 1.4));
     return copy;
   }
 
   function towerStats(tower) {
     var def = TOWERS[tower.type];
-    var stats = tower.level < 2
-      ? def.levels[tower.level]
-      : def.specs[tower.spec].levels[Math.min(2, tower.level - 2)];
+    var stats;
+    if (def.specs) {
+      stats = tower.level < 2 || !tower.spec
+        ? def.levels[Math.min(def.levels.length - 1, tower.level)]
+        : def.specs[tower.spec].levels[Math.min(def.specs[tower.spec].levels.length - 1, tower.level - 2)];
+    } else {
+      stats = def.levels[Math.min(def.levels.length - 1, tower.level)];
+    }
     if (tower.level >= 5) stats = rankBoost(stats);
     return applySupport(stats, tower);
+  }
+
+  function isArrowPath(tower) {
+    return tower.type === 'basic' && (!tower.spec || tower.spec === 'arrow');
+  }
+
+  function isCannonPath(tower) {
+    return tower.type === 'basic' && tower.spec === 'cannon';
   }
 
   function towerLabel(tower) {
@@ -1963,6 +1995,8 @@ function selectedTower() {
     state.meteor = null;
     state.pendingHero = '';
     state.freeSpec = false;
+    state.splashLedger = {};
+    state.buildMenu = 'root';
   }
 
   function pathIndex(c, r) {
@@ -2235,7 +2269,7 @@ function selectedTower() {
     return [
       { id: 'gold', name: '金幣 +200', desc: '立刻獲得 200 金幣' },
       { id: 'interest', name: '利息', desc: '立刻 +50，接下來 5 波每波 +30' },
-      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等，可到 6 等並全面加強' },
+      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等。金幣最高 5 等，只有這張卡可升到 6 等（數值×1.4）' },
       { id: 'wall', name: '阻擋物', desc: '放在路上，擋住怪物 10 秒' },
       { id: 'push', name: '擊退', desc: '使用後全場怪物沿路退回總長的 10%' },
       { id: 'hero', name: '英雄塔', desc: '自選英雄。選定後不能轉職，打怪升到 10 等' },
@@ -2488,7 +2522,8 @@ function selectedTower() {
   }
 
   function needsSpec(tower) {
-    return tower.level === 1 && !tower.spec;
+    var def = TOWERS[tower.type];
+    return !!(def && def.specs && tower.level === 1 && !tower.spec);
   }
 
   function moveSpeed(enemy) {
@@ -2507,12 +2542,9 @@ function selectedTower() {
         continue;
       }
       var stats = towerStats(tower);
-      if (stats.beam) {
-        updateLaser(tower, stats, dt);
-        continue;
-      }
       tower.cooldown -= dt;
-      var targets = targetsInRange(tower, stats.range, stats.targets || 1);
+      var want = isCannonPath(tower) ? Math.min(3, stats.shots || 1) : (stats.targets || 1);
+      var targets = targetsInRange(tower, stats.range, want);
       if (!targets.length) continue;
       var pos = enemyPos(targets[0]);
       var desired = Math.atan2(pos.y - (tower.r + 0.5), pos.x - (tower.c + 0.5));
@@ -2522,32 +2554,6 @@ function selectedTower() {
         tower.cooldown = stats.cooldown;
       }
     }
-  }
-
-  function enemyInRange(tower, enemy, range) {
-    var pos = enemyPos(enemy);
-    var dx = pos.x - (tower.c + 0.5);
-    var dy = pos.y - (tower.r + 0.5);
-    return dx * dx + dy * dy <= range * range;
-  }
-
-  function updateLaser(tower, stats, dt) {
-    var target = findEnemy(tower.beamId);
-    if (target && !enemyInRange(tower, target, stats.range)) target = null;
-    if (!target) {
-      var front = targetsInRange(tower, stats.range, 1);
-      target = front.length ? front[0] : null;
-      tower.beamId = target ? target.id : null;
-    }
-    if (!target) return;
-    var pos = enemyPos(target);
-    tower.aim = Math.atan2(pos.y - (tower.r + 0.5), pos.x - (tower.c + 0.5));
-    tower.flash = 0.4;
-    tower.cooldown -= dt;
-    if (tower.cooldown > 0) return;
-    tower.cooldown = stats.cooldown;
-    hurtEnemy(target, stats.damage);
-    if (target.dead) tower.beamId = null;
   }
 
   function targetsInRange(tower, range, limit) {
@@ -2568,12 +2574,47 @@ function selectedTower() {
     return found;
   }
 
+  function launchShell(tower, enemy, stats, look, volleyId) {
+    var originX = tower.c + 0.5;
+    var originY = tower.r + 0.5;
+    var pos = pointAt(enemy.dist);
+    var travel = Math.max(0.12, Math.hypot(pos.x - originX, pos.y - originY) / 4.2);
+    var lead = Math.min(WAYPOINTS.length - 1, enemy.dist + moveSpeed(enemy) * travel * 0.8);
+    var target = pointAt(lead);
+    var total = Math.hypot(target.x - originX, target.y - originY) || 0.01;
+    state.projectiles.push({
+      kind: 'shell',
+      x: originX,
+      y: originY,
+      tx: target.x,
+      ty: target.y,
+      total: total,
+      damage: stats.damage,
+      splash: stats.splash,
+      speed: 4.2,
+      dead: false,
+      effect: stats.effect || '',
+      slow: stats.slow || 0,
+      slowTime: stats.slowTime || 0,
+      burn: stats.burn || 0,
+      burnTime: stats.burnTime || 0,
+      burnEvery: stats.burnEvery || 0.5,
+      color: tower.type === 'fire' ? '#e02323' : '#161616',
+      rings: tower.type === 'fire' || isCannonPath(tower) ? 3 : 1,
+      bomb: tower.type === 'fire',
+      falloff: isCannonPath(tower) || tower.type === 'fire',
+      volleyId: volleyId || 0,
+      artSheet: look.sheet,
+      artRow: look.row,
+    });
+  }
+
   function fire(tower, targets, stats) {
     var originX = tower.c + 0.5;
     var originY = tower.r + 0.5;
     tower.flash = 1;
     var look = towerLook(tower);
-    if (tower.type === 'arrow' && tower.spec === 'bolt') {
+    if (tower.type === 'bolt') {
       var chain = chainFrom(targets[0], stats.chain || 1, stats.chainRange || 1.8);
       if (!chain.length) {
         resistFloater(targets[0], '抗電');
@@ -2600,7 +2641,7 @@ function selectedTower() {
       vibrateHit();
       return;
     }
-    if (tower.type === 'arrow') {
+    if (isArrowPath(tower)) {
       for (var i = 0; i < targets.length; i++) {
         state.projectiles.push({
           kind: 'arrow',
@@ -2620,7 +2661,7 @@ function selectedTower() {
       vibrateHit();
       return;
     }
-    if (tower.spec === 'ice') {
+    if (tower.type === 'ice') {
       state.projectiles.push({
         kind: 'wave',
         x: originX,
@@ -2639,7 +2680,7 @@ function selectedTower() {
       vibrate(16);
       return;
     }
-    if (tower.spec === 'poison') {
+    if (tower.type === 'poison') {
       state.projectiles.push({
         kind: 'poison',
         x: originX,
@@ -2658,37 +2699,23 @@ function selectedTower() {
       vibrate(12);
       return;
     }
-    var enemy = targets[0];
-    var pos = pointAt(enemy.dist);
-    var travel = Math.max(0.12, Math.hypot(pos.x - originX, pos.y - originY) / 4.2);
-    var lead = Math.min(WAYPOINTS.length - 1, enemy.dist + moveSpeed(enemy) * travel * 0.8);
-    var target = pointAt(lead);
-    var total = Math.hypot(target.x - originX, target.y - originY) || 0.01;
-    state.projectiles.push({
-      kind: 'shell',
-      x: originX,
-      y: originY,
-      tx: target.x,
-      ty: target.y,
-      total: total,
-      damage: stats.damage,
-      splash: stats.splash,
-      speed: 4.2,
-      dead: false,
-      effect: stats.effect || '',
-      slow: stats.slow || 0,
-      slowTime: stats.slowTime || 0,
-      burn: stats.burn || 0,
-      burnTime: stats.burnTime || 0,
-      burnEvery: stats.burnEvery || 0.5,
-      color: tower.spec === 'fire' ? '#e02323' : (tower.spec === 'stone' ? '#7a4a28' : '#161616'),
-      rings: tower.spec === 'fire' || tower.spec === 'stone' ? 3 : 1,
-      bomb: tower.spec === 'fire',
-      artSheet: look.sheet,
-      artRow: look.row,
-    });
-    Sfx.cannon();
-    vibrate(16);
+    if (isCannonPath(tower)) {
+      var volleyId = state.nextId++;
+      state.splashLedger[volleyId] = {};
+      var shots = Math.min(3, stats.shots || 1, targets.length);
+      for (var s = 0; s < shots; s++) launchShell(tower, targets[s], stats, look, volleyId);
+      Sfx.cannon();
+      vibrate(16);
+      return;
+    }
+    if (tower.type === 'fire') {
+      var fireVolley = state.nextId++;
+      state.splashLedger[fireVolley] = {};
+      launchShell(tower, targets[0], stats, look, fireVolley);
+      Sfx.cannon();
+      vibrate(16);
+      return;
+    }
   }
 
   function chainFrom(first, count, reach) {
@@ -2723,15 +2750,22 @@ function selectedTower() {
 
   function updateProjectiles(dt) {
     if (state.phase !== 'combat') return;
+    var liveVolley = {};
     for (var i = 0; i < state.projectiles.length; i++) {
       var shot = state.projectiles[i];
       if (shot.dead) continue;
+      if (shot.volleyId) liveVolley[shot.volleyId] = true;
       if (shot.kind === 'arrow') updateArrow(shot, dt);
       else if (shot.kind === 'slash') updateSlash(shot, dt);
       else if (shot.kind === 'cut') updateCut(shot, dt);
       else if (shot.kind === 'poison') updatePoison(shot, dt);
       else if (shot.kind === 'wave') updateWave(shot, dt);
       else updateShell(shot, dt);
+      if (!shot.dead && shot.volleyId) liveVolley[shot.volleyId] = true;
+    }
+    for (var key in state.splashLedger) {
+      if (!Object.prototype.hasOwnProperty.call(state.splashLedger, key)) continue;
+      if (!liveVolley[key]) delete state.splashLedger[key];
     }
   }
 
@@ -2814,6 +2848,25 @@ function selectedTower() {
     shot.y += (dy / dist) * step;
   }
 
+  function splashFalloff(dist, radius) {
+    if (radius <= 0) return 1;
+    var t = Math.min(1, Math.max(0, dist / radius));
+    return Math.max(0.25, 1 - t * 0.75);
+  }
+
+  function applySplashHit(enemy, shot, amount) {
+    var ledger = shot.volleyId ? state.splashLedger[shot.volleyId] : null;
+    if (ledger) {
+      var prev = ledger[enemy.id] || 0;
+      if (amount <= prev) return false;
+      hurtEnemy(enemy, amount - prev);
+      ledger[enemy.id] = amount;
+    } else {
+      hurtEnemy(enemy, amount);
+    }
+    return true;
+  }
+
   function explode(shot) {
     Sfx.cannon();
     burst(shot.tx, shot.ty, shot.color || '#ffb15a', shot.bomb ? 22 : 14);
@@ -2834,10 +2887,11 @@ function selectedTower() {
       if (enemy.dead) continue;
       var pos = pointAt(enemy.dist);
       var dist = Math.hypot(pos.x - shot.tx, pos.y - shot.ty);
-      if (dist <= shot.splash + enemy.radius * 0.35) {
-        hurtEnemy(enemy, shot.damage * (dist <= shot.splash * 0.5 ? 1 : 0.62));
-        if (!enemy.dead) applyShellEffect(enemy, shot);
-      }
+      var reach = shot.splash + enemy.radius * 0.35;
+      if (dist > reach) continue;
+      var mul = shot.falloff ? splashFalloff(dist, shot.splash) : (dist <= shot.splash * 0.5 ? 1 : 0.62);
+      applySplashHit(enemy, shot, shot.damage * mul);
+      if (!enemy.dead) applyShellEffect(enemy, shot);
     }
   }
 
@@ -3208,7 +3262,8 @@ function selectedTower() {
       toast('廣告贈送英雄：' + heroName(heroId));
       return true;
     }
-    var type = Math.random() < 0.55 ? 'arrow' : 'cannon';
+    var pool = ['basic', 'basic', 'poison', 'fire', 'ice', 'bolt'];
+    var type = pool[Math.floor(Math.random() * pool.length)];
     placeFreeTower(type, cell);
     toast('廣告贈送 ' + TOWERS[type].name);
     syncHud();
@@ -4018,8 +4073,10 @@ function selectedTower() {
   function toggleBuildSite(c, r) {
     if (state.buildSite && state.buildSite.c === c && state.buildSite.r === r) {
       state.buildSite = null;
+      state.buildMenu = 'root';
     } else {
       state.buildSite = { c: c, r: r };
+      state.buildMenu = 'root';
       state.selectedId = null;
       state.sellArmed = false;
     }
@@ -4043,6 +4100,7 @@ function selectedTower() {
   function clearSelection() {
     state.buildType = null;
     state.buildSite = null;
+    state.buildMenu = 'root';
     state.selectedId = null;
     state.sellArmed = false;
     renderInspector();
@@ -4151,7 +4209,7 @@ function selectedTower() {
     var refund = Math.floor(tower.invested * sellRatio());
     var maxed = towerMaxed(tower);
     inspectTitle.textContent = towerLabel(tower) + '  Lv.' + (tower.level + 1);
-    inspectMeta.textContent = needsSpec(tower) ? specChoiceText(tower) : statLine(stats);
+    inspectMeta.textContent = needsSpec(tower) ? specChoiceText(tower) : statLine(stats, tower);
     if (needsSpec(tower)) {
       var row = document.createElement('div');
       row.className = 'spec-row';
@@ -4165,24 +4223,27 @@ function selectedTower() {
       }
       inspectActions.appendChild(row);
     } else {
-      var upgrade = makeActButton(maxed ? '已滿級' : '升級 ' + nextUpgradeCost(tower), 'btn-mint btn-primary-act', 'upgrade');
-      upgrade.disabled = maxed || state.gold < nextUpgradeCost(tower);
+      var upgradeLabel = tower.level >= 5
+        ? '已滿級'
+        : (maxed ? '金幣滿等' : '升級 ' + nextUpgradeCost(tower));
+      var upgrade = makeActButton(upgradeLabel, 'btn-mint btn-primary-act', 'upgrade');
+      upgrade.disabled = maxed || tower.level >= 5 || state.gold < nextUpgradeCost(tower);
       inspectActions.appendChild(upgrade);
     }
     appendSellRow(refund);
   }
 
-  function statLine(stats) {
-    var bits = stats.beam
-      ? ['持續 ' + Math.round(stats.damage / stats.cooldown) + '/秒', '射程 ' + fmt(stats.range), '鎖定最前']
-      : [
-        '傷害 ' + stats.damage,
-        '射程 ' + fmt(stats.range),
-        '攻速 ' + fmt(1 / stats.cooldown) + '/秒',
-      ];
+  function statLine(stats, tower) {
+    var bits = [
+      '傷害 ' + stats.damage,
+      '射程 ' + fmt(stats.range),
+      '攻速 ' + fmt(1 / stats.cooldown) + '/秒',
+    ];
     if (stats.chain) bits.push('串連 ' + stats.chain);
     if (stats.splash && stats.effect !== 'slow') bits.push('範圍 ' + fmt(stats.splash));
+    if (stats.shots) bits.push('彈數 ' + Math.min(3, stats.shots));
     if (stats.targets > 1) bits.push('目標 ' + stats.targets);
+    if (tower && tower.level >= 5) bits.push('滿等×1.4');
     if (stats.effect === 'slow') bits.push('緩速 ' + Math.round(stats.slow * 100) + '%', '3次凍結');
     if (stats.effect === 'burn') bits.push('灼燒 ' + Math.round(stats.burn / stats.burnEvery) + '/秒', '傳染3秒');
     if (stats.effect === 'poison') bits.push('中毒 ' + Math.round(stats.poison / stats.poisonEvery) + '/秒', '單體', '傳染3秒');
@@ -4190,8 +4251,7 @@ function selectedTower() {
   }
 
   function specChoiceText(tower) {
-    if (tower.type === 'arrow') return '升到 3 等選擇特化。電塔一發會串連，3等打2隻、4等3隻、5等4隻。雷射塔鎖定最前面的一隻，持續高傷直到死亡。';
-    return '升到 3 等選擇特化。冰塔藍色光波，碰到緩速，第 3 次凍結。火塔是紅色炸彈，群傷高、灼燒低。毒塔綠色，打一隻，持續傷害高。火和毒都會傳染，從第一次中算起最多 3 秒。石塔咖啡色，傷害往外擴散。';
+    return '升到 3 等選擇特化。箭塔：高傷高攻速，滿等可同時打兩隻。砲塔：擴散範圍傷，一次最多 3 發，中心最高、外圍遞減，擴散傷害不疊加。';
   }
 
   function makeActButton(label, className, act) {
@@ -4684,30 +4744,28 @@ function selectedTower() {
 
   function towerLook(tower) {
     var shown = tower.level + 1;
-    if (tower.type === 'arrow') {
-      if (tower.spec === 'focus') {
+    if (isArrowPath(tower) || tower.type === 'bolt') {
+      if (tower.spec === 'arrow') {
         if (shown <= 3) return { sheet: 0, row: 2 };
         if (shown === 4) return { sheet: 0, row: 3 };
-        return { sheet: 1, row: 0 };
-      }
-      if (tower.spec === 'twin') {
-        if (shown <= 3) return { sheet: 1, row: 1 };
-        if (shown === 4) return { sheet: 1, row: 2 };
+        if (shown === 5) return { sheet: 1, row: 0 };
         return { sheet: 1, row: 3 };
       }
+      if (tower.type === 'bolt') return { sheet: 0, row: shown <= 3 ? 2 : 3 };
       return { sheet: 0, row: shown <= 1 ? 0 : 1 };
     }
-    if (tower.spec === 'fire') {
+    if (tower.type === 'fire') {
       if (shown <= 3) return { sheet: 3, row: 2 };
       if (shown === 4) return { sheet: 3, row: 3 };
       return { sheet: 2, row: 0 };
     }
-    if (tower.spec === 'ice') {
+    if (tower.type === 'ice') {
       if (shown <= 3) return { sheet: 2, row: 1 };
       if (shown === 4) return { sheet: 2, row: 2 };
       return { sheet: 4, row: 0 };
     }
-    if (tower.spec === 'stone') {
+    if (tower.type === 'poison') return { sheet: 3, row: shown <= 2 ? 0 : 1 };
+    if (isCannonPath(tower)) {
       if (shown <= 3) return { sheet: 2, row: 3 };
       if (shown === 4) return { sheet: 4, row: 2 };
       return { sheet: 4, row: 3 };
@@ -4780,15 +4838,16 @@ function selectedTower() {
   }
 
   function towerSpriteKey(tower) {
-    var shown = tower.level + 1;
-    if (tower.type === 'arrow') {
-      if (tower.spec === 'focus') return 'heavy' + shown;
-      if (tower.spec === 'twin') return 'twin' + shown;
+    var shown = Math.min(5, tower.level + 1);
+    if (isArrowPath(tower) || tower.type === 'bolt') {
+      if (tower.spec === 'arrow' && shown >= 5) return 'twin' + Math.min(5, shown);
+      if (tower.spec === 'arrow') return 'heavy' + Math.min(5, Math.max(3, shown));
       return shown <= 1 ? 'arrow1' : 'arrow2';
     }
-    if (tower.spec === 'ice') return shown >= 5 ? 'ice4' : 'ice' + shown;
-    if (tower.spec === 'fire') return 'fire5';
-    if (tower.spec === 'stone') return 'stone' + shown;
+    if (tower.type === 'ice') return shown >= 5 ? 'ice4' : 'ice' + Math.max(3, shown);
+    if (tower.type === 'fire') return 'fire5';
+    if (tower.type === 'poison') return shown <= 1 ? 'cannon1' : 'cannon2';
+    if (isCannonPath(tower)) return 'stone' + Math.min(5, Math.max(3, shown));
     return shown <= 1 ? 'cannon1' : 'cannon2';
   }
 
@@ -5389,19 +5448,17 @@ function selectedTower() {
     ctx.restore();
   }
 
-  var BUILD_ICON = {
-    arrow: { sx: 44, sy: 396, sw: 124, sh: 124 },
-    cannon: { sx: 220, sy: 392, sw: 128, sh: 128 },
-  };
-
   function buildMenuLayout() {
     if (!state.buildSite) return null;
     var tile = view.tile;
     var gap = 8;
-    var btnW = Math.max(84, tile * 1.85);
-    var btnH = Math.max(102, tile * 2.15);
-    var panelW = btnW * 2 + gap * 3;
-    var panelH = btnH + gap * 2;
+    var elementMode = state.buildMenu === 'element';
+    var cols = elementMode ? 2 : 2;
+    var rows = elementMode ? 3 : 1;
+    var btnW = Math.max(78, tile * 1.7);
+    var btnH = Math.max(88, tile * 1.85);
+    var panelW = btnW * cols + gap * (cols + 1);
+    var panelH = btnH * rows + gap * (rows + 1);
     var cx = worldX(state.buildSite.c + 0.5);
     var cellTop = worldY(state.buildSite.r);
     var cellBottom = worldY(state.buildSite.r + 1);
@@ -5417,17 +5474,32 @@ function selectedTower() {
       y = Math.max(6, cellTop - panelH - 12);
       below = false;
     }
-    return {
-      x: x,
-      y: y,
-      w: panelW,
-      h: panelH,
-      below: below,
-      buttons: [
-        { type: 'arrow', x: x + gap, y: y + gap, w: btnW, h: btnH },
-        { type: 'cannon', x: x + gap * 2 + btnW, y: y + gap, w: btnW, h: btnH },
-      ],
-    };
+    var buttons = [];
+    if (elementMode) {
+      var elems = ELEMENT_TYPES;
+      for (var e = 0; e < elems.length; e++) {
+        var ec = e % 2;
+        var er = Math.floor(e / 2);
+        buttons.push({
+          type: elems[e],
+          x: x + gap + ec * (btnW + gap),
+          y: y + gap + er * (btnH + gap),
+          w: btnW,
+          h: btnH,
+        });
+      }
+      buttons.push({
+        type: 'back',
+        x: x + gap,
+        y: y + gap + 2 * (btnH + gap),
+        w: btnW * 2 + gap,
+        h: btnH * 0.72,
+      });
+    } else {
+      buttons.push({ type: 'basic', x: x + gap, y: y + gap, w: btnW, h: btnH });
+      buttons.push({ type: 'element', x: x + gap * 2 + btnW, y: y + gap, w: btnW, h: btnH });
+    }
+    return { x: x, y: y, w: panelW, h: panelH, below: below, buttons: buttons };
   }
 
   function pointInRect(px, py, rect) {
@@ -5475,7 +5547,9 @@ function selectedTower() {
     for (var i = 0; i < menu.buttons.length; i++) {
       var btn = menu.buttons[i];
       var def = TOWERS[btn.type];
-      var poor = state.gold < def.cost;
+      var label = btn.type === 'element' ? '屬性塔' : (btn.type === 'back' ? '返回' : def.name);
+      var cost = def ? def.cost : 0;
+      var poor = def && state.gold < def.cost;
       roundRect(btn.x, btn.y, btn.w, btn.h, 12);
       ctx.fillStyle = '#fff';
       ctx.fill();
@@ -5485,38 +5559,83 @@ function selectedTower() {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.save();
-      ctx.translate(btn.x + btn.w / 2, btn.y + 34);
-      ctx.strokeStyle = '#161616';
+      ctx.translate(btn.x + btn.w / 2, btn.y + Math.min(34, btn.h * 0.38));
+      ctx.strokeStyle = def && def.color ? def.color : '#161616';
+      ctx.fillStyle = ctx.strokeStyle;
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      if (btn.type === 'arrow') {
-        ctx.beginPath();
-        ctx.arc(0, 0, 16, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(-8, 0);
-        ctx.lineTo(8, 0);
-        ctx.moveTo(2, -6);
-        ctx.lineTo(10, 0);
-        ctx.lineTo(2, 6);
-        ctx.stroke();
-      } else {
-        ctx.strokeRect(-14, -14, 28, 28);
-        ctx.beginPath();
-        ctx.arc(0, 0, 6, 0, Math.PI * 2);
-        ctx.stroke();
-      }
+      drawBuildGlyph(btn.type);
       ctx.restore();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#161616';
-      ctx.font = '800 15px ' + FONT;
-      ctx.fillText(def.name, btn.x + btn.w / 2, btn.y + btn.h - 30);
-      ctx.font = '800 14px ' + FONT;
-      ctx.fillText(String(def.cost), btn.x + btn.w / 2, btn.y + btn.h - 13);
+      ctx.font = '800 ' + (btn.type === 'back' ? '14' : '13') + 'px ' + FONT;
+      ctx.fillText(label, btn.x + btn.w / 2, btn.y + btn.h - (cost ? 28 : 16));
+      if (cost) {
+        ctx.font = '800 13px ' + FONT;
+        ctx.fillText(String(cost), btn.x + btn.w / 2, btn.y + btn.h - 12);
+      }
     }
     ctx.restore();
+  }
+
+  function drawBuildGlyph(type) {
+    if (type === 'basic') {
+      ctx.beginPath();
+      ctx.arc(0, 0, 15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-7, 0);
+      ctx.lineTo(7, 0);
+      ctx.moveTo(1, -5);
+      ctx.lineTo(9, 0);
+      ctx.lineTo(1, 5);
+      ctx.stroke();
+    } else if (type === 'element') {
+      ctx.strokeRect(-14, -14, 28, 28);
+      ctx.beginPath();
+      ctx.moveTo(-6, 6);
+      ctx.lineTo(0, -8);
+      ctx.lineTo(6, 6);
+      ctx.closePath();
+      ctx.stroke();
+    } else if (type === 'back') {
+      ctx.beginPath();
+      ctx.moveTo(6, -8);
+      ctx.lineTo(-8, 0);
+      ctx.lineTo(6, 8);
+      ctx.stroke();
+    } else if (type === 'poison') {
+      ctx.beginPath();
+      ctx.arc(0, 4, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(-5, -6, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (type === 'fire') {
+      inkX(0, 0, 10);
+    } else if (type === 'ice') {
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(0, 10);
+      ctx.moveTo(-9, -4);
+      ctx.lineTo(9, 4);
+      ctx.stroke();
+    } else if (type === 'bolt') {
+      ctx.beginPath();
+      ctx.moveTo(-4, -12);
+      ctx.lineTo(4, -2);
+      ctx.lineTo(-2, 0);
+      ctx.lineTo(5, 12);
+      ctx.lineTo(-5, 2);
+      ctx.lineTo(1, 0);
+      ctx.closePath();
+      ctx.stroke();
+    }
   }
 
   function drawFlashes() {
@@ -5586,21 +5705,14 @@ function selectedTower() {
       if (Math.cos(tower.aim || 0) < 0) ctx.scale(-1, 1);
       if (skillAuraOn(tower)) drawPossess(tower, s);
       drawStick(tower, s);
-    } else if (tower.type === 'arrow') {
+    } else if (isArrowPath(tower) || tower.type === 'bolt') {
       ctx.beginPath();
       ctx.arc(0, 0, s, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.save();
       ctx.rotate(tower.aim);
-      if (tower.spec === 'laser') {
-        ctx.strokeStyle = '#7c3aed';
-        ctx.lineWidth = 3.5;
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.2, 0);
-        ctx.lineTo(s * 1.05, 0);
-        ctx.stroke();
-      } else if (tower.spec === 'bolt') {
+      if (tower.type === 'bolt') {
         ctx.strokeStyle = '#e0b000';
         ctx.beginPath();
         ctx.moveTo(-s * 0.5, s * 0.18);
@@ -5621,10 +5733,10 @@ function selectedTower() {
     } else {
       ctx.fillRect(-s, -s, s * 2, s * 2);
       ctx.strokeRect(-s, -s, s * 2, s * 2);
-      if (tower.spec === 'fire') {
+      if (tower.type === 'fire') {
         ctx.strokeStyle = '#e02323';
         inkX(0, 0, s * 0.4);
-      } else if (tower.spec === 'poison') {
+      } else if (tower.type === 'poison') {
         ctx.fillStyle = '#3cbf4a';
         ctx.beginPath();
         ctx.arc(0, s * 0.08, s * 0.28, 0, Math.PI * 2);
@@ -5632,10 +5744,7 @@ function selectedTower() {
         ctx.beginPath();
         ctx.arc(-s * 0.16, -s * 0.22, s * 0.1, 0, Math.PI * 2);
         ctx.fill();
-      } else if (tower.spec === 'stone') {
-        ctx.fillStyle = '#7a4a28';
-        ctx.fillRect(-s * 0.28, -s * 0.28, s * 0.56, s * 0.56);
-      } else if (tower.spec === 'ice') {
+      } else if (tower.type === 'ice') {
         ctx.strokeStyle = '#2f7bff';
         ctx.beginPath();
         ctx.arc(0, 0, s * 0.36, 0, Math.PI * 2);
@@ -5907,22 +6016,6 @@ function selectedTower() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#161616';
-    if (state.phase === 'combat') {
-      for (var i = 0; i < state.towers.length; i++) {
-        var tower = state.towers[i];
-        if (tower.spec !== 'laser' || !tower.beamId) continue;
-        var enemy = findEnemy(tower.beamId);
-        if (!enemy) continue;
-        var pos = enemyPos(enemy);
-        ctx.globalAlpha = 0.95;
-        ctx.strokeStyle = '#7c3aed';
-        ctx.lineWidth = Math.max(3, view.tile * 0.07);
-        ctx.beginPath();
-        ctx.moveTo(worldX(tower.c + 0.5), worldY(tower.r + 0.5));
-        ctx.lineTo(worldX(pos.x), worldY(pos.y));
-        ctx.stroke();
-      }
-    }
     for (var a = 0; a < state.arcs.length; a++) {
       var arc = state.arcs[a];
       ctx.globalAlpha = Math.max(0.45, arc.life / arc.maxLife);
@@ -6144,7 +6237,18 @@ function selectedTower() {
     if (menu) {
       for (var i = 0; i < menu.buttons.length; i++) {
         if (pointInRect(point.x, point.y, menu.buttons[i])) {
-          placeChosen(menu.buttons[i].type);
+          var pick = menu.buttons[i].type;
+          if (pick === 'element') {
+            state.buildMenu = 'element';
+            Sfx.ui();
+            return;
+          }
+          if (pick === 'back') {
+            state.buildMenu = 'root';
+            Sfx.ui();
+            return;
+          }
+          placeChosen(pick);
           return;
         }
       }
@@ -6278,8 +6382,14 @@ function selectedTower() {
       if ((event.key === ' ' || event.key === 'Enter') && state.phase === 'prep' && !state.pickMode && !state.adBusy && screenMenu.hidden && screenChapters.hidden && screenStages.hidden && screenDifficulty.hidden) {
         event.preventDefault();
         startWave(state.wave + 1);
-      } else if (event.key === '1') placeChosen('arrow');
-      else if (event.key === '2') placeChosen('cannon');
+      } else if (event.key === '1') placeChosen('basic');
+      else if (event.key === '2') {
+        if (state.buildSite) state.buildMenu = 'element';
+      }
+      else if (event.key === '3') placeChosen('poison');
+      else if (event.key === '4') placeChosen('fire');
+      else if (event.key === '5') placeChosen('ice');
+      else if (event.key === '6') placeChosen('bolt');
     });
     document.addEventListener('visibilitychange', function () { lastTs = 0; });
     window.addEventListener('resize', resize);
