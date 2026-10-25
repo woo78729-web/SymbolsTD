@@ -571,24 +571,217 @@
     return blocked;
   }
 
+  function pathCellKey(c, r) { return c + ',' + r; }
+
+  function pathStickiness(cells) {
+    var index = {};
+    for (var i = 0; i < cells.length; i++) index[pathCellKey(cells[i].c, cells[i].r)] = i;
+    var sticky = 0;
+    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var n = 0; n < cells.length; n++) {
+      for (var d = 0; d < dirs.length; d++) {
+        var nk = pathCellKey(cells[n].c + dirs[d][0], cells[n].r + dirs[d][1]);
+        if (index[nk] == null) continue;
+        if (Math.abs(index[nk] - n) === 1) continue;
+        sticky += 1;
+      }
+    }
+    return sticky / 2;
+  }
+
+  function pathTurnCount(cells) {
+    var turns = 0;
+    for (var i = 1; i < cells.length - 1; i++) {
+      var dx0 = cells[i].c - cells[i - 1].c;
+      var dy0 = cells[i].r - cells[i - 1].r;
+      var dx1 = cells[i + 1].c - cells[i].c;
+      var dy1 = cells[i + 1].r - cells[i].r;
+      if (dx0 !== dx1 || dy0 !== dy1) turns += 1;
+    }
+    return turns;
+  }
+
+  function sanitizePathCells(cells, blocked) {
+    var seen = new Set();
+    var out = [];
+    for (var i = 0; i < cells.length; i++) {
+      var k = pathCellKey(cells[i].c, cells[i].r);
+      if (blocked.has(k)) return null;
+      if (seen.has(k)) return null;
+      seen.add(k);
+      out.push({ c: cells[i].c, r: cells[i].r });
+    }
+    for (var n = 1; n < out.length; n++) {
+      if (Math.abs(out[n].c - out[n - 1].c) + Math.abs(out[n].r - out[n - 1].r) !== 1) return null;
+    }
+    return out;
+  }
+
+  function acceptGeneratedPath(cells, blocked) {
+    if (!cells) return null;
+    cells = sanitizePathCells(cells, blocked || new Set());
+    if (!cells || cells.length < 30) return null;
+    if (cells[0].c !== 0 || cells[0].r !== 0) return null;
+    var end = infiniteEnd();
+    if (cells[cells.length - 1].c !== end.c || cells[cells.length - 1].r !== end.r) return null;
+    if (pathTurnCount(cells) < 7) return null;
+    if (pathStickiness(cells) > Math.max(2, cells.length * 0.1)) return null;
+    return cells;
+  }
+
+  function buildWindingInfinitePath(blocked) {
+    blocked = blocked || new Set();
+    var end = infiniteEnd();
+    for (var attempt = 0; attempt < 40; attempt++) {
+      var leftEdge = Math.floor(Math.random() * 3);
+      var rightEdge = 6 + Math.floor(Math.random() * 3);
+      if (rightEdge - leftEdge < 5) rightEdge = Math.min(8, leftEdge + 5);
+
+      var rows = [0];
+      var cur = 0;
+      while (cur < ROWS - 1) {
+        var remain = ROWS - 1 - cur;
+        var gap = remain <= 3 ? remain : (2 + Math.floor(Math.random() * 3));
+        cur += gap;
+        if (cur > ROWS - 1) cur = ROWS - 1;
+        if (cur !== rows[rows.length - 1]) rows.push(cur);
+        if (cur >= ROWS - 1) break;
+      }
+      if (rows.length < 5) continue;
+
+      var points = [[0, 0]];
+      var c = 0;
+      var goRight = Math.random() < 0.5;
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (i > 0) points.push([c, row]);
+        if (i === rows.length - 1) {
+          points.push([end.c, row]);
+          continue;
+        }
+        var span = 3 + Math.floor(Math.random() * 4);
+        var target = goRight ? Math.min(rightEdge, c + span) : Math.max(leftEdge, c - span);
+        if (target === c) target = goRight ? Math.min(8, c + 4) : Math.max(0, c - 4);
+        points.push([target, row]);
+        c = target;
+        goRight = !goRight;
+      }
+      var cells = acceptGeneratedPath(chain(points), blocked);
+      if (cells) return cells;
+    }
+    return null;
+  }
+
+  function buildColumnWindingPath(blocked) {
+    blocked = blocked || new Set();
+    var end = infiniteEnd();
+    for (var attempt = 0; attempt < 40; attempt++) {
+      var topEdge = Math.floor(Math.random() * 2);
+      var bottomEdge = 10 + Math.floor(Math.random() * 3);
+      if (bottomEdge > 12) bottomEdge = 12;
+      var cols = [0];
+      var cur = 0;
+      while (cur < end.c) {
+        var step = 2 + Math.floor(Math.random() * 3);
+        cur = Math.min(end.c, cur + step);
+        if (cur !== cols[cols.length - 1]) cols.push(cur);
+        if (cur >= end.c) break;
+      }
+      if (cols[cols.length - 1] !== end.c) cols.push(end.c);
+      if (cols.length < 4) continue;
+
+      var points = [[0, 0]];
+      var r = 0;
+      var goDown = true;
+      for (var i = 0; i < cols.length; i++) {
+        var col = cols[i];
+        if (i > 0) points.push([col, r]);
+        if (i === cols.length - 1) {
+          points.push([col, end.r]);
+          continue;
+        }
+        var targetR = goDown ? bottomEdge : topEdge;
+        targetR = goDown
+          ? Math.min(12, Math.max(r + 3, bottomEdge - Math.floor(Math.random() * 2)))
+          : Math.max(0, Math.min(r - 3, topEdge + Math.floor(Math.random() * 2)));
+        if (targetR === r) targetR = goDown ? Math.min(12, r + 4) : Math.max(0, r - 4);
+        points.push([col, targetR]);
+        r = targetR;
+        goDown = !goDown;
+      }
+      var cells = acceptGeneratedPath(chain(points), blocked);
+      if (cells) return cells;
+    }
+    return null;
+  }
+
+  function buildScatteredWaypointPath(blocked) {
+    blocked = blocked || new Set();
+    var end = infiniteEnd();
+    for (var attempt = 0; attempt < 50; attempt++) {
+      var points = [[0, 0]];
+      var count = 4 + Math.floor(Math.random() * 4);
+      var used = new Set(['0,0', end.c + ',' + end.r]);
+      for (var n = 0; n < count; n++) {
+        var picks = [];
+        for (var tries = 0; tries < 30; tries++) {
+          var pc = 1 + Math.floor(Math.random() * (COLS - 2));
+          var pr = 1 + Math.floor(Math.random() * (ROWS - 2));
+          var pk = pathCellKey(pc, pr);
+          if (used.has(pk) || blocked.has(pk)) continue;
+          var last = points[points.length - 1];
+          var dist = Math.abs(pc - last[0]) + Math.abs(pr - last[1]);
+          if (dist < 4 || dist > 14) continue;
+          picks.push([pc, pr]);
+        }
+        if (!picks.length) break;
+        var choose = picks[Math.floor(Math.random() * picks.length)];
+        used.add(pathCellKey(choose[0], choose[1]));
+        points.push(choose);
+      }
+      points.push([end.c, end.r]);
+      if (points.length < 6) continue;
+      var cells = acceptGeneratedPath(chain(points), blocked);
+      if (cells) return cells;
+    }
+    return null;
+  }
+
+  function pathSignature(cells) {
+    if (!cells || !cells.length) return '';
+    var step = Math.max(1, Math.floor(cells.length / 8));
+    var parts = [];
+    for (var i = 0; i < cells.length; i += step) parts.push(cells[i].c + ':' + cells[i].r);
+    parts.push(cells[cells.length - 1].c + ':' + cells[cells.length - 1].r);
+    return parts.join('|');
+  }
+
   function randomWeightPath(start, end, blocked) {
-    var key = function (c, r) { return c + ',' + r; };
     var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     var best = {};
     var prev = {};
     var queue = [start];
-    best[key(start.c, start.r)] = 0;
+    var startKey = pathCellKey(start.c, start.r);
+    best[startKey] = 0;
     while (queue.length) {
       var cur = queue.shift();
-      var ck = key(cur.c, cur.r);
+      var ck = pathCellKey(cur.c, cur.r);
       if (cur.c === end.c && cur.r === end.r) break;
-      for (var i = 0; i < dirs.length; i++) {
-        var nc = cur.c + dirs[i][0];
-        var nr = cur.r + dirs[i][1];
+      var order = dirs.slice().sort(function () { return Math.random() - 0.5; });
+      for (var i = 0; i < order.length; i++) {
+        var nc = cur.c + order[i][0];
+        var nr = cur.r + order[i][1];
         if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
-        var nk = key(nc, nr);
+        var nk = pathCellKey(nc, nr);
         if (blocked.has(nk)) continue;
-        var nextCost = best[ck] + 1 + Math.random() * 4.5;
+        var stick = 0;
+        for (var d = 0; d < dirs.length; d++) {
+          var ak = pathCellKey(nc + dirs[d][0], nr + dirs[d][1]);
+          if (best[ak] == null) continue;
+          if (ak === ck) continue;
+          stick += 1;
+        }
+        var nextCost = best[ck] + 1 + Math.random() * 6 + stick * 3.5;
         if (best[nk] == null || nextCost < best[nk]) {
           best[nk] = nextCost;
           prev[nk] = cur;
@@ -596,12 +789,12 @@
         }
       }
     }
-    var endKey = key(end.c, end.r);
+    var endKey = pathCellKey(end.c, end.r);
     if (best[endKey] == null) return null;
     var cells = [end];
     var walk = end;
     while (walk.c !== start.c || walk.r !== start.r) {
-      walk = prev[key(walk.c, walk.r)];
+      walk = prev[pathCellKey(walk.c, walk.r)];
       if (!walk) return null;
       cells.push(walk);
     }
@@ -609,20 +802,49 @@
     return cells;
   }
 
+  function scoreRandomPath(cells) {
+    if (!cells) return -1;
+    return cells.length * 2 + pathTurnCount(cells) * 4 - pathStickiness(cells) * 8;
+  }
+
   function buildRandomInfinitePath() {
     var start = infiniteStart();
     var end = infiniteEnd();
     var blocked = towerBlockSet();
-    var best = null;
-    for (var attempt = 0; attempt < 48; attempt++) {
-      var cells = randomWeightPath(start, end, blocked);
-      if (!cells || cells.length < ROWS + 4) continue;
-      if (!best || cells.length > best.length) best = cells;
-      if (cells.length >= ROWS * 2) return cells;
+    var candidates = [];
+    var lastSig = state.lastPathSig || '';
+
+    function pushCandidate(cells) {
+      if (!cells) return;
+      var sig = pathSignature(cells);
+      if (sig && sig === lastSig) return;
+      candidates.push(cells);
     }
-    if (best) return best;
-    var open = randomWeightPath(start, end, new Set());
-    return open || buildInfinitePath();
+
+    for (var i = 0; i < 18; i++) {
+      var roll = Math.random();
+      if (roll < 0.34) pushCandidate(buildWindingInfinitePath(blocked));
+      else if (roll < 0.67) pushCandidate(buildColumnWindingPath(blocked));
+      else pushCandidate(buildScatteredWaypointPath(blocked));
+    }
+    for (var a = 0; a < 24; a++) {
+      var weighted = acceptGeneratedPath(randomWeightPath(start, end, blocked), blocked);
+      pushCandidate(weighted);
+    }
+
+    if (!candidates.length) {
+      pushCandidate(buildWindingInfinitePath(new Set()));
+      pushCandidate(buildColumnWindingPath(new Set()));
+      pushCandidate(buildScatteredWaypointPath(new Set()));
+      pushCandidate(acceptGeneratedPath(randomWeightPath(start, end, new Set()), new Set()));
+    }
+    if (!candidates.length) return buildInfinitePath();
+
+    candidates.sort(function (a, b) { return scoreRandomPath(b) - scoreRandomPath(a); });
+    var pool = candidates.slice(0, Math.min(8, candidates.length));
+    var chosen = pool[Math.floor(Math.random() * pool.length)];
+    state.lastPathSig = pathSignature(chosen);
+    return chosen;
   }
 
   function refundTowersOnPath() {
@@ -999,16 +1221,16 @@ function selectedTower() {
   var INFINITE_PROFILES = {
     normal: {
       id: 'normal', name: '普通',
-      blurb: '血量與數量都提高，擊殺金幣變少。起始 60 金、20 生命。',
-      hp: 1.36, growth: 1.225, speed: 1.08, speedGrow: 0.042, speedCap: 1.72,
-      gold: 0.8, gap: 0.86, gapMin: 0.46, extra: 1, rush: 0.18,
-      lives: 20, purse: 60, swiftFrom: 3, swiftEvery: 3, bruteEvery: 5,
+      blurb: '血量與數量適中，擊殺金幣稍少。起始 100 金、20 生命。',
+      hp: 1.18, growth: 1.185, speed: 1.03, speedGrow: 0.034, speedCap: 1.52,
+      gold: 0.92, gap: 0.95, gapMin: 0.52, extra: 0, rush: 0.1,
+      lives: 20, purse: 100, swiftFrom: 3, swiftEvery: 3, bruteEvery: 5,
     },
     hell: {
       id: 'hell', name: '地獄',
       blurb: '血量、速度、數量都更高，擊殺金幣較少。起始 100 金、14 生命。',
-      hp: 1.6, growth: 1.28, speed: 1.14, speedGrow: 0.048, speedCap: 1.95,
-      gold: 0.65, gap: 0.78, gapMin: 0.4, extra: 2, rush: 0.22,
+      hp: 1.68, growth: 1.295, speed: 1.16, speedGrow: 0.05, speedCap: 2.0,
+      gold: 0.62, gap: 0.76, gapMin: 0.38, extra: 2, rush: 0.24,
       lives: 14, purse: 100, swiftFrom: 2, swiftEvery: 2, bruteEvery: 3,
     },
   };
@@ -1224,8 +1446,8 @@ function selectedTower() {
       gruntSpeed = Math.min(1.62, gruntSpeed * 1.06);
       gold = Math.max(4, Math.round(gold * 0.9));
     }
-    var bossMul = 11 + Math.min(wave, 40) * 0.22;
-    if (diff && diff.id === 'hell') bossMul = 3.6 + Math.min(wave, 40) * 0.04;
+    var bossMul = 9.5 + Math.min(wave, 40) * 0.18;
+    if (diff && diff.id === 'hell') bossMul = 5.4 + Math.min(wave, 40) * 0.1;
     var hp = Math.round(gruntHp * bossMul);
     return {
       id: state.nextId++,
@@ -2757,10 +2979,14 @@ function selectedTower() {
     Sfx.kill();
   }
 
+  function countdownBuildOpen() {
+    return state.clearCountdown > 0 && (state.phase === 'reward' || state.phase === 'victory');
+  }
+
   function beginClearCountdown(kind) {
     state.clearKind = kind || 'wave';
     state.clearCountdown = 5;
-    state.paused = true;
+    state.paused = false;
     state.projectiles = [];
     state.arcs = [];
     var title = kind === 'victory' ? '關卡通過' : ('第 ' + state.wave + ' 波守住了');
@@ -2820,7 +3046,7 @@ function selectedTower() {
         saveStars();
       }
       beginClearCountdown('victory');
-      state.banner.text = starGlyph(stars) + ' 通過';
+      if (state.banner) state.banner.text = starGlyph(stars) + ' 通過';
       return;
     }
     state.phase = 'reward';
@@ -2925,6 +3151,25 @@ function selectedTower() {
     return list;
   }
 
+  function pathDistance(c, r) {
+    var best = 99;
+    for (var i = 0; i < route.cells.length; i++) {
+      var cell = route.cells[i];
+      var dist = Math.abs(cell.c - c) + Math.abs(cell.r - r);
+      if (dist < best) best = dist;
+    }
+    return best;
+  }
+
+  function emptyBuildCellsNearPath() {
+    var all = emptyBuildCells();
+    if (!all.length) return all;
+    var near = all.filter(function (cell) { return pathDistance(cell.c, cell.r) <= 1; });
+    if (near.length) return near;
+    near = all.filter(function (cell) { return pathDistance(cell.c, cell.r) <= 2; });
+    return near.length ? near : all;
+  }
+
   function placeFreeTower(type, cell) {
     var def = TOWERS[type];
     if (!def || !cell) return false;
@@ -2949,7 +3194,7 @@ function selectedTower() {
   }
 
   function grantAdTower() {
-    var empties = emptyBuildCells();
+    var empties = emptyBuildCellsNearPath();
     if (!empties.length) {
       toast('沒有空地可放塔');
       return false;
@@ -3462,7 +3707,7 @@ function selectedTower() {
       var copy = document.createElement('span');
       copy.className = 'mode-desc';
       var blurb = mode === 'custom' && diff.id === 'normal'
-        ? '怪物稍厚、稍密，擊殺金幣稍少。起始 60 金、20 生命。'
+        ? '怪物稍厚、稍密，擊殺金幣稍少。起始 100 金、20 生命。'
         : diff.blurb;
       copy.textContent = blurb + (best > 0 ? ' 最遠第 ' + best + ' 波。' : '');
       btn.appendChild(title);
@@ -3638,7 +3883,7 @@ function selectedTower() {
       if (state.difficulty !== 'hell') state.difficulty = 'normal';
     }
     var diff = runProfile();
-    state.gold = level ? level.initialGold : (diff ? diff.purse : START_GOLD);
+    state.gold = level ? level.initialGold : (diff ? diff.purse : (mode === 'custom' ? 100 : START_GOLD));
     state.lives = diff ? diff.lives : START_LIVES;
     state.shownLives = state.lives;
     if (diff) state.best = loadBest(diff.id, mode);
@@ -3679,6 +3924,7 @@ function selectedTower() {
     state.hurt = 0;
     state.clearCountdown = 0;
     state.clearKind = '';
+    state.lastPathSig = '';
     clearRunExtras();
     if (mode === 'campaign') setRoute(chain(level.path));
     else if (mode === 'custom') setRoute(straightColumn(4));
@@ -3732,7 +3978,7 @@ function selectedTower() {
   function placeChosen(type) {
     var site = state.buildSite;
     if (!site) return;
-    if (state.phase !== 'prep' && state.phase !== 'combat' && state.phase !== 'edit') return;
+    if (state.phase !== 'prep' && state.phase !== 'combat' && state.phase !== 'edit' && !countdownBuildOpen()) return;
     if (isPath(site.c, site.r) || towerAt(site.c, site.r)) {
       state.buildSite = null;
       return;
@@ -5890,7 +6136,8 @@ function selectedTower() {
 
   function handleTap(clientX, clientY) {
     if (modal.classList.contains('is-open') || state.adBusy) return;
-    if (state.phase === 'reward' || state.phase === 'gameover' || state.phase === 'victory' || state.phase === 'menu') return;
+    if (state.phase === 'gameover' || state.phase === 'menu') return;
+    if ((state.phase === 'reward' || state.phase === 'victory') && !countdownBuildOpen()) return;
     Sfx.unlock();
     var point = canvasPoint(clientX, clientY);
     var menu = buildMenuLayout();
@@ -5922,7 +6169,7 @@ function selectedTower() {
       routeEditTap(cell);
       return;
     }
-    if ((state.phase === 'prep' || state.phase === 'combat' || state.phase === 'edit') && !isPath(cell.c, cell.r)) {
+    if ((state.phase === 'prep' || state.phase === 'combat' || state.phase === 'edit' || countdownBuildOpen()) && !isPath(cell.c, cell.r)) {
       toggleBuildSite(cell.c, cell.r);
       return;
     }
@@ -5981,7 +6228,7 @@ function selectedTower() {
         toast('先完成卡牌選擇');
         return;
       }
-      if (state.phase !== 'prep' && state.phase !== 'combat' && state.phase !== 'edit') return;
+      if (state.phase !== 'prep' && state.phase !== 'combat' && state.phase !== 'edit' && !countdownBuildOpen()) return;
       state.pickMode = 'wall';
       state.banner = { text: '阻擋物', sub: '點道路，擋住怪物 10 秒', life: 4 };
       toast('點在道路上');
