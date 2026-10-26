@@ -2217,10 +2217,10 @@ function selectedTower() {
     if (String(boardId).indexOf('-hell') < 0) return;
     if (!cloudReady()) return;
     var account = loadAccount();
-    if (!account) {
-      if (!rankHintShown) {
+    if (!account || String(account.uid).indexOf('guest-') === 0) {
+      if (!account && !rankHintShown) {
         rankHintShown = true;
-        toast('用 Google 或訪客登入後，成績才會計入線上排行');
+        toast('用 Google 登入後，成績才會計入線上排行');
       }
       return;
     }
@@ -5266,13 +5266,93 @@ function selectedTower() {
     });
   }
 
+  var PATCH_NOTES = [
+    {
+      date: '10/27',
+      title: '地獄成績記到雲端排行',
+      detail: '用 Google 登入後，無限地獄和自訂地獄的波次會進同一張週榜，不限好友。每週一 00:00（台北時間）結算。打過第 25 波才能進前 10。第 1 到 3 名可在祭壇召喚全知全能的神，第 4 到 10 名可召喚光之神使。第 1 名鑽石、絕對王者；第 2 名黃金、不滅霸主；第 3 名黃金、災厄之主；第 4、5 名白銀；第 6 到 10 名青銅。',
+    },
+    {
+      date: '10/27',
+      title: '可以加好友看名片',
+      detail: '登入後有一組 6 碼 ID。把 ID 給對方，或貼上對方的 ID，就能看到他的頭像、最高紀錄，以及這週的地獄光環。關卡星星還是留在自己的手機上。',
+    },
+    {
+      date: '10/26',
+      title: '關卡目錄換成章節圖',
+      detail: '進目錄後，中間是這一章的圖，左右箭頭換章，下面 1 到 5 是關卡。八張圖依序是潮濕藤蔓地牢、部落熔岩、碎骨殿堂、晶礦大廳、劇毒巢穴、邪教神殿、冰霜囚牢、廢鐵工坊。',
+    },
+    {
+      date: '10/26',
+      title: '按鈕和外框改成手繪線',
+      detail: '圖鑑、排行、好友、開始，還有底下的作戰，都用同一套手繪框。作戰是黑底白字。自訂和無限維持文字按鈕。',
+    },
+    {
+      date: '10/26',
+      title: '祭壇改成商品卡',
+      detail: '召喚英雄改成兩欄。每張卡有英雄圖、名字、能力和價錢，一隻 1000 金。名次不夠的全知全能的神、光之神使是灰色，寫著未解鎖。地圖上的祭壇是一顆圓，中間是空心尖頂。',
+    },
+  ];
+
+  function renderPatchNotes(notes) {
+    var list = document.getElementById('modal-notes');
+    if (!list) return;
+    list.replaceChildren();
+    if (!notes || !notes.length) {
+      list.hidden = true;
+      return;
+    }
+    list.hidden = false;
+    notes.forEach(function (note) {
+      var item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'notice-item';
+      item.setAttribute('aria-expanded', 'false');
+      var date = document.createElement('span');
+      date.className = 'notice-date';
+      date.textContent = note.date;
+      var title = document.createElement('span');
+      title.className = 'notice-title';
+      title.textContent = note.title;
+      var more = document.createElement('span');
+      more.className = 'notice-more';
+      more.textContent = '細項';
+      var detail = document.createElement('span');
+      detail.className = 'notice-detail';
+      detail.textContent = note.detail;
+      item.appendChild(date);
+      item.appendChild(more);
+      item.appendChild(title);
+      item.appendChild(detail);
+      item.addEventListener('click', function () {
+        var open = item.classList.toggle('is-open');
+        item.setAttribute('aria-expanded', open ? 'true' : 'false');
+        more.textContent = open ? '收合' : '細項';
+      });
+      list.appendChild(item);
+    });
+  }
+
+  function openPatchNotes() {
+    openModal({
+      tone: 'reward',
+      kicker: '公告',
+      title: '更新資訊',
+      desc: '這幾天改過的地方。點一則就能看細項。',
+      notes: PATCH_NOTES,
+      actions: [{ label: '知道了', className: 'btn-ghost is-exit', onClick: closeModal }],
+    });
+  }
+
   function openModal(options) {
-    modal.classList.remove('is-over', 'is-reward', 'is-shop');
+    modal.classList.remove('is-over', 'is-reward', 'is-shop', 'is-notice');
     modal.classList.add(options.tone === 'over' ? 'is-over' : 'is-reward');
     if (options.shop) modal.classList.add('is-shop');
+    if (options.notes) modal.classList.add('is-notice');
     modalKicker.textContent = options.kicker;
     modalTitle.textContent = options.title;
     modalDesc.textContent = options.desc;
+    renderPatchNotes(options.notes);
     modalActions.replaceChildren();
     options.actions.forEach(function (action) {
       modalActions.appendChild(actionButton(action));
@@ -5282,7 +5362,7 @@ function selectedTower() {
   }
 
   function closeModal() {
-    modal.classList.remove('is-open', 'is-over', 'is-reward', 'is-shop');
+    modal.classList.remove('is-open', 'is-over', 'is-reward', 'is-shop', 'is-notice');
     modal.setAttribute('aria-hidden', 'true');
   }
 
@@ -5818,6 +5898,11 @@ function selectedTower() {
     cloudDb = firebase.firestore();
     firebase.auth().onAuthStateChanged(function (user) {
       if (!user) {
+        var localGuest = loadAccount();
+        if (localGuest && String(localGuest.uid).indexOf('guest-') === 0) {
+          paintAccount();
+          return;
+        }
         clearAccount();
         onlineBoards = {};
         onlineRanks = {};
@@ -5900,20 +5985,10 @@ function selectedTower() {
     });
   }
 
-  function beginGuestSignIn() {
-    if (cloudReady()) {
-      firebase.auth().signInAnonymously().then(function () {
-        closeModal();
-        showMenu();
-        toast('已用訪客進入');
-      }).catch(function () {
-        toast('訪客登入失敗');
-      });
-      return;
-    }
+  function enterLocalGuest() {
     var id = '';
     try { id = localStorage.getItem('symbols-td-guest-id') || ''; } catch (error) { id = ''; }
-    if (!id) {
+    if (!id || id.indexOf('guest-') !== 0) {
       id = 'guest-' + Date.now().toString(36);
       try { localStorage.setItem('symbols-td-guest-id', id); } catch (error) { /* ignore */ }
     }
@@ -5921,6 +5996,20 @@ function selectedTower() {
     paintAccount();
     showMenu();
     toast('已用訪客進入');
+  }
+
+  function beginGuestSignIn() {
+    if (!cloudReady()) {
+      enterLocalGuest();
+      return;
+    }
+    firebase.auth().signInAnonymously().then(function () {
+      closeModal();
+      showMenu();
+      toast('已用訪客進入');
+    }).catch(function () {
+      enterLocalGuest();
+    });
   }
 
   function openAccountCard() {
@@ -9187,7 +9276,10 @@ function selectedTower() {
     var copyCodeBtn = document.getElementById('btn-copy-code');
     var playerCard = document.getElementById('player-card');
     var boardBack = document.getElementById('btn-board-back');
-    if (welcomeStart) welcomeStart.addEventListener('click', showMenu);
+    if (welcomeStart) welcomeStart.addEventListener('click', function () {
+      showMenu();
+      openPatchNotes();
+    });
     if (welcomeAccount) welcomeAccount.addEventListener('click', beginGoogleSignIn);
     if (welcomeGuest) welcomeGuest.addEventListener('click', beginGuestSignIn);
     if (accountChip) accountChip.addEventListener('click', openAccountCard);

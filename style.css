@@ -531,6 +531,45 @@ canvas {
 
 .modal-card h2 { margin: 6px 0 8px; font-size: 26px; line-height: 1.25; }
 .modal-desc { margin: 0 0 16px; color: var(--muted); line-height: 1.55; }
+.notice-list { display: grid; gap: 8px; margin: 0 0 12px; }
+.notice-list[hidden] { display: none !important; }
+.modal.is-notice .notice-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 2px 8px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+}
+.modal.is-notice .notice-date {
+  grid-column: 1;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #8a847c;
+}
+.modal.is-notice .notice-title {
+  grid-column: 1;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.modal.is-notice .notice-more {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 12px;
+  color: #8a847c;
+}
+.modal.is-notice .notice-detail {
+  display: none;
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #3a3a3a;
+}
+.modal.is-notice .notice-item.is-open .notice-detail { display: block; }
 .modal-actions { display: grid; gap: 8px; }
 .modal-actions .btn { text-align: left; }
 .modal-actions .btn.is-locked {
