@@ -276,6 +276,9 @@
 
   var view = { w: 360, h: 520, dpr: 1, tile: 32, originX: 0, originY: 0 };
   var route = { cells: [], set: new Set() };
+  var altarCache = null;
+  var HERO_COST = 1000;
+  var HERO_IDS = ['sword', 'archer', 'mage', 'priest'];
   var WAYPOINTS = [];
 
   var state = {
@@ -343,6 +346,7 @@
     time: 0,
     walls: [],
     traps: [],
+    fogs: [],
     gusts: [],
     interestLeft: 0,
     items: { wall: 0, push: 0 },
@@ -528,6 +532,7 @@
       return { x: cell.c + 0.5, y: cell.r + 0.5 };
     });
     rebuildPathJumps();
+    altarCache = null;
     if (state && state.walls) {
       state.walls = state.walls.filter(function (wall) { return route.set.has(wall.c + ',' + wall.r); });
       state.traps = state.traps.filter(function (trap) { return route.set.has(trap.c + ',' + trap.r); });
@@ -2163,6 +2168,7 @@ function selectedTower() {
     tickHellLock(dt);
     updateTowers(dt);
     updateGusts(dt);
+    updateFogs(dt);
     updateMeteor(dt);
     updateProjectiles(dt);
     flushSpawns();
@@ -2214,6 +2220,7 @@ function selectedTower() {
         leakEnemy(enemy);
         continue;
       }
+      if (enemy.fogTime > 0) enemy.fogTime -= dt;
       if (enemy.poisonRuinTime > 0) {
         enemy.poisonRuinTime -= dt;
         enemy.poisonRuinAcc = (enemy.poisonRuinAcc || 0) + enemy.maxHp * (enemy.poisonRuinRate || 0.03) * dt;
@@ -2230,7 +2237,7 @@ function selectedTower() {
       }
       var regenRate = hellDeffValue('regen');
       if (regenRate > 0 && enemy.hp < enemy.maxHp) {
-        if (enemy.poisonTime > 0 || enemy.poisonRuin) {
+        if (healBlocked(enemy)) {
           triggerPoisonCounter(enemy);
         } else {
           enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * regenRate * dt);
@@ -2381,12 +2388,16 @@ function selectedTower() {
     hurtEnemy(enemy, pct, null, { pierce: true, ignoreShield: true });
   }
 
+  function healBlocked(enemy) {
+    return !!(enemy && (enemy.poisonTime > 0 || enemy.poisonRuin || enemy.fogTime > 0));
+  }
+
   function tickBoss(enemy, dt) {
     enemy.pulse += dt;
     var pos = pointAt(enemy.dist);
     if (enemy.bossId === 'regen') {
-      if (enemy.poisonTime > 0 || enemy.poisonRuin) {
-        triggerPoisonCounter(enemy);
+      if (healBlocked(enemy)) {
+        if (enemy.poisonTime > 0 || enemy.poisonRuin) triggerPoisonCounter(enemy);
         enemy.regenShow = (enemy.regenShow || 0) - dt;
       } else {
         var before = enemy.hp;
@@ -2434,8 +2445,8 @@ function selectedTower() {
       enemy.mendAcc += dt;
       if (enemy.mendAcc < 0.5) return;
       enemy.mendAcc = 0;
-      if (enemy.poisonTime > 0 || enemy.poisonRuin) {
-        triggerPoisonCounter(enemy);
+      if (healBlocked(enemy)) {
+        if (enemy.poisonTime > 0 || enemy.poisonRuin) triggerPoisonCounter(enemy);
         return;
       }
       for (var i = 0; i < state.enemies.length; i++) {
@@ -2443,7 +2454,7 @@ function selectedTower() {
         if (other === enemy || other.dead || other.hp >= other.maxHp) continue;
         var otherPos = pointAt(other.dist);
         if (Math.hypot(otherPos.x - pos.x, otherPos.y - pos.y) > 1.8) continue;
-        if (other.poisonTime > 0 || other.poisonRuin) {
+        if (healBlocked(other)) {
           triggerPoisonCounter(other);
           if (state.time - (other.lastMend || 0) > 0.9) {
             other.lastMend = state.time;
@@ -2578,40 +2589,58 @@ function selectedTower() {
   }
 
   function heroName(id) {
-    if (id === 'sword') return '劍士';
-    if (id === 'archer') return '弓箭手';
-    if (id === 'mage') return '法師';
-    if (id === 'priest') return '祝念師';
+    if (id === 'sword') return '緋紅劍客';
+    if (id === 'archer') return '叢林獵手';
+    if (id === 'mage') return '萬象法師';
+    if (id === 'priest') return '戰靈樂手';
     return '英雄';
   }
 
-  function priestAura(tower) {
-    var diameter = 5 + tower.level * (5 / 9);
-    return { radius: diameter / 2, bonus: 0.05 + tower.level * (0.10 / 9) };
+  function heroSkillName(id) {
+    if (id === 'sword') return '修羅附體';
+    if (id === 'archer') return '致命毒霧';
+    if (id === 'mage') return '隕石術';
+    if (id === 'priest') return '致命節奏';
+    return '技能';
   }
 
-  function supportBonus(tower) {
-    var best = 0;
+  function priestAura(tower) {
+    var radius = 2.15 + tower.level * (2.45 / 9);
+    var bonus = 0.08 + tower.level * (0.14 / 9);
+    var haste = 0.06 + tower.level * (0.12 / 9);
+    var tempo = 0.028 + tower.level * (0.036 / 9);
+    return { radius: radius, bonus: bonus, haste: haste, tempo: tempo };
+  }
+
+  function supportAura(tower) {
+    var bonus = 0;
+    var haste = 0;
     for (var i = 0; i < state.towers.length; i++) {
       var other = state.towers[i];
       if (other.type !== 'hero' || other.hero !== 'priest' || other.id === tower.id) continue;
       var aura = priestAura(other);
       var dist = Math.hypot((other.c + 0.5) - (tower.c + 0.5), (other.r + 0.5) - (tower.r + 0.5));
-      if (dist <= aura.radius + 0.001) best = Math.max(best, aura.bonus);
+      if (dist > aura.radius + 0.001) continue;
+      bonus = Math.max(bonus, aura.bonus);
+      haste = Math.max(haste, aura.haste);
     }
-    return best;
+    return { bonus: bonus, haste: haste };
+  }
+
+  function supportBonus(tower) {
+    return supportAura(tower).bonus;
   }
 
   function applySupport(stats, tower) {
-    var bonus = supportBonus(tower);
-    if (bonus <= 0) return stats;
+    var aura = supportAura(tower);
+    if (aura.bonus <= 0 && aura.haste <= 0) return stats;
     var copy = cloneStats(stats);
     if (tower.type === 'mint') {
-      if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + bonus * 0.5);
+      if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + aura.haste);
       return copy;
     }
-    copy.damage = Math.max(1, Math.round((copy.damage || 0) * (1 + bonus)));
-    if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + bonus);
+    copy.damage = Math.max(1, Math.round((copy.damage || 0) * (1 + aura.bonus)));
+    if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + aura.haste);
     return copy;
   }
 
@@ -2621,27 +2650,26 @@ function selectedTower() {
     if (tower.hero === 'priest') {
       stats = { range: priestAura(tower).radius, damage: 0, cooldown: 1, targets: 0 };
     } else if (tower.hero === 'sword') {
-      var power = tower.buffTime > 0 ? (0.10 + lv * 0.02) : 0;
       stats = {
-        range: 1.7 + lv * 0.06,
-        damage: Math.round((22 + lv * 8) * (1 + power)),
-        cooldown: Math.max(0.42, (0.72 - lv * 0.03) / (1 + power)),
+        range: 2.4 + lv * 0.16,
+        damage: 26 + lv * 7,
+        cooldown: Math.max(0.48, 0.78 - lv * 0.028),
         targets: 1,
-        slashDist: 2.2 + lv * 0.25,
-        slashMul: 1.4 + lv * 0.12,
+        slashDist: 3.4 + lv * 0.18,
+        slashMul: 1.2,
       };
     } else if (tower.hero === 'archer') {
       stats = {
-        range: 2.6 + lv * 0.08,
-        damage: 14 + lv * 5,
-        cooldown: Math.max(0.5, 0.85 - lv * 0.03),
-        targets: 3,
+        range: 3.6 + lv * (4.8 / 9),
+        damage: 18 + lv * 5,
+        cooldown: Math.max(0.55, 0.92 - lv * 0.03),
+        targets: 1,
       };
     } else {
       stats = {
-        range: 2.3 + lv * 0.05,
-        damage: 18 + lv * 4,
-        cooldown: Math.max(0.7, 1.15 - lv * 0.04),
+        range: 2.45 + lv * 0.08,
+        damage: 20 + lv * 4,
+        cooldown: Math.max(0.72, 1.08 - lv * 0.03),
         targets: 1,
       };
     }
@@ -2652,11 +2680,11 @@ function selectedTower() {
   function heroBlurb(tower) {
     var need = tower.level >= 9 ? 0 : 6 + tower.level * 4;
     var xp = tower.level >= 9 ? '已滿等' : ('經驗 ' + tower.xp + '/' + need);
-    if (tower.hero === 'sword') return '每三下放出劍氣。主動：劍神附體。' + xp;
-    if (tower.hero === 'archer') return '一次三箭，每三輪丟陷阱。主動：毒性連鎖。' + xp;
-    if (tower.hero === 'mage') return '火、冰、風輪換。主動：隕石術。' + xp;
+    if (tower.hero === 'sword') return '走到射程內的路上追砍，刀路傷敵。每三下半月劍氣。主動：修羅附體。' + xp;
+    if (tower.hero === 'archer') return '超遠單箭，打穿護盾、鐵甲並打掉抗性。主動：致命毒霧。' + xp;
+    if (tower.hero === 'mage') return '火破盾、冰緩速、風擊退。主動：隕石術，全圖持續。' + xp;
     var aura = priestAura(tower);
-    return '光環直徑 ' + fmt(aura.radius * 2) + ' 格，攻與攻速 +' + Math.round(aura.bonus * 100) + '%。' + xp;
+    return '不攻擊。光環半徑 ' + fmt(aura.radius) + '，攻擊 +' + Math.round(aura.bonus * 100) + '%、攻速 +' + Math.round(aura.haste * 100) + '%。主動：致命節奏。' + xp;
   }
 
   function towerById(id) {
@@ -2667,11 +2695,18 @@ function selectedTower() {
     return null;
   }
 
-  function hasHero() {
+  function hasHeroId(id) {
     for (var i = 0; i < state.towers.length; i++) {
-      if (state.towers[i].type === 'hero') return true;
+      if (state.towers[i].type === 'hero' && state.towers[i].hero === id) return true;
     }
     return false;
+  }
+
+  function heroRosterFull() {
+    for (var i = 0; i < HERO_IDS.length; i++) {
+      if (!hasHeroId(HERO_IDS[i])) return false;
+    }
+    return true;
   }
 
   function grantHeroXp(tower, amount) {
@@ -2707,6 +2742,7 @@ function selectedTower() {
   function clearRunExtras() {
     state.walls = [];
     state.traps = [];
+    state.fogs = [];
     state.gusts = [];
     state.interestLeft = 0;
     state.items = { wall: 0, push: 0 };
@@ -2802,20 +2838,59 @@ function selectedTower() {
     if (!state.meteor) return;
     state.meteor.life -= dt;
     state.meteor.tick -= dt;
+    var rocks = state.meteor.rocks || (state.meteor.rocks = []);
+    for (var r = rocks.length - 1; r >= 0; r--) {
+      rocks[r].life -= dt;
+      if (rocks[r].life <= 0) rocks.splice(r, 1);
+    }
     if (state.meteor.tick <= 0) {
-      state.meteor.tick = 1;
-      var slice = state.meteor.pct / 10;
+      state.meteor.tick = 0.5;
       for (var i = 0; i < state.enemies.length; i++) {
         var enemy = state.enemies[i];
         if (enemy.dead) continue;
-        hurtEnemy(enemy, Math.max(1, enemy.maxHp * slice), state.meteor.ownerId);
+        hurtEnemy(enemy, Math.max(1, enemy.maxHp * state.meteor.pct), state.meteor.ownerId, { pierce: true, ignoreShield: true, keepDamage: true });
+      }
+      for (var n = 0; n < 3; n++) {
+        rocks.push({
+          tx: Math.random() * COLS,
+          ty: Math.random() * ROWS,
+          life: 0.48,
+          max: 0.48,
+        });
       }
     }
     if (state.meteor.life <= 0) state.meteor = null;
   }
 
+  function updateFogs(dt) {
+    for (var i = state.fogs.length - 1; i >= 0; i--) {
+      var fog = state.fogs[i];
+      fog.life -= dt;
+      if (fog.life <= 0) {
+        state.fogs.splice(i, 1);
+        continue;
+      }
+      for (var n = 0; n < state.enemies.length; n++) {
+        var enemy = state.enemies[n];
+        if (enemy.dead) continue;
+        var pos = enemyPos(enemy);
+        if (Math.hypot(pos.x - fog.x, pos.y - fog.y) > fog.radius + enemy.radius * 0.4) continue;
+        var fresh = !(enemy.fogTime > 0);
+        enemy.fogTime = 0.35;
+        enemy.fogAcc = (enemy.fogAcc || 0) + enemy.maxHp * fog.pct * dt;
+        if (enemy.fogAcc >= 1) {
+          var chip = Math.floor(enemy.fogAcc);
+          enemy.fogAcc -= chip;
+          hurtEnemy(enemy, chip, fog.ownerId, { pierce: true, ignoreShield: true, keepDamage: true });
+        }
+        if (fresh) spawnFloater(pos.x, pos.y - 0.45, '毒霧', '#3cbf4a');
+      }
+    }
+  }
+
   function updateSlash(shot, dt) {
     shot.life -= dt;
+    shot.spin = (shot.spin || 0) + dt * 12;
     var step = shot.speed * dt;
     shot.x += Math.cos(shot.angle) * step;
     shot.y += Math.sin(shot.angle) * step;
@@ -2824,9 +2899,15 @@ function selectedTower() {
       var enemy = state.enemies[i];
       if (enemy.dead || shot.hit[enemy.id]) continue;
       var pos = pointAt(enemy.dist);
-      if (Math.hypot(pos.x - shot.x, pos.y - shot.y) <= enemy.radius + 0.28) {
+      if (Math.hypot(pos.x - shot.x, pos.y - shot.y) <= enemy.radius + 0.32) {
         shot.hit[enemy.id] = true;
-        hurtEnemy(enemy, shot.damage, shot.ownerId);
+        var dmg = shot.hpPct ? Math.max(1, enemy.maxHp * shot.hpPct) : shot.damage;
+        hurtEnemy(enemy, dmg, shot.ownerId, {
+          slashKill: true,
+          keepDamage: !!shot.hpPct,
+          pierce: !!shot.hpPct,
+          ignoreShield: !!shot.hpPct,
+        });
       }
     }
     if (shot.travel >= shot.maxDist || shot.life <= 0) shot.dead = true;
@@ -2837,23 +2918,130 @@ function selectedTower() {
     if (shot.life <= 0) shot.dead = true;
   }
 
-  function launchSlash(tower, target, stats) {
-    var pos = pointAt(target.dist);
-    var angle = Math.atan2(pos.y - (tower.r + 0.5), pos.x - (tower.c + 0.5));
+  function swordBody(tower) {
+    if (tower.fx == null || tower.fy == null) {
+      tower.fx = tower.c + 0.5;
+      tower.fy = tower.r + 0.5;
+    }
+    return { x: tower.fx, y: tower.fy };
+  }
+
+  function clampToHome(tower, x, y, range) {
+    var hx = tower.c + 0.5;
+    var hy = tower.r + 0.5;
+    var dx = x - hx;
+    var dy = y - hy;
+    var dist = Math.hypot(dx, dy);
+    var max = Math.max(0.25, range - 0.1);
+    if (dist <= max) return { x: x, y: y };
+    return { x: hx + (dx / dist) * max, y: hy + (dy / dist) * max };
+  }
+
+  function launchCrescent(tower, stats, hpPct) {
+    var body = swordBody(tower);
     state.projectiles.push({
       kind: 'slash',
-      x: tower.c + 0.5,
-      y: tower.r + 0.5,
-      angle: angle,
-      damage: Math.round(stats.damage * stats.slashMul),
-      speed: 7,
+      x: body.x,
+      y: body.y,
+      angle: tower.aim || 0,
+      spin: 0,
+      crescent: true,
+      damage: Math.round(stats.damage * (stats.slashMul || 1.2)),
+      hpPct: hpPct || 0,
+      speed: 6.4,
       travel: 0,
-      maxDist: stats.slashDist,
-      life: 1.2,
+      maxDist: stats.slashDist || 3.4,
+      life: 1.15,
       ownerId: tower.id,
       hit: {},
       dead: false,
     });
+  }
+
+  function swordSwing(tower, stats) {
+    var body = swordBody(tower);
+    var asura = tower.buffTime > 0;
+    var reach = asura ? 1.5 : 1.15;
+    var arc = asura ? 1.4 : 1.05;
+    var hpPct = asura ? (0.0045 + tower.level * 0.0005) : 0;
+    tower.shots = (tower.shots || 0) + 1;
+    tower.swing = 1;
+    state.projectiles.push({
+      kind: 'cut',
+      x: body.x,
+      y: body.y,
+      angle: tower.aim || 0,
+      life: asura ? 0.16 : 0.28,
+      maxLife: asura ? 0.16 : 0.28,
+      wide: asura,
+      dead: false,
+    });
+    for (var i = 0; i < state.enemies.length; i++) {
+      var enemy = state.enemies[i];
+      if (enemy.dead) continue;
+      var pos = enemyPos(enemy);
+      var dx = pos.x - body.x;
+      var dy = pos.y - body.y;
+      var dist = Math.hypot(dx, dy);
+      if (dist > reach + enemy.radius) continue;
+      if (dist > 0.32) {
+        var ang = Math.atan2(dy, dx);
+        var diff = Math.atan2(Math.sin(ang - (tower.aim || 0)), Math.cos(ang - (tower.aim || 0)));
+        if (Math.abs(diff) > arc) continue;
+      }
+      hurtEnemy(enemy, hpPct ? enemy.maxHp * hpPct : stats.damage, tower.id, {
+        slashKill: true,
+        keepDamage: !!hpPct,
+        pierce: !!hpPct,
+        ignoreShield: !!hpPct,
+      });
+    }
+    if (tower.shots % 3 === 0) launchCrescent(tower, stats, hpPct);
+    Sfx.arrow();
+  }
+
+  function updateSword(tower, dt, stats) {
+    var asura = tower.buffTime > 0;
+    var speed = (asura ? 11 : 1) * (2.55 + tower.level * 0.12);
+    tower.cooldown -= dt;
+    var body = swordBody(tower);
+    var targets = targetsInRange(tower, stats.range, 8);
+    var dest = { x: tower.c + 0.5, y: tower.r + 0.5 };
+    if (targets.length) {
+      var pick = targets[0];
+      if (asura) {
+        var far = -1;
+        for (var t = 0; t < targets.length; t++) {
+          var spot = enemyPos(targets[t]);
+          var away = Math.hypot(spot.x - body.x, spot.y - body.y);
+          if (away > far) {
+            far = away;
+            pick = targets[t];
+          }
+        }
+      }
+      var pos = enemyPos(pick);
+      dest = clampToHome(tower, pos.x, pos.y, stats.range);
+      tower.aim = Math.atan2(pos.y - body.y, pos.x - body.x);
+    }
+    tower.trail = tower.trail || [];
+    tower.trail.push({ x: body.x, y: body.y });
+    if (tower.trail.length > 5) tower.trail.shift();
+    var mx = dest.x - tower.fx;
+    var my = dest.y - tower.fy;
+    var md = Math.hypot(mx, my);
+    var step = speed * dt;
+    if (md > 0.05) {
+      var move = Math.min(md, step);
+      tower.fx += (mx / md) * move;
+      tower.fy += (my / md) * move;
+      if (!targets.length) tower.aim = Math.atan2(my, mx);
+    }
+    if (tower.cooldown > 0) return;
+    var melee = enemiesNear(tower.fx, tower.fy, asura ? 1.25 : 0.82);
+    if (!melee.length) return;
+    swordSwing(tower, stats);
+    tower.cooldown = asura ? Math.max(0.05, stats.cooldown / 11) : stats.cooldown;
   }
 
   function enemiesNear(x, y, radius) {
@@ -2868,62 +3056,79 @@ function selectedTower() {
   }
 
   function castElement(tower, target) {
-    var roll = Math.floor(Math.random() * 3);
+    tower.element = ((tower.element || 0) + 1) % 3;
+    var roll = tower.element;
     var pos = pointAt(target.dist);
     var rank = tower.level / 9;
     if (roll === 0) {
-      var burned = enemiesNear(pos.x, pos.y, 1.1);
-      for (var i = 0; i < burned.length; i++) hurtEnemy(burned[i], 40 + tower.level * 10, tower.id);
-      state.shocks.push({ x: pos.x, y: pos.y, life: 0.36, maxLife: 0.36, radius: 1.1, color: '#e02323', rings: 2, bomb: true });
-    } else if (roll === 1) {
-      var frozen = enemiesNear(pos.x, pos.y, 1.05);
-      var hold = 2 + rank;
-      for (var n = 0; n < frozen.length; n++) {
-        hurtEnemy(frozen[n], 18 + tower.level * 4, tower.id);
-        if (resists(frozen[n], 'freeze')) resistFloater(frozen[n], '抗凍');
-        else frozen[n].freeze = Math.max(frozen[n].freeze || 0, hold);
+      var burned = enemiesNear(pos.x, pos.y, 1.05);
+      for (var i = 0; i < burned.length; i++) {
+        var foe = burned[i];
+        if (foe.shield > 0) {
+          foe.shield = 0;
+          spawnFloater(pointAt(foe.dist).x, pointAt(foe.dist).y - 0.55, '破盾', '#e02323');
+        }
+        hurtEnemy(foe, 28 + tower.level * 8, tower.id, { ignoreShield: true });
       }
-      state.shocks.push({ x: pos.x, y: pos.y, life: 0.36, maxLife: 0.36, radius: 1.05, color: '#2f7bff', rings: 2, bomb: false });
+      state.shocks.push({ x: pos.x, y: pos.y, life: 0.36, maxLife: 0.36, radius: 1.05, color: '#e02323', rings: 2, bomb: true });
+    } else if (roll === 1) {
+      var chilled = enemiesNear(pos.x, pos.y, 1.1);
+      var slow = Math.min(0.55, 0.28 + rank * 0.22);
+      for (var n = 0; n < chilled.length; n++) {
+        hurtEnemy(chilled[n], 12 + tower.level * 3, tower.id);
+        if (resists(chilled[n], 'slow')) resistFloater(chilled[n], '抗緩');
+        else {
+          chilled[n].slow = Math.max(chilled[n].slow || 0, slow);
+          chilled[n].slowTime = Math.max(chilled[n].slowTime || 0, 1.8);
+        }
+      }
+      state.shocks.push({ x: pos.x, y: pos.y, life: 0.36, maxLife: 0.36, radius: 1.1, color: '#2f7bff', rings: 2, bomb: false });
     } else {
-      var pulled = enemiesNear(pos.x, pos.y, 1.15);
-      for (var g = 0; g < pulled.length; g++) hurtEnemy(pulled[g], 8 + tower.level * 2, tower.id);
-      state.gusts.push({ x: pos.x, y: pos.y, life: 2 + rank, radius: 1.15, pull: 1.1 });
+      var pushed = enemiesNear(pos.x, pos.y, 1.15);
+      var knock = 0.75 + rank * 0.55;
+      for (var g = 0; g < pushed.length; g++) {
+        hurtEnemy(pushed[g], 8 + tower.level * 2, tower.id);
+        pushed[g].dist = Math.max(0, pushed[g].dist - knock);
+      }
+      state.gusts.push({ x: pos.x, y: pos.y, life: 0.45, radius: 1.15, pull: 0 });
     }
+  }
+
+  function hunterGuarded(enemy) {
+    return !!(enemy && (enemy.shield > 0 || enemy.bossId === 'armor' || enemy.bossId === 'ward' || enemy.resist || hasHellDeff('thick')));
+  }
+
+  function hunterStrike(enemy, tower, damage) {
+    var opts = { pierce: true, ignoreShield: true };
+    var amount = damage;
+    if (hunterGuarded(enemy)) {
+      amount = Math.max(damage, enemy.maxHp * (0.05 + tower.level * 0.004));
+      var pos = enemyPos(enemy);
+      if (enemy.shield > 0) enemy.shield = 0;
+      if (enemy.resist) enemy.resist = '';
+      enemy.firePierce = true;
+      spawnFloater(pos.x, pos.y - 0.6, '貫甲', '#1c7a34');
+    }
+    hurtEnemy(enemy, amount, tower.id, opts);
   }
 
   function heroFire(tower, targets, stats) {
     tower.shots = (tower.shots || 0) + 1;
     tower.swing = 1;
-    if (tower.hero === 'sword') {
-      var hit = pointAt(targets[0].dist);
-      hurtEnemy(targets[0], stats.damage, tower.id);
+    if (tower.hero === 'archer') {
       state.projectiles.push({
-        kind: 'cut',
-        x: hit.x,
-        y: hit.y,
+        kind: 'arrow',
+        hunter: true,
+        x: tower.c + 0.5,
+        y: tower.r + 0.5,
         angle: tower.aim,
-        life: 0.28,
-        maxLife: 0.28,
+        damage: stats.damage,
+        speed: 11,
+        targetId: targets[0].id,
         dead: false,
+        life: 1.6,
+        ownerId: tower.id,
       });
-      if (tower.shots % 3 === 0) launchSlash(tower, targets[0], stats);
-      Sfx.arrow();
-    } else if (tower.hero === 'archer') {
-      for (var i = 0; i < targets.length && i < 3; i++) {
-        state.projectiles.push({
-          kind: 'arrow',
-          x: tower.c + 0.5,
-          y: tower.r + 0.5,
-          angle: tower.aim,
-          damage: stats.damage,
-          speed: 9.5,
-          targetId: targets[i].id,
-          dead: false,
-          life: 1.5,
-          ownerId: tower.id,
-        });
-      }
-      if (tower.shots % 3 === 0) dropTrap();
       Sfx.arrow();
     } else if (tower.hero === 'mage') {
       castElement(tower, targets[0]);
@@ -2936,6 +3141,10 @@ function selectedTower() {
     if (tower.buffTime > 0) tower.buffTime -= dt;
     if (tower.hero === 'priest') return;
     var stats = heroStats(tower);
+    if (tower.hero === 'sword') {
+      updateSword(tower, dt, stats);
+      return;
+    }
     tower.cooldown -= dt;
     var targets = targetsInRange(tower, stats.range, stats.targets || 1);
     if (!targets.length) return;
@@ -2947,31 +3156,35 @@ function selectedTower() {
   }
 
   function castHeroSkill(tower) {
-    if (!tower || tower.type !== 'hero' || tower.hero === 'priest') return;
+    if (!tower || tower.type !== 'hero') return;
     if (state.phase !== 'combat') { toast('戰鬥中才能施放'); return; }
     if (tower.skillCd > 0) return;
     var lv = tower.level;
-    tower.skillCd = 50;
+    if (tower.hero === 'archer') {
+      state.pickMode = 'fog';
+      state.fogHeroId = tower.id;
+      state.banner = { text: '致命毒霧', sub: '點一處丟出毒霧', life: 6 };
+      toast('點地圖施放毒霧');
+      renderInspector();
+      return;
+    }
     if (tower.hero === 'sword') {
-      tower.buffTime = 10 + lv * 2;
-      toast('劍神附體');
-    } else if (tower.hero === 'archer') {
-      tower.auraTime = 4;
-      var stats = heroStats(tower);
-      var victims = targetsInRange(tower, stats.range, 99);
-      var slow = Math.min(0.55, 0.25 + lv * 0.03);
-      for (var i = 0; i < victims.length; i++) {
-        if (resists(victims[i], 'slow')) resistFloater(victims[i], '抗緩');
-        else {
-          victims[i].slow = Math.max(victims[i].slow || 0, slow);
-          victims[i].slowTime = Math.max(victims[i].slowTime || 0, 3);
-        }
-        applyPoison(victims[i], 8 + lv * 4, 3, 0.5);
-        victims[i].heroTag = tower.id;
-      }
-      toast('毒性連鎖');
+      tower.skillCd = 36;
+      tower.buffTime = Math.min(5, 3 + lv * 0.22);
+      toast('修羅附體');
+    } else if (tower.hero === 'priest') {
+      tower.skillCd = 40;
+      tower.buffTime = 5;
+      toast('致命節奏');
     } else if (tower.hero === 'mage') {
-      state.meteor = { life: 10, tick: 0.15, pct: 0.10 + (lv / 9) * 0.15, ownerId: tower.id };
+      tower.skillCd = 42;
+      state.meteor = {
+        life: 7,
+        tick: 0.05,
+        pct: 0.012 + (lv / 9) * 0.014,
+        ownerId: tower.id,
+        rocks: [],
+      };
       toast('隕石術');
     }
     Sfx.ui();
@@ -2995,8 +3208,8 @@ function selectedTower() {
       { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等。金幣最高 5 等，只有這張卡可升到 6 等（數值×1.4）' },
       { id: 'wall', name: '阻擋物', desc: '放在路上，擋住怪物 10 秒' },
       { id: 'push', name: '擊退', desc: '使用後全場怪物沿路退回總長的 10%' },
-      { id: 'hero', name: '英雄塔', desc: '自選英雄。選定後不能轉職，打怪升到 10 等' },
-    ].filter(function (card) { return card.id !== 'hero' || !hasHero(); });
+      { id: 'hero', name: '英雄塔', desc: '自選一位尚未登場的英雄，免費放置，之後可拖曳換位' },
+    ].filter(function (card) { return card.id !== 'hero' || !heroRosterFull(); });
   }
 
   function pickRandomCard(exceptId) {
@@ -3033,26 +3246,122 @@ function selectedTower() {
     return true;
   }
 
-  function placeHero(cell) {
+  function placeHero(cell, invested) {
+    var heroId = state.pendingHero;
     state.towers.push({
       id: state.nextId++,
       type: 'hero',
-      hero: state.pendingHero,
+      hero: heroId,
       c: cell.c,
       r: cell.r,
       level: 0,
       xp: 0,
       spec: null,
-      invested: 0,
+      invested: invested || 0,
       cooldown: 0.2,
       aim: -Math.PI / 2,
       shots: 0,
       skillCd: 0,
       buffTime: 0,
+      fx: cell.c + 0.5,
+      fy: cell.r + 0.5,
+      trail: [],
+      element: 0,
     });
     state.pendingHero = '';
     Sfx.build();
-    toast('英雄已就位，選定後不能轉職');
+    toast(heroName(heroId) + (invested ? ' 已從祭壇登場' : ' 已就位') + '，可拖曳換位');
+  }
+
+  function altarSpot() {
+    if (altarCache && !isPath(altarCache.c, altarCache.r)) return altarCache;
+    var prefs = [
+      { c: 0, r: 0 }, { c: 8, r: 0 }, { c: 0, r: 12 }, { c: 8, r: 12 },
+      { c: 0, r: 1 }, { c: 8, r: 1 }, { c: 1, r: 0 }, { c: 7, r: 0 },
+    ];
+    for (var i = 0; i < prefs.length; i++) {
+      if (!isPath(prefs[i].c, prefs[i].r)) {
+        altarCache = prefs[i];
+        return altarCache;
+      }
+    }
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        if (!isPath(c, r)) {
+          altarCache = { c: c, r: r };
+          return altarCache;
+        }
+      }
+    }
+    altarCache = { c: 0, r: 0 };
+    return altarCache;
+  }
+
+  function isAltarCell(c, r) {
+    var spot = altarSpot();
+    return !!(spot && spot.c === c && spot.r === r);
+  }
+
+  function heroSpawnCell() {
+    var altar = altarSpot();
+    var best = null;
+    var bestD = 99;
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        if (isPath(c, r) || towerAt(c, r) || isAltarCell(c, r)) continue;
+        var dist = Math.abs(c - altar.c) + Math.abs(r - altar.r);
+        if (dist < bestD) {
+          bestD = dist;
+          best = { c: c, r: r };
+        }
+      }
+    }
+    return best;
+  }
+
+  function canDropHero(cell, hero) {
+    if (!cell || isPath(cell.c, cell.r) || isAltarCell(cell.c, cell.r)) return false;
+    var other = towerAt(cell.c, cell.r);
+    return !other || other.id === hero.id;
+  }
+
+  function summonHero(id) {
+    if (hasHeroId(id)) { toast('這位英雄已在場上'); return; }
+    if (state.gold < HERO_COST) { toast('需要 ' + HERO_COST + ' 金幣'); return; }
+    var cell = heroSpawnCell();
+    if (!cell) { toast('沒有空地可登場'); return; }
+    state.gold -= HERO_COST;
+    state.pendingHero = id;
+    placeHero(cell, HERO_COST);
+    closeModal();
+    syncHud();
+  }
+
+  function heroCatalog() {
+    return [
+      { id: 'sword', name: '緋紅劍客', desc: '追砍刀路，三下半月劍氣。1000 金' },
+      { id: 'archer', name: '叢林獵手', desc: '超遠貫甲，毒霧禁療。1000 金' },
+      { id: 'mage', name: '萬象法師', desc: '火破盾、冰緩、風退。1000 金' },
+      { id: 'priest', name: '戰靈樂手', desc: '光環加攻與攻速。1000 金' },
+    ];
+  }
+
+  function openAltar() {
+    var classes = heroCatalog().filter(function (hero) { return !hasHeroId(hero.id); });
+    if (!classes.length) { toast('四位英雄都在場上'); return; }
+    openModal({
+      tone: 'reward',
+      kicker: '祭壇',
+      title: '召喚英雄',
+      desc: '每位 1000 金幣，同一種只能有一隻。登場後可拖曳換位。',
+      actions: classes.map(function (hero) {
+        return {
+          label: hero.name + '　' + hero.desc,
+          className: state.gold < HERO_COST ? 'btn-ghost' : 'btn-mint',
+          onClick: function () { summonHero(hero.id); },
+        };
+      }),
+    });
   }
 
   function placeWall(cell) {
@@ -3094,9 +3403,29 @@ function selectedTower() {
       return true;
     }
     if (state.pickMode === 'heroPlace') {
-      if (isPath(cell.c, cell.r) || towerAt(cell.c, cell.r)) { toast('點沒有塔的空地'); return true; }
+      if (isPath(cell.c, cell.r) || towerAt(cell.c, cell.r) || isAltarCell(cell.c, cell.r)) { toast('點沒有塔的空地'); return true; }
       placeHero(cell);
       finishCard();
+      return true;
+    }
+    if (state.pickMode === 'fog') {
+      var hero = towerById(state.fogHeroId);
+      state.pickMode = '';
+      state.banner = null;
+      if (!hero || hero.skillCd > 0) return true;
+      state.fogs.push({
+        x: cell.c + 0.5,
+        y: cell.r + 0.5,
+        radius: 1.35 + hero.level * 0.08,
+        life: 10,
+        pct: 0.025 + hero.level * 0.003,
+        ownerId: hero.id,
+      });
+      hero.skillCd = 30;
+      toast('致命毒霧');
+      Sfx.ui();
+      renderInspector();
+      syncHud();
       return true;
     }
     if (state.pickMode === 'wall') {
@@ -3115,24 +3444,20 @@ function selectedTower() {
     state.phase = 'prep';
     state.paused = false;
     state.pickMode = 'heroPlace';
-    state.banner = { text: heroName(id), sub: '點空地放置，選定後不能轉職', life: 6 };
+    state.banner = { text: heroName(id), sub: '點空地放置，之後可拖曳換位', life: 6 };
     closeModal();
     toast('點空地放置' + heroName(id));
     syncHud();
   }
 
   function openHeroPick() {
-    var classes = [
-      { id: 'sword', name: '劍士', desc: '每三下劍氣。主動：劍神附體' },
-      { id: 'archer', name: '弓箭手', desc: '一次三箭，路上陷阱。主動：毒性連鎖' },
-      { id: 'mage', name: '法師', desc: '火、冰、風輪換。主動：隕石術' },
-      { id: 'priest', name: '祝念師', desc: '不攻擊。光環提升攻與攻速' },
-    ];
+    var classes = heroCatalog().filter(function (hero) { return !hasHeroId(hero.id); });
+    if (!classes.length) { toast('四位英雄都在場上'); return; }
     openModal({
       tone: 'reward',
-      kicker: '英雄塔',
+      kicker: '英雄',
       title: '選擇英雄',
-      desc: '選定後不能轉職。英雄靠擊殺升到 10 等，不能用金幣升級。',
+      desc: '同一種只能有一隻。放好後可拖曳換位，靠擊殺升到 10 等。',
       actions: classes.map(function (hero) {
         return {
           label: hero.name + '　' + hero.desc,
@@ -3181,7 +3506,7 @@ function selectedTower() {
       toast('點選要升級的塔');
       syncHud();
     } else if (id === 'hero') {
-      if (hasHero()) { toast('場上已有英雄'); finishCard(); return; }
+      if (heroRosterFull()) { toast('四位英雄都在場上'); finishCard(); return; }
       var room = false;
       for (var r = 0; r < ROWS && !room; r++) {
         for (var c = 0; c < COLS; c++) {
@@ -3367,6 +3692,7 @@ function selectedTower() {
       total: total,
       damage: stats.damage,
       splash: stats.splash,
+      ownerId: tower.id,
       speed: 4.2,
       dead: false,
       effect: stats.effect || '',
@@ -3409,7 +3735,7 @@ function selectedTower() {
           life: 0.16,
           maxLife: 0.16,
         });
-        hurtEnemy(chain[c], stats.damage);
+        hurtEnemy(chain[c], stats.damage, tower.id);
         fromX = hit.x;
         fromY = hit.y;
       }
@@ -3429,6 +3755,7 @@ function selectedTower() {
           targetId: targets[i].id,
           dead: false,
           life: 1.5,
+          ownerId: tower.id,
           artSheet: look.sheet,
           artRow: look.row,
         });
@@ -3442,6 +3769,7 @@ function selectedTower() {
         kind: 'wave',
         x: originX,
         y: originY,
+        ownerId: tower.id,
         radius: 0,
         maxRadius: stats.range,
         speed: stats.range / 0.42,
@@ -3461,6 +3789,7 @@ function selectedTower() {
         kind: 'poison',
         x: originX,
         y: originY,
+        ownerId: tower.id,
         damage: stats.damage,
         poison: stats.poison,
         poisonTime: stats.poisonTime,
@@ -3533,7 +3862,7 @@ function selectedTower() {
       if (shot.volleyId) liveVolley[shot.volleyId] = true;
       if (shot.kind === 'arrow') updateArrow(shot, dt);
       else if (shot.kind === 'slash') updateSlash(shot, dt);
-      else if (shot.kind === 'cut') updateCut(shot, dt);
+      else if (shot.kind === 'cut' || shot.kind === 'killslash') updateCut(shot, dt);
       else if (shot.kind === 'poison') updatePoison(shot, dt);
       else if (shot.kind === 'wave') updateWave(shot, dt);
       else updateShell(shot, dt);
@@ -3561,7 +3890,11 @@ function selectedTower() {
     shot.angle = Math.atan2(dy, dx);
     if (dist <= target.radius + 0.12) {
       shot.dead = true;
-      hurtEnemy(target, shot.damage, shot.ownerId);
+      if (shot.hunter) {
+        var hunter = towerById(shot.ownerId);
+        if (hunter) hunterStrike(target, hunter, shot.damage);
+        else hurtEnemy(target, shot.damage, shot.ownerId, { pierce: true, ignoreShield: true });
+      } else hurtEnemy(target, shot.damage, shot.ownerId);
       return;
     }
     var step = Math.min(dist, shot.speed * dt);
@@ -3584,7 +3917,7 @@ function selectedTower() {
     var dist = Math.hypot(dx, dy) || 0.0001;
     if (dist <= target.radius + 0.12) {
       shot.dead = true;
-      hurtEnemy(target, shot.damage);
+      hurtEnemy(target, shot.damage, shot.ownerId);
       if (!target.dead) applyPoison(target, shot.poison, shot.poisonTime, shot.poisonEvery);
       return;
     }
@@ -3636,10 +3969,10 @@ function selectedTower() {
     if (ledger) {
       var prev = ledger[enemy.id] || 0;
       if (amount <= prev) return false;
-      hurtEnemy(enemy, amount - prev);
+      hurtEnemy(enemy, amount - prev, shot.ownerId);
       ledger[enemy.id] = amount;
     } else {
-      hurtEnemy(enemy, amount);
+      hurtEnemy(enemy, amount, shot.ownerId);
     }
     return true;
   }
@@ -3724,7 +4057,7 @@ function selectedTower() {
       var dist = Math.hypot(pos.x - shot.x, pos.y - shot.y);
       if (dist > shot.maxRadius || dist > shot.radius + enemy.radius * 0.2) continue;
       shot.hit[enemy.id] = true;
-      hurtEnemy(enemy, shot.damage);
+      hurtEnemy(enemy, shot.damage, shot.ownerId);
       if (!enemy.dead) chillEnemy(enemy, shot.slow, shot.slowTime);
     }
     if (shot.radius >= shot.maxRadius) shot.dead = true;
@@ -3761,6 +4094,13 @@ function selectedTower() {
       if (owner && owner.type === 'hero') enemy.heroTag = owner.id;
     }
     var damage = Math.max(1, Math.round(amount));
+    if (ownerId && !opts.keepDamage) {
+      var tempo = tempoHit(ownerId, enemy);
+      if (tempo > 0) {
+        damage = Math.max(1, Math.round(tempo));
+        opts.ignoreShield = true;
+      }
+    }
     var pierceArmor = opts.pierce || enemy.firePierce || (enemy.burnTime > 0 && enemy.bossId === 'armor');
     if (enemy.bossId === 'armor' && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.5));
     if (enemy.shield > 0 && !opts.ignoreShield) {
@@ -3782,7 +4122,40 @@ function selectedTower() {
       var pos = enemyPos(enemy);
       spawnFloater(pos.x, pos.y - 0.35, String(damage), '#e02323');
     }
-    if (enemy.hp <= 0) killEnemy(enemy);
+    if (enemy.hp <= 0) {
+      if (opts.slashKill) spawnSlashKill(enemy);
+      killEnemy(enemy);
+    }
+  }
+
+  function tempoHit(ownerId, enemy) {
+    var tower = towerById(ownerId);
+    if (!tower || !enemy || enemy.maxHp <= 0) return 0;
+    var best = 0;
+    for (var i = 0; i < state.towers.length; i++) {
+      var bard = state.towers[i];
+      if (bard.type !== 'hero' || bard.hero !== 'priest' || !(bard.buffTime > 0)) continue;
+      var aura = priestAura(bard);
+      var dist = Math.hypot((bard.c + 0.5) - (tower.c + 0.5), (bard.r + 0.5) - (tower.r + 0.5));
+      if (dist <= aura.radius + 0.001) best = Math.max(best, aura.tempo);
+    }
+    if (best <= 0) return 0;
+    var stats = tower.type === 'hero' ? heroStats(tower) : towerStats(tower);
+    var cd = Math.max(0.18, stats.cooldown || 0.8);
+    return enemy.maxHp * best * cd;
+  }
+
+  function spawnSlashKill(enemy) {
+    var pos = enemyPos(enemy);
+    state.projectiles.push({
+      kind: 'killslash',
+      x: pos.x,
+      y: pos.y,
+      life: 0.42,
+      maxLife: 0.42,
+      dead: false,
+    });
+    burst(pos.x, pos.y, '#e02323', 12);
   }
 
   function killEnemy(enemy) {
@@ -4101,8 +4474,8 @@ function selectedTower() {
       return false;
     }
     var cell = empties[Math.floor(Math.random() * empties.length)];
-    if (Math.random() < 0.08 && !hasHero()) {
-      var heroes = ['sword', 'archer', 'mage', 'priest'];
+    if (Math.random() < 0.08 && !heroRosterFull()) {
+      var heroes = HERO_IDS.filter(function (id) { return !hasHeroId(id); });
       var heroId = heroes[Math.floor(Math.random() * heroes.length)];
       state.pendingHero = heroId;
       placeHero(cell);
@@ -5105,24 +5478,24 @@ function selectedTower() {
       ],
     });
     appendInfoCard(list, {
-      tag: '英雄', title: '劍士', paint: { kind: 'hero', hero: 'sword' },
-      desc: '近戰。每三下劍氣；主動：劍神附體。',
-      stats: ['<strong>傷</strong>：約 22+等×8', '<strong>主動</strong>：附體加成攻速與傷'],
+      tag: '英雄', title: '緋紅劍客', paint: { kind: 'hero', hero: 'sword' },
+      desc: '走到放置點的射程內追砍。刀揮過的怪都會受傷，每三下射出旋轉半月劍氣。主動：修羅附體。',
+      stats: ['<strong>主動</strong>：移速與攻速 +1000%，攻擊改為血量%，最多 5 秒', '<strong>操作</strong>：可拖曳換位，技能點放置處'],
     });
     appendInfoCard(list, {
-      tag: '英雄', title: '弓箭手', paint: { kind: 'hero', hero: 'archer' },
-      desc: '三箭遠程。每三輪陷阱；主動：毒性連鎖。',
-      stats: ['<strong>目標</strong>：3 箭', '<strong>射程</strong>：約 2.6 起'],
+      tag: '英雄', title: '叢林獵手', paint: { kind: 'hero', hero: 'archer' },
+      desc: '最遠的單體貫穿。打到護盾、鐵甲或抗性時改為血量傷害，並打掉那層抗性。',
+      stats: ['<strong>滿等</strong>：射程幾乎蓋住全圖', '<strong>主動</strong>：致命毒霧，禁療並每秒扣血，10 秒，冷卻 30 秒'],
     });
     appendInfoCard(list, {
-      tag: '英雄', title: '法師', paint: { kind: 'hero', hero: 'mage' },
-      desc: '火／冰／風輪換；主動：隕石術。',
-      stats: ['<strong>傷</strong>：約 18+等×4', '<strong>主動</strong>：隕石範圍'],
+      tag: '英雄', title: '萬象法師', paint: { kind: 'hero', hero: 'mage' },
+      desc: '火破盾、冰緩速、風把怪沿路推回去。主動：隕石術，全圖持續落下。',
+      stats: ['<strong>普攻</strong>：三系輪流', '<strong>主動</strong>：全圖血量傷害'],
     });
     appendInfoCard(list, {
-      tag: '英雄', title: '祝念', paint: { kind: 'hero', hero: 'priest' },
-      desc: '光環提升附近塔的攻擊與攻速。',
-      stats: ['<strong>定位</strong>：不輸出', '<strong>光環</strong>：攻／攻速加成'],
+      tag: '英雄', title: '戰靈樂手', paint: { kind: 'hero', hero: 'priest' },
+      desc: '不攻擊。光環提升裡面每座塔的攻擊與攻速，滿等大約蓋住半張圖。',
+      stats: ['<strong>光環</strong>：攻擊約 +8%～22%，攻速約 +6%～18%', '<strong>主動</strong>：致命節奏，光環內攻擊改打總血量%'],
     });
   }
 
@@ -5622,13 +5995,14 @@ function selectedTower() {
     if (tower.type === 'hero') {
       inspectTitle.textContent = heroName(tower.hero) + '  Lv.' + (tower.level + 1);
       inspectMeta.textContent = heroBlurb(tower);
-      if (tower.hero !== 'priest') {
-        var skillName = tower.hero === 'sword' ? '劍神附體' : (tower.hero === 'archer' ? '毒性連鎖' : '隕石術');
-        var cd = tower.skillCd || 0;
-        var skill = makeActButton(cd > 0 ? skillName + ' ' + Math.ceil(cd) + '秒' : skillName, 'btn-mint btn-primary-act', 'skill');
-        skill.disabled = cd > 0 || state.phase !== 'combat';
-        inspectActions.appendChild(skill);
-      }
+      var skillName = heroSkillName(tower.hero);
+      var cd = tower.skillCd || 0;
+      var skillLabel = state.pickMode === 'fog' && state.fogHeroId === tower.id
+        ? '點地圖施放'
+        : (cd > 0 ? skillName + ' ' + Math.ceil(cd) + '秒' : skillName);
+      var skill = makeActButton(skillLabel, 'btn-mint btn-primary-act', 'skill');
+      skill.disabled = cd > 0 || state.phase !== 'combat';
+      inspectActions.appendChild(skill);
       appendSellRow(Math.floor(tower.invested * sellRatio()));
       return;
     }
@@ -5745,7 +6119,7 @@ function selectedTower() {
     var skillBtn = inspectActions.querySelector('[data-act="skill"]');
     if (skillBtn && selected && selected.type === 'hero') {
       var skillCd = selected.skillCd || 0;
-      var skillName = selected.hero === 'sword' ? '劍神附體' : (selected.hero === 'archer' ? '毒性連鎖' : '隕石術');
+      var skillName = heroSkillName(selected.hero);
       skillBtn.disabled = skillCd > 0 || state.phase !== 'combat';
       skillBtn.textContent = skillCd > 0 ? skillName + ' ' + Math.ceil(skillCd) + '秒' : skillName;
     }
@@ -5849,6 +6223,9 @@ function selectedTower() {
       ctx.translate((Math.random() - 0.5) * state.shake * 2, (Math.random() - 0.5) * state.shake * 2);
     }
     drawBoard();
+    drawAltar();
+    drawFogs();
+    drawPriestAuras();
     drawRouteMarks();
     drawRouteHints();
     drawFlashes();
@@ -5857,6 +6234,7 @@ function selectedTower() {
     drawEnemies();
     drawBeams();
     drawProjectiles();
+    drawMeteors();
     drawShocks();
     drawParticles();
     drawFloaters();
@@ -5866,6 +6244,7 @@ function selectedTower() {
     drawBuildMenu();
     if (state.pickMode === 'level') drawHint('點一座塔，永久提升 1 等');
     else if (state.pickMode === 'heroPlace') drawHint('點空地放置' + heroName(state.pendingHero));
+    else if (state.pickMode === 'fog') drawHint('點一處丟出致命毒霧');
     else if (state.pickMode === 'wall') drawHint('點道路放置阻擋物');
     else if (state.phase === 'edit' && !state.editTool && !state.buildSite) {
       drawHint('選擇直線或轉彎，再點亮起的空地');
@@ -5875,6 +6254,19 @@ function selectedTower() {
         : (state.mode === 'campaign'
           ? (state.stagePlan && state.stagePlan.index === 5 ? '最後一波是本章首領' : '守住基地。受傷越少，星星越多')
           : '點空地放塔，每 10 波三選一'));
+    }
+  }
+
+  function drawPriestAuras() {
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (tower.type !== 'hero' || tower.hero !== 'priest') continue;
+      var aura = priestAura(tower);
+      var alpha = tower.buffTime > 0 ? 0.16 : 0.07;
+      ctx.beginPath();
+      ctx.arc(worldX(tower.c + 0.5), worldY(tower.r + 0.5), aura.radius * view.tile, 0, Math.PI * 2);
+      ctx.fillStyle = tower.buffTime > 0 ? 'rgba(224, 35, 35, ' + alpha + ')' : 'rgba(201, 162, 39, ' + alpha + ')';
+      ctx.fill();
     }
   }
 
@@ -5929,24 +6321,13 @@ function selectedTower() {
       ctx.stroke();
       ctx.restore();
     }
-    if (state.meteor && state.meteor.life > 0) {
-      ctx.save();
-      ctx.fillStyle = '#161616';
-      for (var m = 0; m < 7; m++) {
-        var mx = view.originX + ((Math.sin(state.time * 3 + m) * 0.5 + 0.5) * COLS) * tile;
-        var my = view.originY + ((m + state.time * 1.4) % ROWS) * tile;
-        ctx.beginPath();
-        ctx.arc(mx, my, tile * 0.12, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
   }
 
   function skillAuraOn(tower) {
     if (!tower || tower.type !== 'hero') return false;
     if (tower.hero === 'sword') return tower.buffTime > 0;
-    if (tower.hero === 'archer') return tower.auraTime > 0;
+    if (tower.hero === 'priest') return tower.buffTime > 0;
+    if (tower.hero === 'archer') return tower.auraTime > 0 || state.pickMode === 'fog' && state.fogHeroId === tower.id;
     if (tower.hero === 'mage') return !!(state.meteor && state.meteor.ownerId === tower.id);
     return false;
   }
@@ -5954,7 +6335,7 @@ function selectedTower() {
   function drawPossess(tower, s) {
     var hero = tower.hero;
     var pulse = 1 + (reduceMotion ? 0 : Math.sin(state.time * 5 + tower.id) * 0.06);
-    var stroke = hero === 'archer' ? '#1c7a34' : (hero === 'mage' ? '#c81e1e' : (hero === 'priest' ? '#c9a227' : '#6d28d9'));
+    var stroke = hero === 'archer' ? '#1c7a34' : (hero === 'mage' ? '#c81e1e' : (hero === 'priest' ? '#c9a227' : '#ff2a2a'));
     ctx.save();
     ctx.strokeStyle = stroke;
     ctx.lineWidth = Math.max(2, s * 0.12);
@@ -6123,7 +6504,7 @@ function selectedTower() {
       ctx.save();
       ctx.rotate(aim || 0);
       if (type === 'bolt') {
-        ctx.fillStyle = '#e0b000';
+        ctx.fillStyle = '#ffe14a';
         markBolt(s * 0.62);
         ctx.fill();
         inkStroke();
@@ -6246,11 +6627,41 @@ function selectedTower() {
     var y = worldY(shot.y);
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(shot.angle);
-    ctx.translate(-view.tile * 0.34, 0);
-    drawBladeWave(0.62, 0.4);
-    ctx.translate(view.tile * 0.34, 0);
-    drawBladeWave(1, 1);
+    if (shot.crescent) {
+      ctx.rotate((shot.angle || 0) + (shot.spin || 0));
+      ctx.strokeStyle = '#161616';
+      ctx.fillStyle = '#ff4d4d';
+      ctx.lineWidth = Math.max(2.2, view.tile * 0.045);
+      ctx.beginPath();
+      ctx.arc(0, 0, view.tile * 0.22, 0.4, Math.PI - 0.4);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, view.tile * 0.12, 0.55, Math.PI - 0.55, true);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.rotate(shot.angle);
+      ctx.translate(-view.tile * 0.34, 0);
+      drawBladeWave(0.62, 0.4);
+      ctx.translate(view.tile * 0.34, 0);
+      drawBladeWave(1, 1);
+    }
+    ctx.restore();
+  }
+
+  function drawKillSlash(shot) {
+    var p = shot.maxLife ? shot.life / shot.maxLife : 0;
+    ctx.save();
+    ctx.translate(worldX(shot.x), worldY(shot.y));
+    ctx.globalAlpha = Math.min(1, p * 1.4);
+    ctx.strokeStyle = '#ff2a2a';
+    ctx.lineWidth = Math.max(3, view.tile * 0.07);
+    ctx.beginPath();
+    ctx.arc(0, 0, view.tile * (0.2 + (1 - p) * 0.45), -0.9, 0.9);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, view.tile * (0.12 + (1 - p) * 0.28), Math.PI - 0.7, Math.PI + 0.7);
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -6260,7 +6671,15 @@ function selectedTower() {
     ctx.translate(worldX(shot.x), worldY(shot.y));
     ctx.rotate(shot.angle - 1.05 + (1 - p) * 1.7);
     ctx.globalAlpha = Math.min(1, p * 1.5);
-    drawBladeWave(0.78, 1);
+    if (shot.wide) ctx.globalAlpha = Math.min(1, p * 1.6);
+    drawBladeWave(shot.wide ? 1.15 : 0.78, 1);
+    if (shot.wide) {
+      ctx.strokeStyle = '#ff2a2a';
+      ctx.lineWidth = Math.max(3, view.tile * 0.07);
+      ctx.beginPath();
+      ctx.arc(0, 0, view.tile * 0.7, -1.05, 1.05);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -7174,14 +7593,147 @@ function selectedTower() {
     ctx.stroke();
   }
 
+  function drawAltar() {
+    if (state.phase === 'menu' || state.phase === 'gameover') return;
+    var spot = altarSpot();
+    if (!spot) return;
+    var x = worldX(spot.c + 0.5);
+    var y = worldY(spot.r + 0.55);
+    var s = view.tile * 0.28;
+    ctx.save();
+    ctx.translate(x, y);
+    inkSeed = 41;
+    inkSetup(Math.max(2, s * 0.16));
+    ctx.fillStyle = '#efe6d6';
+    ctx.strokeStyle = '#161616';
+    ctx.beginPath();
+    ctx.moveTo(-s * 1.15, s * 0.35);
+    ctx.lineTo(s * 1.15, s * 0.35);
+    ctx.lineTo(s * 0.85, s * 0.95);
+    ctx.lineTo(-s * 0.85, s * 0.95);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.7, s * 0.35);
+    ctx.lineTo(s * 0.7, s * 0.35);
+    ctx.lineTo(s * 0.45, -s * 0.15);
+    ctx.lineTo(-s * 0.45, -s * 0.15);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.fillStyle = '#e02323';
+    inkCircle(0, -s * 0.55, s * 0.28, 10);
+    ctx.fill();
+    inkStroke();
+    ctx.fillStyle = '#161616';
+    ctx.font = '800 ' + Math.max(10, Math.round(s * 0.7)) + 'px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('祭', 0, s * 0.15);
+    ctx.restore();
+  }
+
+  function drawFogs() {
+    for (var i = 0; i < state.fogs.length; i++) {
+      var fog = state.fogs[i];
+      var x = worldX(fog.x);
+      var y = worldY(fog.y);
+      var rad = fog.radius * view.tile;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = 'rgba(60, 191, 74, 0.28)';
+      ctx.beginPath();
+      ctx.arc(0, 0, rad, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(28, 90, 36, 0.65)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
+  function drawMeteors() {
+    if (!state.meteor || !state.meteor.rocks) return;
+    for (var i = 0; i < state.meteor.rocks.length; i++) {
+      var rock = state.meteor.rocks[i];
+      var t = 1 - rock.life / (rock.max || 0.48);
+      var x = worldX(rock.tx);
+      var y = worldY(rock.ty - (1 - t) * 3.2);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = '#ffb15a';
+      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = Math.max(3, view.tile * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(0, view.tile * 0.35);
+      ctx.lineTo(-view.tile * 0.08, -view.tile * 0.55);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#5a4030';
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(4, view.tile * 0.1), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#161616';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#e02323';
+      ctx.beginPath();
+      ctx.arc(-2, -2, Math.max(2, view.tile * 0.04), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function drawTowers() {
-    for (var i = 0; i < state.towers.length; i++) drawTower(state.towers[i]);
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (tower.type === 'hero' && tower.hero === 'sword') drawSwordGhosts(tower);
+    }
+    for (var n = 0; n < state.towers.length; n++) drawTower(state.towers[n]);
+  }
+
+  function drawSwordGhosts(tower) {
+    if (!(tower.buffTime > 0) || !tower.trail) return;
+    for (var i = 0; i < tower.trail.length; i++) {
+      var ghost = tower.trail[i];
+      ctx.save();
+      ctx.translate(worldX(ghost.x), worldY(ghost.y - 0.08));
+      ctx.globalAlpha = 0.12 + (i / tower.trail.length) * 0.28;
+      ctx.fillStyle = '#ff2a2a';
+      ctx.beginPath();
+      ctx.arc(0, 0, view.tile * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ff2a2a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, view.tile * 0.28, -1, 1);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   function drawTower(tower) {
     var tile = view.tile;
-    var x = worldX(tower.c + 0.5);
-    var y = worldY(tower.r + 0.42);
+    var ax = tower.c + 0.5;
+    var ay = tower.r + 0.42;
+    if (tower.type === 'hero' && tower.hero === 'sword' && tower.fx != null) {
+      ax = tower.fx;
+      ay = tower.fy - 0.08;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(224, 35, 35, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(worldX(tower.c + 0.5), worldY(tower.r + 0.5), tile * 0.18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+    var x = worldX(ax);
+    var y = worldY(ay);
     var s = tower.type === 'hero' ? tile * 0.3 : tile * 0.26;
     ctx.save();
     ctx.translate(x, y);
@@ -8065,10 +8617,10 @@ function selectedTower() {
       var y2 = worldY(arc.y2);
       ctx.globalAlpha = Math.max(0.5, arc.life / arc.maxLife);
       ctx.strokeStyle = '#161616';
-      ctx.lineWidth = Math.max(4, view.tile * 0.09);
+      ctx.lineWidth = Math.max(4.2, view.tile * 0.09);
       strokeBolt(x1, y1, x2, y2);
-      ctx.strokeStyle = '#e0b000';
-      ctx.lineWidth = Math.max(2.2, view.tile * 0.05);
+      ctx.strokeStyle = '#ffe14a';
+      ctx.lineWidth = Math.max(2.4, view.tile * 0.055);
       strokeBolt(x1, y1, x2, y2);
     }
     ctx.restore();
@@ -8099,6 +8651,7 @@ function selectedTower() {
       if (shot.kind === 'arrow') drawArrowShot(shot);
       else if (shot.kind === 'slash') drawSlash(shot);
       else if (shot.kind === 'cut') drawCut(shot);
+      else if (shot.kind === 'killslash') drawKillSlash(shot);
       else if (shot.kind === 'wave') drawWave(shot);
       else if (shot.kind === 'poison') drawPoisonShot(shot);
       else drawShell(shot);
@@ -8339,6 +8892,19 @@ function selectedTower() {
       Sfx.ui();
       return;
     }
+    var wandering = heroAtPoint(point.x, point.y);
+    if (wandering && wandering.hero === 'sword') {
+      state.editTool = null;
+      selectTower(wandering);
+      syncRouteBar();
+      Sfx.ui();
+      return;
+    }
+    if (isAltarCell(cell.c, cell.r)) {
+      openAltar();
+      Sfx.ui();
+      return;
+    }
     if (state.phase === 'edit' && state.editTool) {
       state.buildSite = null;
       routeEditTap(cell);
@@ -8359,6 +8925,27 @@ function selectedTower() {
     clearSelection();
   }
 
+  function heroAtPoint(px, py) {
+    var best = null;
+    var bestD = view.tile * 0.62;
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (tower.type !== 'hero') continue;
+      var hx = tower.c + 0.5;
+      var hy = tower.r + 0.5;
+      if (tower.hero === 'sword' && tower.fx != null) {
+        hx = tower.fx;
+        hy = tower.fy;
+      }
+      var dist = Math.hypot(worldX(hx) - px, worldY(hy) - py);
+      if (dist < bestD) {
+        bestD = dist;
+        best = tower;
+      }
+    }
+    return best;
+  }
+
   function bindUi() {
     document.addEventListener('pointerdown', function () { Sfx.unlock(); }, { passive: true });
     document.addEventListener('gesturestart', function (event) { event.preventDefault(); }, { passive: false });
@@ -8370,17 +8957,60 @@ function selectedTower() {
 
     canvas.addEventListener('pointerdown', function (event) {
       if (pointer) return;
-      pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      var point = canvasPoint(event.clientX, event.clientY);
+      var hero = heroAtPoint(point.x, point.y);
+      pointer = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        heroId: hero ? hero.id : 0,
+        origin: hero ? { c: hero.c, r: hero.r } : null,
+        moved: false,
+      };
     });
     canvas.addEventListener('pointermove', function (event) {
       var point = canvasPoint(event.clientX, event.clientY);
       state.hover = cellAt(point.x, point.y);
+      if (!pointer || pointer.id !== event.pointerId || !pointer.heroId) return;
+      var dx = event.clientX - pointer.x;
+      var dy = event.clientY - pointer.y;
+      if (dx * dx + dy * dy > 64) pointer.moved = true;
+      if (!pointer.moved) return;
+      var hero = towerById(pointer.heroId);
+      var cell = state.hover;
+      if (!hero || !cell || !canDropHero(cell, hero)) return;
+      hero.c = cell.c;
+      hero.r = cell.r;
+      if (hero.hero === 'sword') {
+        hero.fx = cell.c + 0.5;
+        hero.fy = cell.r + 0.5;
+      }
     });
     canvas.addEventListener('pointerleave', function () { state.hover = null; });
     canvas.addEventListener('pointerup', function (event) {
       if (!pointer || pointer.id !== event.pointerId) return;
       var start = pointer;
       pointer = null;
+      if (start.moved && start.heroId) {
+        var hero = towerById(start.heroId);
+        var point = canvasPoint(event.clientX, event.clientY);
+        var cell = cellAt(point.x, point.y);
+        if (hero && (!cell || !canDropHero(cell, hero))) {
+          hero.c = start.origin.c;
+          hero.r = start.origin.r;
+          if (hero.hero === 'sword') {
+            hero.fx = hero.c + 0.5;
+            hero.fy = hero.r + 0.5;
+          }
+          toast('這裡不能放');
+          Sfx.bad();
+        } else if (hero) {
+          selectTower(hero);
+          toast('已移動' + heroName(hero.hero));
+          Sfx.ui();
+        }
+        return;
+      }
       var dx = event.clientX - start.x;
       var dy = event.clientY - start.y;
       if (dx * dx + dy * dy > 400) return;
