@@ -10,9 +10,21 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="description" content="直式塔防小遊戲，可透過 Capacitor 打包，並預留 Google AdMob 獎勵與插頁廣告。" />
   <title>SymbolsTD</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=67" />
 </head>
 <body>
+  <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true">
+    <filter id="sketch-filter" x="-8%" y="-8%" width="116%" height="116%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.014" numOctaves="2" seed="4" result="noise" />
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.75" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+  <svg width="160" height="160" aria-hidden="true" style="position:absolute;left:-999px;top:0">
+    <filter id="ink-rough" x="-15%" y="-15%" width="130%" height="130%" filterUnits="objectBoundingBox">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="4" result="noise" />
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="3.2" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
   <div id="app">
     <h1 class="sr-only">SymbolsTD</h1>
 
@@ -21,80 +33,181 @@
         <div class="welcome-art">
           <img class="welcome-bg" src="assets/ui/bg-welcome-v8.jpg?v=13" alt="" aria-hidden="true" draggable="false" />
           <img class="welcome-logo" src="assets/ui/logo-symbols-td.png?v=14" alt="SymbolsTD" />
-          <button type="button" class="welcome-start" id="btn-welcome-start" aria-label="開始遊戲">
+          <div class="welcome-user" id="welcome-user" hidden>
+            <img id="welcome-avatar" alt="" />
+            <span id="welcome-user-name"></span>
+          </div>
+          <button type="button" class="welcome-account" id="btn-welcome-account">
+            <span class="g-mark" aria-hidden="true">G</span>
+            <span id="welcome-account-label">使用 Google 登入</span>
+          </button>
+          <button type="button" class="welcome-account welcome-guest" id="btn-welcome-guest">訪客登入</button>
+          <button type="button" class="welcome-start" id="btn-welcome-start" aria-label="開始遊戲" hidden>
             <img src="assets/ui/btn-start.png?v=13" alt="開始遊戲" />
           </button>
         </div>
       </div>
     </section>
 
-    <section id="screen-menu" class="screen screen-menu" hidden>
+    <section id="screen-menu" class="screen play-home" hidden>
+      <button type="button" class="player-card sketch-box" id="player-card">
+        <span class="card-fx" aria-hidden="true"></span>
+        <span class="player-avatar" aria-hidden="true">
+          <img id="player-avatar-img" alt="" hidden />
+          <span id="player-avatar-letter">?</span>
+        </span>
+        <span class="player-card-copy">
+          <strong id="player-card-name">尚未登入</strong>
+          <span id="player-card-id" hidden>ID</span>
+          <span id="player-card-best">登入後才有名片</span>
+          <span id="player-card-rank">第 11 名起沒有稱號</span>
+        </span>
+        <span class="card-medal" id="player-medal" hidden>
+          <span class="card-medal-gem" aria-hidden="true"></span>
+          <span class="card-medal-name" id="player-medal-name"></span>
+        </span>
+      </button>
+      <header class="home-top">
+        <button type="button" class="home-ico sketch-circle" id="btn-menu-back" aria-label="返回歡迎頁">‹</button>
+        <nav class="home-side" aria-label="其他">
+          <button type="button" class="home-tool sketch-box" id="btn-open-index" aria-label="圖鑑"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M6 4.5h12v15H6z" fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 4.5c2.2 1.6 4.2 1.6 6 0 1.8 1.6 3.8 1.6 6 0" fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>圖鑑</button>
+          <button type="button" class="home-tool sketch-box" id="btn-open-board" aria-label="排行榜"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M8 4h8v6a4 4 0 0 1-8 0V4z" fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 6.5H5.2A2.4 2.4 0 0 0 8 10M16 6.5h2.8A2.4 2.4 0 0 1 16 10M12 14v3M9 19.5h6" fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>排行</button>
+          <button type="button" class="home-tool sketch-box" id="btn-open-friends" aria-label="加好友"><svg viewBox="0 0 24 24" aria-hidden="true" ><circle cx="9" cy="8" r="2.4" fill="none" stroke="#1a1a1a" stroke-width="2.5"/><circle cx="16" cy="9" r="1.9" fill="none" stroke="#1a1a1a" stroke-width="2.5"/><path d="M4 18.2c.6-2.4 2.6-3.8 5-3.8s4.4 1.4 5 3.8M14.2 14.8c1.5-.2 2.8.4 3.6 1.5.5.7.8 1.4.9 2" fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>好友</button>
+        </nav>
+        <div class="home-pills">
+          <span class="home-pill sketch-box" id="home-stars">★ 0</span>
+          <span class="home-pill sketch-box" id="home-clear">通關 0/40</span>
+        </div>
+      </header>
+      <div class="home-body">
+        <div class="home-stage">
+          <p class="home-kicker" id="home-chapter-kicker">章節 1</p>
+          <h2 id="home-chapter-name">潮濕藤蔓地牢</h2>
+          <p class="home-progress" id="home-progress">進度 0/5</p>
+          <div class="home-frame sketch-box">
+            <button type="button" class="home-arrow sketch-circle" id="home-prev" aria-label="上一章">‹</button>
+            <img id="home-art" alt="" />
+            <p class="home-lock" id="home-lock" hidden>未解鎖</p>
+            <button type="button" class="home-arrow sketch-circle is-next" id="home-next" aria-label="下一章">›</button>
+          </div>
+          <div class="home-stages" id="home-stages"></div>
+          <p class="home-reward-label"><span>獎勵</span></p>
+          <div class="home-rewards">
+            <div class="home-reward sketch-box"><b id="home-waves">12</b><span>波次</span></div>
+            <div class="home-reward sketch-box"><b id="home-gold">60</b><span>起始金</span></div>
+            <div class="home-reward sketch-box"><b id="home-boss">王</b><span>首領</span></div>
+          </div>
+          <button type="button" class="home-start sketch-box" id="btn-home-start">開始</button>
+        </div>
+      </div>
+      <nav class="home-dock" aria-label="模式">
+        <button type="button" class="is-on sketch-box sketch-box-dark" id="btn-mode-campaign">作戰</button>
+        <button type="button" id="btn-mode-custom">自訂</button>
+        <button type="button" id="btn-mode-infinite">無限</button>
+      </nav>
+    </section>
+
+    <section id="screen-aura" class="screen screen-menu ink-sheet" hidden>
       <div class="screen-head menu-head">
-        <button type="button" class="icon-btn" id="btn-menu-back" aria-label="返回歡迎頁">‹</button>
+        <button type="button" class="icon-btn" id="btn-aura-back" aria-label="返回">‹</button>
         <div>
-          <p class="screen-kicker">SymbolsTD</p>
-          <h2>目錄</h2>
+          <p class="screen-kicker">名片</p>
+          <h2>光環</h2>
         </div>
       </div>
-      <div class="menu-actions">
-        <button type="button" class="doodle-btn" id="btn-mode-campaign" aria-label="關卡爬塔">
-          <img src="assets/ui/btn-mode-campaign.png?v=11" alt="關卡爬塔" />
-        </button>
-        <button type="button" class="doodle-btn" id="btn-mode-custom" aria-label="自訂路線">
-          <img src="assets/ui/btn-mode-custom.png?v=11" alt="自訂路線" />
-        </button>
-        <button type="button" class="doodle-btn" id="btn-mode-infinite" aria-label="無限隨機">
-          <img src="assets/ui/btn-mode-infinite.png?v=11" alt="無限隨機" />
-        </button>
-        <button type="button" class="doodle-btn" id="btn-open-codex" aria-label="怪圖鑑">
-          <img src="assets/ui/btn-codex.png?v=11" alt="怪圖鑑" />
-        </button>
-        <button type="button" class="doodle-btn" id="btn-open-towers" aria-label="塔明細">
-          <img src="assets/ui/btn-towers.png?v=11" alt="塔明細" />
-        </button>
-        <button type="button" class="doodle-btn" id="btn-open-hell" aria-label="地獄詞綴">
-          <img src="assets/ui/btn-hell-deff.png?v=11" alt="地獄詞綴" />
-        </button>
-      </div>
+      <p class="screen-note">第 1 名絕對王者、第 2 名不滅霸主、第 3 名災厄之主，稱號接在名字後面。這些只留到本週結算，下週沒有名次，光環、稱號、獎盃都會消失。第 11 名起沒有稱號，也沒有獎盃。</p>
+      <article class="player-card aura-sample is-diamond">
+        <span class="card-fx" aria-hidden="true"></span>
+        <span class="player-avatar" aria-hidden="true"><span>訪</span></span>
+        <span class="player-card-copy">
+          <strong class="name-line">訪客<span class="name-epithet is-1">絕對王者</span></strong>
+          <span>地獄榜第 1 名</span>
+          <span>可召喚全知全能的神</span>
+        </span>
+        <span class="card-medal is-diamond"><span class="card-medal-gem" aria-hidden="true"></span><span class="card-medal-name">鑽石</span></span>
+      </article>
+      <article class="player-card aura-sample is-special">
+        <span class="card-fx" aria-hidden="true"></span>
+        <span class="player-avatar" aria-hidden="true"><span>訪</span></span>
+        <span class="player-card-copy">
+          <strong class="name-line">訪客<span class="name-epithet is-3">災厄之主</span></strong>
+          <span>地獄榜第 3 名</span>
+          <span>可召喚全知全能的神</span>
+        </span>
+        <span class="card-medal is-gold"><span class="card-medal-gem" aria-hidden="true"></span><span class="card-medal-name">黃金</span></span>
+      </article>
+      <article class="player-card aura-sample is-ordinary">
+        <span class="card-fx" aria-hidden="true"></span>
+        <span class="player-avatar" aria-hidden="true"><span>訪</span></span>
+        <span class="player-card-copy">
+          <strong>一般光環</strong>
+          <span>地獄榜第 8 名</span>
+          <span>可召喚光之神使</span>
+        </span>
+        <span class="card-medal is-bronze"><span class="card-medal-gem" aria-hidden="true"></span><span class="card-medal-name">青銅</span></span>
+      </article>
+      <article class="player-card aura-sample">
+        <span class="player-avatar" aria-hidden="true"><span>訪</span></span>
+        <span class="player-card-copy">
+          <strong>沒有光環</strong>
+          <span>地獄榜第 11 名起</span>
+          <span>無稱號</span>
+        </span>
+      </article>
     </section>
 
-    <section id="screen-hell" class="screen screen-info" hidden>
+    <section id="screen-friends" class="screen screen-info ink-sheet" hidden>
       <div class="screen-head">
-        <button type="button" class="icon-btn" id="btn-hell-back" aria-label="返回">‹</button>
+        <button type="button" class="icon-btn" id="btn-friends-back" aria-label="返回">‹</button>
         <div>
-          <p class="screen-kicker">圖鑑</p>
-          <h2>地獄詞綴</h2>
+          <p class="screen-kicker">名片</p>
+          <h2>加好友</h2>
         </div>
       </div>
-      <p class="screen-note">地獄難度會疊加詞綴。毒克制回血，火克制厚皮。</p>
-      <div id="hell-info-list" class="info-list"></div>
+      <p class="screen-note">把你的 ID 給對方，或貼上對方的 ID。好友名片會顯示他的頭像、最高紀錄，以及地獄榜光環。</p>
+      <p class="friend-code" id="friend-code">登入後才有 ID。</p>
+      <button type="button" class="menu-text-btn" id="btn-copy-code">複製 ID</button>
+      <label class="board-name">
+        好友 ID
+        <input id="friend-code-input" maxlength="12" placeholder="貼上對方的 ID" autocomplete="off" />
+      </label>
+      <button type="button" class="menu-text-btn" id="btn-add-friend">加好友</button>
+      <ul class="friend-list" id="friend-list"></ul>
     </section>
 
-    <section id="screen-codex" class="screen screen-info" hidden>
+    <section id="screen-board" class="screen screen-info ink-sheet" hidden>
       <div class="screen-head">
-        <button type="button" class="icon-btn" id="btn-codex-back" aria-label="返回">‹</button>
+        <button type="button" class="icon-btn" id="btn-board-back" aria-label="返回">‹</button>
         <div>
-          <p class="screen-kicker">圖鑑</p>
-          <h2>怪圖鑑</h2>
+          <p class="screen-kicker">比較</p>
+          <h2>排行榜</h2>
         </div>
       </div>
-      <p class="screen-note">先看清楚怪的特性與克制，再開戰。</p>
-      <div id="codex-list" class="info-list"></div>
+      <p class="screen-note">每週一 00:00（台北時間）結算，只排這一週的地獄成績。下週沒有名次，光環、稱號、獎盃都會消失。打過第 25 波才能進前 10，不到第 25 波從第 11 名起算。第 1 到 3 名可召喚全知全能的神，第 4 到 10 名可召喚光之神使。第 11 名起無稱號。</p>
+      <p class="screen-note" id="board-account">尚未登入。</p>
+      <div class="board-tabs" id="board-tabs"></div>
+      <ol class="board-list" id="board-list"></ol>
     </section>
 
-    <section id="screen-towers" class="screen screen-info" hidden>
+    <section id="screen-index" class="screen screen-info ink-sheet" hidden>
       <div class="screen-head">
-        <button type="button" class="icon-btn" id="btn-towers-back" aria-label="返回">‹</button>
+        <button type="button" class="icon-btn" id="btn-index-back" aria-label="返回">‹</button>
         <div>
-          <p class="screen-kicker">圖鑑</p>
-          <h2>塔明細</h2>
+          <h2>圖鑑</h2>
         </div>
       </div>
-      <p class="screen-note">各塔效果、分支與克制一覽。</p>
-      <div id="tower-info-list" class="info-list"></div>
+      <div class="index-tabs" id="index-tabs">
+        <button type="button" class="index-tab is-on" data-index="codex">怪圖鑑</button>
+        <button type="button" class="index-tab" data-index="towers">塔明細</button>
+        <button type="button" class="index-tab" data-index="hell">地獄詞綴</button>
+      </div>
+      <p class="screen-note" id="index-note">先看清楚怪的特性與克制，再開戰。</p>
+      <div id="codex-list" class="info-list index-panel" data-index-panel="codex"></div>
+      <div id="tower-info-list" class="info-list index-panel" data-index-panel="towers" hidden></div>
+      <div id="hell-info-list" class="info-list index-panel" data-index-panel="hell" hidden></div>
     </section>
 
-    <section id="screen-difficulty" class="screen" hidden>
+    <section id="screen-difficulty" class="screen ink-sheet" hidden>
       <div class="screen-head">
         <button type="button" class="icon-btn" id="btn-difficulty-back" aria-label="返回選單">‹</button>
         <div>
@@ -104,28 +217,6 @@
       </div>
       <p class="screen-note" id="difficulty-note">開局隨機地圖後固定路線。普通與地獄分開記錄最遠波次。</p>
       <div id="difficulty-list"></div>
-    </section>
-    <section id="screen-chapters" class="screen" hidden>
-      <div class="screen-head">
-        <button type="button" class="icon-btn" id="btn-chapters-back" aria-label="返回選單">‹</button>
-        <div>
-          <p class="screen-kicker">世界</p>
-          <h2>選擇章節</h2>
-        </div>
-      </div>
-      <p class="screen-note">由下往上。通過本章第 5 關後解鎖下一章。</p>
-      <div id="chapter-list" class="chapter-list"></div>
-    </section>
-    <section id="screen-stages" class="screen" hidden>
-      <div class="screen-head">
-        <button type="button" class="icon-btn" id="btn-stages-back" aria-label="返回章節">‹</button>
-        <div>
-          <p class="screen-kicker" id="stage-kicker">章節</p>
-          <h2 id="stage-title">關卡</h2>
-        </div>
-      </div>
-      <p class="screen-note" id="stage-note"></p>
-      <div id="stage-track" class="stage-track"></div>
     </section>
     <header class="hud">
       <button type="button" class="icon-btn" id="btn-back" aria-label="返回選單">‹</button>
@@ -142,9 +233,11 @@
         <span class="stat-label">金幣</span>
       </div>
       <button type="button" class="icon-btn" id="btn-pause" aria-pressed="false" aria-label="暫停">
-        <img class="hud-ico" src="assets/ui/btn-pause.png" alt="" />
+        <svg class="hud-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.2v11.6M16 6.2v11.6" fill="none" stroke="#1a1a1a" stroke-width="2.6" stroke-linecap="round"/></svg>
       </button>
-      <button type="button" class="icon-btn" id="btn-sound" aria-pressed="false" aria-label="關閉音效">♪</button>
+      <button type="button" class="icon-btn" id="btn-sound" aria-pressed="false" aria-label="關閉音效">
+        <svg class="hud-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 16.2V8.4l6.6-2v7.6" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7.4" cy="16.2" r="1.8" fill="none" stroke="#1a1a1a" stroke-width="2.2"/><circle cx="14" cy="14" r="1.8" fill="none" stroke="#1a1a1a" stroke-width="2.2"/></svg>
+      </button>
     </header>
 
     <main class="stage" id="stage">
@@ -208,7 +301,11 @@
 
   <div class="toast" id="toast" role="status"></div>
 
+  <script src="firebase-config.js?v=16"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="admob-bridge.js"></script>
-  <script src="game.js"></script>
+  <script src="game.js?v=56"></script>
 </body>
 </html>

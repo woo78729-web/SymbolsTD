@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function weekKeyOf(millis) {
+      let shifted = millis + 28800000;
+      let day = int(shifted / 86400000);
+      return day - ((day + 3) % 7);
+    }
+    match /boards/{boardId}/entries/{uid} {
+      function knownBoard() {
+        return boardId in ['infinite-normal', 'infinite-hell', 'custom-normal', 'custom-hell'];
+      }
+      function signedIn() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+      function validScore() {
+        return request.resource.data.uid == request.auth.uid
+          && request.resource.data.wave is int
+          && request.resource.data.wave > 0
+          && request.resource.data.wave <= 9999
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 24
+          && request.resource.data.picture is string
+          && request.resource.data.picture.size() <= 500
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'picture', 'wave', 'updated']);
+      }
+      allow read: if knownBoard();
+      allow create: if knownBoard() && signedIn() && validScore();
+      allow update: if knownBoard() && signedIn() && validScore()
+        && request.resource.data.wave >= resource.data.wave;
+      allow delete: if false;
+    }
+    match /boards/{boardId}/weeks/{weekId}/entries/{uid} {
+      function knownBoard() {
+        return boardId in ['infinite-normal', 'infinite-hell', 'custom-normal', 'custom-hell'];
+      }
+      function signedIn() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+      function validScore() {
+        return request.resource.data.uid == request.auth.uid
+          && request.resource.data.wave is int
+          && request.resource.data.wave > 0
+          && request.resource.data.wave <= 9999
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 24
+          && request.resource.data.picture is string
+          && request.resource.data.picture.size() <= 500
+          && request.resource.data.updated is timestamp
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'picture', 'wave', 'updated']);
+      }
+      function thisWeek() {
+        return weekId == string(weekKeyOf(request.time.toMillis()));
+      }
+      allow read: if knownBoard();
+      allow create: if knownBoard() && signedIn() && thisWeek() && validScore();
+      allow update: if knownBoard() && signedIn() && thisWeek() && validScore()
+        && request.resource.data.wave >= resource.data.wave;
+      allow delete: if false;
+    }
+    match /users/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 24
+        && request.resource.data.picture is string
+        && request.resource.data.picture.size() <= 500
+        && request.resource.data.bestLabel is string
+        && request.resource.data.bestLabel.size() <= 24
+        && request.resource.data.bestWave is int
+        && request.resource.data.bestWave >= 0
+        && request.resource.data.bestWave <= 9999
+        && request.resource.data.hellRank is int
+        && request.resource.data.hellRank >= 0
+        && request.resource.data.hellRank <= 9999
+        && request.resource.data.rankWeek is int
+        && request.resource.data.rankWeek >= 0
+        && request.resource.data.rankWeek <= 1000000
+        && request.resource.data.guest is bool
+        && request.resource.data.friendId is string
+        && request.resource.data.friendId.matches('^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$')
+        && request.resource.data.keys().hasOnly(['name', 'picture', 'bestLabel', 'bestWave', 'hellRank', 'rankWeek', 'guest', 'friendId']);
+      match /friends/{friendUid} {
+        allow read, delete: if request.auth != null && request.auth.uid == uid;
+        allow create, update: if request.auth != null
+          && request.auth.uid == uid
+          && friendUid != uid
+          && request.resource.data.uid == friendUid
+          && request.resource.data.keys().hasOnly(['uid']);
+      }
+    }
+    match /handles/{friendId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && friendId.matches('^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$')
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid']);
+      allow update, delete: if false;
+    }
+  }
+}

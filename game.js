@@ -13,79 +13,6 @@
   var SELL_RATIO = 0.6;
   var FONT = '"PingFang TC","Microsoft JhengHei","Segoe UI",sans-serif';
 
-  // Crops are pixels of the 1024×571 sheets. Ice has no separate 5th frame
-  // and fire only has the final hell-tower, so those ranks reuse the closest art.
-  var SPRITE_MAP = {
-    regen: { sx: 20, sy: 58, sw: 124, sh: 90 },
-    rush: { sx: 160, sy: 54, sw: 114, sh: 88 },
-    summon: { sx: 282, sy: 50, sw: 108, sh: 100 },
-    ward: { sx: 396, sy: 48, sw: 130, sh: 100 },
-    split: { sx: 20, sy: 188, sw: 124, sh: 84 },
-    mend: { sx: 160, sy: 184, sw: 112, sh: 90 },
-    frost: { sx: 282, sy: 178, sw: 136, sh: 100 },
-    armor: { sx: 436, sy: 172, sw: 96, sh: 104 },
-    arrow1: { sx: 36, sy: 374, sw: 54, sh: 24 },
-    arrow2: { sx: 109, sy: 374, sw: 56, sh: 24 },
-    cannon1: { sx: 327, sy: 374, sw: 54, sh: 24 },
-    cannon2: { sx: 412, sy: 376, sw: 58, sh: 22 },
-    heavy3: { sx: 36, sy: 454, sw: 54, sh: 22 },
-    heavy4: { sx: 108, sy: 452, sw: 62, sh: 24 },
-    heavy5: { sx: 186, sy: 446, sw: 94, sh: 32 },
-    twin3: { sx: 28, sy: 518, sw: 62, sh: 22 },
-    twin4: { sx: 104, sy: 516, sw: 64, sh: 24 },
-    twin5: { sx: 192, sy: 508, sw: 94, sh: 28 },
-    ice3: { sx: 334, sy: 446, sw: 66, sh: 28 },
-    ice4: { sx: 414, sy: 450, sw: 70, sh: 26 },
-    fire5: { sx: 500, sy: 442, sw: 88, sh: 28 },
-    stone3: { sx: 318, sy: 516, sw: 64, sh: 22 },
-    stone4: { sx: 398, sy: 514, sw: 70, sh: 24 },
-    stone5: { sx: 516, sy: 508, sw: 108, sh: 34 },
-    vert: { sx: 708, sy: 100, sw: 32, sh: 56 },
-    horiz: { sx: 872, sy: 246, sw: 72, sh: 26 },
-    cornerUL: { sx: 840, sy: 384, sw: 72, sh: 42 },
-    cornerUR: { sx: 926, sy: 384, sw: 72, sh: 42 },
-    cornerDL: { sx: 696, sy: 472, sw: 72, sh: 52 },
-    cornerDR: { sx: 786, sy: 472, sw: 72, sh: 52 },
-    portal: { sx: 852, sy: 492, sw: 66, sh: 52 },
-    chest: { sx: 936, sy: 492, sw: 74, sh: 50 },
-  };
-
-  var UI_MAP = {
-    floor: { sx: 772, sy: 382, sw: 100, sh: 96 },
-  };
-
-  var gameSheet = new Image();
-  var uiSheet = new Image();
-  var envSheet = new Image();
-  var minionSheet = new Image();
-  var towerSheets = [new Image(), new Image(), new Image(), new Image(), new Image()];
-  var pathSheet = new Image();
-  var castBoss = new Image();
-  var castMinion = new Image();
-  var fieldSheet = new Image();
-  var groundCh1 = new Image();
-  var uiMain = new Image();
-  var spritesReady = false;
-  var uiReady = false;
-  var envReady = false;
-  var minionReady = false;
-  var towerArtReady = false;
-  var pathReady = false;
-  var castReady = false;
-  var castMinionReady = false;
-  var fieldReady = false;
-  var groundCh1Ready = false;
-  var towerStampCache = {};
-  var pathStampCache = {};
-  var castStampCache = {};
-
-  var THEME_LOCAL = {
-    ground: { dx: 36, dy: 176, sw: 72, sh: 60 },
-    road: { dx: 34, dy: 72, sw: 76, sh: 64 },
-    bend: { dx: 148, dy: 72, sw: 76, sh: 64 },
-    goal: { dx: 148, dy: 184, sw: 72, sh: 58 },
-  };
-
   var ELEMENT_TYPES = ['poison', 'fire', 'ice', 'bolt'];
 
   var TOWERS = {
@@ -245,9 +172,10 @@
   var soundBtn = document.getElementById('btn-sound');
   var pauseBtn = document.getElementById('btn-pause');
   var screenWelcome = document.getElementById('screen-welcome');
-  var screenCodex = document.getElementById('screen-codex');
-  var screenTowersInfo = document.getElementById('screen-towers');
-  var screenHell = document.getElementById('screen-hell');
+  var screenIndex = document.getElementById('screen-index');
+  var screenBoard = document.getElementById('screen-board');
+  var screenFriends = document.getElementById('screen-friends');
+  var screenAura = document.getElementById('screen-aura');
   var inspector = document.getElementById('inspector');
   var inspectTitle = document.getElementById('inspect-title');
   var inspectMeta = document.getElementById('inspect-meta');
@@ -259,15 +187,8 @@
   var modalActions = document.getElementById('modal-actions');
   var toastEl = document.getElementById('toast');
   var screenMenu = document.getElementById('screen-menu');
-  var screenChapters = document.getElementById('screen-chapters');
-  var screenStages = document.getElementById('screen-stages');
   var screenDifficulty = document.getElementById('screen-difficulty');
   var difficultyList = document.getElementById('difficulty-list');
-  var chapterList = document.getElementById('chapter-list');
-  var stageTrack = document.getElementById('stage-track');
-  var stageKicker = document.getElementById('stage-kicker');
-  var stageTitle = document.getElementById('stage-title');
-  var stageNote = document.getElementById('stage-note');
   var routeBar = document.getElementById('route-bar');
   var tileStraightEl = document.getElementById('tile-straight');
   var tileTurnEl = document.getElementById('tile-turn');
@@ -279,6 +200,7 @@
   var altarCache = null;
   var HERO_COST = 1000;
   var HERO_IDS = ['sword', 'archer', 'mage', 'priest'];
+  var HERALD_RADIUS = 4.5;
   var WAYPOINTS = [];
 
   var state = {
@@ -931,36 +853,36 @@
 
   var MINION_PAIRS = [
     [
-      { id: 'slime', name: '綠史萊姆', color: '#3dcf62', frame: { sx: 14, sy: 74, sw: 98, sh: 58 } },
-      { id: 'crawler', name: '沼澤爬行者', color: '#7dce4a', frame: { sx: 128, sy: 72, sw: 114, sh: 60 } },
+      { id: 'slime', name: '綠史萊姆', color: '#3dcf62' },
+      { id: 'crawler', name: '沼澤爬行者', color: '#7dce4a' },
     ],
     [
-      { id: 'goblin', name: '小哥布林', color: '#8fd14a', frame: { sx: 258, sy: 72, sw: 112, sh: 60 } },
-      { id: 'pup', name: '狂暴幼狼', color: '#d5d5de', frame: { sx: 392, sy: 72, sw: 118, sh: 60 } },
+      { id: 'goblin', name: '小哥布林', color: '#8fd14a' },
+      { id: 'pup', name: '狂暴幼狼', color: '#d5d5de' },
     ],
     [
-      { id: 'skel', name: '骷髏步兵', color: '#efe6d6', frame: { sx: 520, sy: 72, sw: 100, sh: 60 } },
-      { id: 'soul', name: '幽魂火球', color: '#c084fc', frame: { sx: 638, sy: 66, sw: 120, sh: 64 } },
+      { id: 'skel', name: '骷髏步兵', color: '#efe6d6' },
+      { id: 'soul', name: '幽魂火球', color: '#c084fc' },
     ],
     [
-      { id: 'tort', name: '晶礦陸龜', color: '#5ec8f0', frame: { sx: 520, sy: 188, sw: 110, sh: 68 } },
-      { id: 'imp', name: '持盾小鬼', color: '#e7a15a', frame: { sx: 648, sy: 188, sw: 110, sh: 68 } },
+      { id: 'tort', name: '晶礦陸龜', color: '#5ec8f0' },
+      { id: 'imp', name: '持盾小鬼', color: '#e7a15a' },
     ],
     [
-      { id: 'mini', name: '小史萊姆', color: '#c084fc', frame: { sx: 14, sy: 338, sw: 88, sh: 56 } },
-      { id: 'mucus', name: '黏液跳躍者', color: '#8fd14a', frame: { sx: 128, sy: 326, sw: 114, sh: 68 } },
+      { id: 'mini', name: '小史萊姆', color: '#c084fc' },
+      { id: 'mucus', name: '黏液跳躍者', color: '#8fd14a' },
     ],
     [
-      { id: 'acolyte', name: '異教徒學徒', color: '#e6c75a', frame: { sx: 260, sy: 324, sw: 120, sh: 70 } },
-      { id: 'wisp', name: '療癒光球', color: '#ffe08a', frame: { sx: 392, sy: 320, sw: 110, sh: 62 } },
+      { id: 'acolyte', name: '異教徒學徒', color: '#e6c75a' },
+      { id: 'wisp', name: '療癒光球', color: '#ffe08a' },
     ],
     [
-      { id: 'frost', name: '小冰魂', color: '#b9e6ff', frame: { sx: 782, sy: 72, sw: 90, sh: 60 } },
-      { id: 'ice', name: '極地冰蟻', color: '#7ec8ff', frame: { sx: 900, sy: 68, sw: 110, sh: 64 } },
+      { id: 'frost', name: '小冰魂', color: '#b9e6ff' },
+      { id: 'ice', name: '極地冰蟻', color: '#7ec8ff' },
     ],
     [
-      { id: 'beetle', name: '發甲甲殼蟲', color: '#b7aa9a', frame: { sx: 782, sy: 196, sw: 100, sh: 58 } },
-      { id: 'golem', name: '廢鐵小魔像', color: '#d9c7a6', frame: { sx: 898, sy: 184, sw: 96, sh: 74 } },
+      { id: 'beetle', name: '發甲甲殼蟲', color: '#b7aa9a' },
+      { id: 'golem', name: '廢鐵小魔像', color: '#d9c7a6' },
     ],
   ];
 
@@ -2059,6 +1981,9 @@ function selectedTower() {
   }
 
   function markBest(wave) {
+    if ((state.mode === 'infinite' || state.mode === 'custom') && runProfile() && runProfile().id === 'hell') {
+      rememberScore((state.mode === 'custom' ? 'custom-' : 'infinite-') + 'hell', wave);
+    }
     if (wave <= state.best) return;
     state.best = wave;
     if (state.mode === 'infinite' || state.mode === 'custom') {
@@ -2070,6 +1995,686 @@ function selectedTower() {
       return;
     }
     saveNumber('fantasia-td-best', wave);
+  }
+
+  var HELL_MIN_WAVE = 25;
+  var BOARD_TABS = [
+    { id: 'infinite-hell', label: '無限地獄' },
+    { id: 'custom-hell', label: '自訂地獄' },
+  ];
+  var boardTab = 'infinite-hell';
+
+  var cloudDb = null;
+  var onlineBoards = {};
+  var onlineRanks = {};
+  var weekBests = {};
+  var rankedWeek = 0;
+  var rankHintShown = false;
+
+  function currentWeekKey(ms) {
+    var shifted = (ms == null ? Date.now() : ms) + 8 * 3600000;
+    var day = Math.floor(shifted / 86400000);
+    return day - ((day + 3) % 7);
+  }
+
+  function nextWeekStartMs() {
+    return (currentWeekKey() + 7) * 86400000 - 8 * 3600000;
+  }
+
+  function weekRemainText() {
+    var left = Math.max(0, nextWeekStartMs() - Date.now());
+    var days = Math.floor(left / 86400000);
+    var hours = Math.floor((left % 86400000) / 3600000);
+    if (days > 0) return '距離週一結算還有 ' + days + ' 天 ' + hours + ' 小時';
+    var mins = Math.max(1, Math.floor((left % 3600000) / 60000));
+    return '距離週一結算還有 ' + hours + ' 小時 ' + mins + ' 分';
+  }
+
+  function ensureWeek() {
+    var week = currentWeekKey();
+    if (rankedWeek === week) return week;
+    var rolled = rankedWeek !== 0;
+    rankedWeek = week;
+    if (!rolled) return week;
+    onlineBoards = {};
+    onlineRanks = {};
+    weekBests = {};
+    paintPlayerCard();
+    if (cloudReady()) refreshAllBoards();
+    return week;
+  }
+
+  function profileRank(person) {
+    if (!person || Number(person.rankWeek) !== currentWeekKey()) return 0;
+    return Number(person.hellRank) || 0;
+  }
+
+  function cloudReady() {
+    var cfg = window.FIREBASE_CONFIG;
+    return !!(cfg && cfg.apiKey && cfg.projectId && window.firebase && firebase.auth && firebase.firestore);
+  }
+
+  function loadAccount() {
+    try {
+      var raw = JSON.parse(localStorage.getItem('symbols-td-account') || 'null');
+      if (!(raw && raw.uid && raw.name)) return null;
+      if (!validFriendId(raw.friendId)) {
+        raw.friendId = makeFriendId();
+        saveAccount(raw);
+      }
+      return raw;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function saveAccount(account) {
+    try { localStorage.setItem('symbols-td-account', JSON.stringify(account)); } catch (error) { /* ignore */ }
+  }
+
+  var FRIEND_ID_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+  function makeFriendId() {
+    var id = '';
+    for (var i = 0; i < 6; i++) {
+      id += FRIEND_ID_ALPHABET.charAt(Math.floor(Math.random() * FRIEND_ID_ALPHABET.length));
+    }
+    return id;
+  }
+
+  function validFriendId(id) {
+    return /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(String(id || ''));
+  }
+
+  function normalizeFriendId(raw) {
+    return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
+  function keptFriendId(uid) {
+    var prev = null;
+    try { prev = JSON.parse(localStorage.getItem('symbols-td-account') || 'null'); } catch (error) { prev = null; }
+    if (prev && prev.uid === uid && validFriendId(prev.friendId)) return prev.friendId;
+    return makeFriendId();
+  }
+
+  function clearAccount() {
+    try { localStorage.removeItem('symbols-td-account'); } catch (error) { /* ignore */ }
+  }
+
+  function guestLabel() {
+    var name = '';
+    try { name = localStorage.getItem('symbols-td-guest-name') || ''; } catch (error) { name = ''; }
+    name = String(name).trim().slice(0, 24);
+    if (name) return name;
+    name = '訪客' + String(Math.floor(1000 + Math.random() * 9000));
+    try { localStorage.setItem('symbols-td-guest-name', name); } catch (error) { /* ignore */ }
+    return name;
+  }
+
+  function playerName() {
+    var account = loadAccount();
+    if (account && account.name) return String(account.name).trim().slice(0, 24) || '玩家';
+    return '玩家';
+  }
+
+  function sortScores(rows) {
+    rows.sort(function (a, b) {
+      if (b.wave !== a.wave) return b.wave - a.wave;
+      return String(a.name).localeCompare(String(b.name));
+    });
+    return rows;
+  }
+
+  function rankInRows(rows, index) {
+    var wave = rows[index].wave || 0;
+    if (wave >= HELL_MIN_WAVE) return index + 1;
+    var qualified = 0;
+    var unqualifiedBefore = 0;
+    for (var i = 0; i < rows.length; i++) {
+      if ((rows[i].wave || 0) >= HELL_MIN_WAVE) qualified += 1;
+      else if (i < index) unqualifiedBefore += 1;
+    }
+    return Math.max(11, qualified + 1) + unqualifiedBefore;
+  }
+
+  function bumpCachedScore(boardId, account, wave) {
+    if (!onlineBoards[boardId]) return;
+    var rows = onlineBoards[boardId].slice();
+    var found = false;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].uid !== account.uid) continue;
+      found = true;
+      if (wave > rows[i].wave) rows[i] = { uid: account.uid, name: account.name, wave: wave };
+    }
+    if (!found) rows.push({ uid: account.uid, name: account.name, wave: wave });
+    onlineBoards[boardId] = sortScores(rows).slice(0, 20);
+    for (var n = 0; n < onlineBoards[boardId].length; n++) {
+      if (onlineBoards[boardId][n].uid !== account.uid) continue;
+      onlineRanks[boardId] = rankInRows(onlineBoards[boardId], n);
+    }
+  }
+
+  function refreshBoard(boardId) {
+    if (!cloudReady() || !cloudDb) return Promise.resolve();
+    var week = ensureWeek();
+    var col = cloudDb.collection('boards').doc(boardId).collection('weeks').doc(String(week)).collection('entries');
+    var account = loadAccount();
+    return col.orderBy('wave', 'desc').limit(20).get().then(function (snap) {
+      var rows = [];
+      snap.forEach(function (doc) {
+        var data = doc.data() || {};
+        rows.push({ uid: doc.id, name: data.name || '玩家', wave: Number(data.wave) || 0 });
+      });
+      onlineBoards[boardId] = rows;
+      if (!account) {
+        onlineRanks[boardId] = 0;
+        return null;
+      }
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].uid === account.uid) {
+          onlineRanks[boardId] = rankInRows(rows, i);
+          return null;
+        }
+      }
+      return col.doc(account.uid).get().then(function (mine) {
+        if (!mine.exists) {
+          onlineRanks[boardId] = 0;
+          return null;
+        }
+        var mineWave = Number((mine.data() || {}).wave) || 0;
+        if (mineWave >= HELL_MIN_WAVE) {
+          return col.where('wave', '>', mineWave).count().get().then(function (countSnap) {
+            onlineRanks[boardId] = (countSnap.data().count || 0) + 1;
+          });
+        }
+        return Promise.all([
+          col.where('wave', '>=', HELL_MIN_WAVE).count().get(),
+          col.where('wave', '>', mineWave).count().get(),
+        ]).then(function (snaps) {
+          var qualified = snaps[0].data().count || 0;
+          var above = snaps[1].data().count || 0;
+          onlineRanks[boardId] = Math.max(11, qualified + 1) + Math.max(0, above - qualified);
+        });
+      });
+    }).catch(function () {
+      if (!onlineBoards[boardId]) onlineBoards[boardId] = [];
+    }).then(function () {
+      paintPlayerCard();
+      publishProfile();
+    });
+  }
+
+  function refreshAllBoards() {
+    var jobs = [];
+    for (var i = 0; i < BOARD_TABS.length; i++) jobs.push(refreshBoard(BOARD_TABS[i].id));
+    return Promise.all(jobs).then(function () {
+      if (screenBoard && !screenBoard.hidden) renderBoard();
+    });
+  }
+
+  function rememberScore(boardId, wave) {
+    if (!(wave > 0)) return;
+    if (String(boardId).indexOf('-hell') < 0) return;
+    if (!cloudReady()) return;
+    var account = loadAccount();
+    if (!account) {
+      if (!rankHintShown) {
+        rankHintShown = true;
+        toast('用 Google 或訪客登入後，成績才會計入線上排行');
+      }
+      return;
+    }
+    var week = ensureWeek();
+    var cached = weekBests[boardId];
+    if (cached && cached.week === week && wave <= cached.wave) return;
+    bumpCachedScore(boardId, account, wave);
+    var ref = cloudDb.collection('boards').doc(boardId).collection('weeks').doc(String(week)).collection('entries').doc(account.uid);
+    ref.get().then(function (snap) {
+      if (currentWeekKey() !== week) return null;
+      var prev = snap.exists && snap.data() ? Number(snap.data().wave) || 0 : 0;
+      weekBests[boardId] = { week: week, wave: Math.max(wave, prev) };
+      if (wave <= prev) return null;
+      return ref.set({
+        uid: account.uid,
+        name: account.name,
+        picture: account.picture || '',
+        wave: wave,
+        updated: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }).then(function () {
+      return refreshBoard(boardId);
+    }).catch(function () {
+      toast('成績沒送到線上');
+    });
+  }
+
+  function boardRank(boardId) {
+    return onlineRanks[boardId] || 0;
+  }
+
+  function bestPlayerRank() {
+    return hellRank();
+  }
+
+  function hellRank() {
+    ensureWeek();
+    var infinite = onlineRanks['infinite-hell'] || 0;
+    var custom = onlineRanks['custom-hell'] || 0;
+    if (!infinite) return custom;
+    if (!custom) return infinite;
+    return Math.min(infinite, custom);
+  }
+
+  function auraForRank(rank) {
+    if (rank === 1) return 'diamond';
+    if (rank >= 2 && rank <= 5) return 'special';
+    if (rank >= 6 && rank <= 10) return 'ordinary';
+    return '';
+  }
+
+  function rankTitle(rank) {
+    if (rank === 1) return { id: 'diamond', name: '鑽石' };
+    if (rank >= 2 && rank <= 3) return { id: 'gold', name: '黃金' };
+    if (rank >= 4 && rank <= 5) return { id: 'silver', name: '白銀' };
+    if (rank >= 6 && rank <= 10) return { id: 'bronze', name: '青銅' };
+    return null;
+  }
+
+  function rankEpithet(rank) {
+    if (rank === 1) return '絕對王者';
+    if (rank === 2) return '不滅霸主';
+    if (rank === 3) return '災厄之主';
+    return '';
+  }
+
+  function paintNamed(el, name, rank) {
+    if (!el) return;
+    el.classList.add('name-line');
+    el.replaceChildren();
+    var text = document.createElement('span');
+    text.className = 'name-text';
+    text.textContent = name || '玩家';
+    el.appendChild(text);
+    var epithet = rankEpithet(rank);
+    if (!epithet) return;
+    var tag = document.createElement('span');
+    tag.className = 'name-epithet is-' + rank;
+    tag.textContent = epithet;
+    el.appendChild(tag);
+  }
+
+  function rankHeroUnlocked(id) {
+    var rank = hellRank();
+    if (id === 'god') return rank >= 1 && rank <= 3;
+    if (id === 'herald') return rank >= 4 && rank <= 10;
+    return true;
+  }
+
+  function fillMedal(node, rank) {
+    if (!node) return;
+    var title = rankTitle(rank);
+    node.hidden = !title;
+    node.className = 'card-medal' + (title ? ' is-' + title.id : '');
+    var label = node.querySelector('.card-medal-name');
+    if (label) label.textContent = title ? title.name : '';
+  }
+
+  function profileBest() {
+    var items = [
+      { label: '無限普通', wave: loadBest('normal', 'infinite') },
+      { label: '無限地獄', wave: loadBest('hell', 'infinite') },
+      { label: '自訂普通', wave: loadBest('normal', 'custom') },
+      { label: '自訂地獄', wave: loadBest('hell', 'custom') },
+    ];
+    var account = loadAccount();
+    if (account) {
+      for (var t = 0; t < BOARD_TABS.length; t++) {
+        var rows = onlineBoards[BOARD_TABS[t].id] || [];
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].uid === account.uid) items.push({ label: BOARD_TABS[t].label, wave: rows[i].wave || 0 });
+        }
+      }
+    }
+    var best = { label: '', wave: 0 };
+    for (var n = 0; n < items.length; n++) {
+      if (items[n].wave > best.wave) best = items[n];
+    }
+    return best;
+  }
+
+  function paintPlayerCard() {
+    var card = document.getElementById('player-card');
+    if (!card) return;
+    var account = loadAccount();
+    var nameEl = document.getElementById('player-card-name');
+    var bestEl = document.getElementById('player-card-best');
+    var rankEl = document.getElementById('player-card-rank');
+    var img = document.getElementById('player-avatar-img');
+    var letter = document.getElementById('player-avatar-letter');
+    var rank = hellRank();
+    var aura = account ? auraForRank(rank) : '';
+    var title = account ? rankTitle(rank) : null;
+    card.classList.toggle('is-diamond', aura === 'diamond');
+    card.classList.toggle('is-special', aura === 'special');
+    card.classList.toggle('is-ordinary', aura === 'ordinary');
+    fillMedal(document.getElementById('player-medal'), account ? rank : 0);
+    var idEl = document.getElementById('player-card-id');
+    if (!account) {
+      if (nameEl) nameEl.textContent = '尚未登入';
+      if (idEl) idEl.hidden = true;
+      if (bestEl) bestEl.textContent = '登入後才有名片';
+      if (rankEl) rankEl.textContent = '第 11 名起沒有稱號';
+      if (img) img.hidden = true;
+      if (letter) { letter.hidden = false; letter.textContent = '?'; }
+      return;
+    }
+    paintNamed(nameEl, account.name, rank);
+    if (idEl) {
+      idEl.hidden = false;
+      idEl.textContent = 'ID　' + account.friendId;
+    }
+    var best = profileBest();
+    if (bestEl) bestEl.textContent = best.wave > 0 ? ('最高 ' + best.label + ' 第 ' + best.wave + ' 波') : '還沒有紀錄';
+    if (rankEl) {
+      rankEl.textContent = !rank
+        ? '本週還沒有名次'
+        : title
+          ? ('本週地獄榜第 ' + rank + ' · ' + title.name)
+          : ('本週地獄榜第 ' + rank + ' · 無稱號');
+    }
+    if (account.picture && img) {
+      img.hidden = false;
+      img.src = account.picture;
+      if (letter) letter.hidden = true;
+    } else {
+      if (img) img.hidden = true;
+      if (letter) { letter.hidden = false; letter.textContent = String(account.name || '?').slice(0, 1); }
+    }
+  }
+
+  function openAuraPreview() {
+    state.phase = 'menu';
+    hideStoryScreens();
+    if (screenAura) screenAura.hidden = false;
+  }
+
+  function openFriends() {
+    state.phase = 'menu';
+    hideStoryScreens();
+    if (screenFriends) screenFriends.hidden = false;
+    renderFriends();
+  }
+
+  function friendAuraClass(rank) {
+    var aura = auraForRank(rank || 0);
+    if (aura === 'diamond') return ' is-diamond';
+    if (aura === 'special') return ' is-special';
+    if (aura === 'ordinary') return ' is-ordinary';
+    return '';
+  }
+
+  function appendFriendCard(listEl, person) {
+    var item = document.createElement('li');
+    var shown = profileRank(person);
+    item.className = 'friend-card' + friendAuraClass(shown);
+    var fx = document.createElement('span');
+    fx.className = 'card-fx';
+    fx.setAttribute('aria-hidden', 'true');
+    item.appendChild(fx);
+    var avatar = document.createElement('span');
+    avatar.className = 'player-avatar';
+    if (person.picture) {
+      var photo = document.createElement('img');
+      photo.alt = '';
+      photo.src = person.picture;
+      avatar.appendChild(photo);
+    } else {
+      avatar.textContent = String(person.name || '?').slice(0, 1);
+    }
+    var copy = document.createElement('div');
+    var name = document.createElement('strong');
+    paintNamed(name, person.name || '玩家', shown);
+    var best = document.createElement('p');
+    best.textContent = person.bestWave > 0 ? ('最高 ' + (person.bestLabel || '紀錄') + ' 第 ' + person.bestWave + ' 波') : '還沒有紀錄';
+    var title = rankTitle(shown);
+    var rank = document.createElement('p');
+    rank.textContent = title ? ('本週' + title.name) : '本週無稱號';
+    copy.appendChild(name);
+    copy.appendChild(best);
+    copy.appendChild(rank);
+    var medal = document.createElement('span');
+    medal.className = 'card-medal';
+    medal.innerHTML = '<span class="card-medal-gem" aria-hidden="true"></span><span class="card-medal-name"></span>';
+    fillMedal(medal, shown);
+    var remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'friend-remove';
+    remove.textContent = '移除';
+    remove.addEventListener('click', function () { removeFriend(person.uid); });
+    item.appendChild(avatar);
+    item.appendChild(copy);
+    if (!medal.hidden) item.appendChild(medal);
+    item.appendChild(remove);
+    listEl.appendChild(item);
+  }
+
+  function renderFriends() {
+    var codeEl = document.getElementById('friend-code');
+    var listEl = document.getElementById('friend-list');
+    if (!listEl) return;
+    var account = loadAccount();
+    if (codeEl) codeEl.textContent = account && account.friendId ? ('你的 ID　' + account.friendId) : '登入後才有 ID。';
+    listEl.replaceChildren();
+    if (!account) {
+      var need = document.createElement('p');
+      need.className = 'board-empty';
+      need.textContent = '請先用 Google 或訪客登入。';
+      listEl.appendChild(need);
+      return;
+    }
+    if (!cloudReady() || !cloudDb || String(account.uid).indexOf('guest-') === 0) {
+      var offline = document.createElement('p');
+      offline.className = 'board-empty';
+      offline.textContent = '線上帳號接上後才能加好友，並看到對方的名片。';
+      listEl.appendChild(offline);
+      return;
+    }
+    var loading = document.createElement('p');
+    loading.className = 'board-empty';
+    loading.textContent = '正在讀取好友…';
+    listEl.appendChild(loading);
+    cloudDb.collection('users').doc(account.uid).collection('friends').get().then(function (snap) {
+      var ids = [];
+      snap.forEach(function (doc) { ids.push(doc.id); });
+      if (!ids.length) {
+        listEl.replaceChildren();
+        var empty = document.createElement('p');
+        empty.className = 'board-empty';
+        empty.textContent = '還沒有好友。把 ID 給對方，或貼上對方的 ID。';
+        listEl.appendChild(empty);
+        return null;
+      }
+      return Promise.all(ids.map(function (id) {
+        return cloudDb.collection('users').doc(id).get().then(function (userDoc) {
+          var data = userDoc.exists ? userDoc.data() : { name: '找不到這位玩家' };
+          data.uid = id;
+          return data;
+        });
+      }));
+    }).then(function (people) {
+      if (!people || screenFriends.hidden) return;
+      listEl.replaceChildren();
+      people.forEach(function (person) { appendFriendCard(listEl, person); });
+    }).catch(function () {
+      listEl.replaceChildren();
+      var failed = document.createElement('p');
+      failed.className = 'board-empty';
+      failed.textContent = '好友名單讀不到。';
+      listEl.appendChild(failed);
+    });
+  }
+
+  function addFriend() {
+    var account = loadAccount();
+    var input = document.getElementById('friend-code-input');
+    var code = normalizeFriendId(input ? input.value : '');
+    if (!account) { toast('請先登入'); return; }
+    if (!cloudReady() || String(account.uid).indexOf('guest-') === 0) { toast('線上帳號還沒接上'); return; }
+    if (!validFriendId(code) || code === account.friendId) { toast('請輸入別人的 ID'); return; }
+    cloudDb.collection('handles').doc(code).get().then(function (handle) {
+      var friendUid = handle.exists && handle.data() ? handle.data().uid : '';
+      if (!friendUid || friendUid === account.uid) {
+        toast('找不到這個 ID');
+        return false;
+      }
+      return cloudDb.collection('users').doc(account.uid).collection('friends').doc(friendUid).set({ uid: friendUid }).then(function () {
+        return true;
+      });
+    }).then(function (ok) {
+      if (!ok) return;
+      if (input) input.value = '';
+      toast('已加上好友');
+      renderFriends();
+    }).catch(function () { toast('加好友失敗'); });
+  }
+
+  function removeFriend(friendUid) {
+    var account = loadAccount();
+    if (!account || !cloudReady() || !friendUid) return;
+    cloudDb.collection('users').doc(account.uid).collection('friends').doc(friendUid).delete().then(function () {
+      toast('已移除好友');
+      renderFriends();
+    }).catch(function () { toast('移除失敗'); });
+  }
+
+  function copyFriendCode() {
+    var account = loadAccount();
+    if (!account) { toast('請先登入'); return; }
+    var code = account.friendId || '';
+    if (!code) { toast('還沒有 ID'); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(function () { toast('已複製 ID'); }).catch(function () { toast(code); });
+      return;
+    }
+    toast(code);
+  }
+
+  function publishProfile() {
+    if (!cloudReady() || !cloudDb) return;
+    var account = loadAccount();
+    if (!account || String(account.uid).indexOf('guest-') === 0) return;
+    claimFriendId(account).then(function () {
+      var latest = loadAccount() || account;
+      var best = profileBest();
+      return cloudDb.collection('users').doc(latest.uid).set({
+        name: latest.name,
+        picture: latest.picture || '',
+        bestLabel: best.label || '',
+        bestWave: best.wave || 0,
+        hellRank: hellRank(),
+        rankWeek: currentWeekKey(),
+        guest: !!latest.guest,
+        friendId: latest.friendId || '',
+      }, { merge: true });
+    }).catch(function () {});
+  }
+
+  function claimFriendId(account, left) {
+    if (!cloudReady() || !cloudDb || !account || String(account.uid).indexOf('guest-') === 0) return Promise.resolve();
+    if (left == null) left = 5;
+    if (!left) return Promise.resolve();
+    if (!validFriendId(account.friendId)) {
+      account.friendId = makeFriendId();
+      saveAccount(account);
+    }
+    var handle = cloudDb.collection('handles').doc(account.friendId);
+    return handle.get().then(function (doc) {
+      if (doc.exists && doc.data() && doc.data().uid === account.uid) return null;
+      if (doc.exists) {
+        account.friendId = makeFriendId();
+        saveAccount(account);
+        return claimFriendId(account, left - 1);
+      }
+      return handle.set({ uid: account.uid });
+    });
+  }
+
+  function renderBoard() {
+    var tabs = document.getElementById('board-tabs');
+    var listEl = document.getElementById('board-list');
+    if (!tabs || !listEl) return;
+    tabs.replaceChildren();
+    BOARD_TABS.forEach(function (tab) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'board-tab' + (tab.id === boardTab ? ' is-on' : '');
+      btn.textContent = tab.label;
+      btn.addEventListener('click', function () {
+        boardTab = tab.id;
+        renderBoard();
+        refreshBoard(tab.id).then(function () {
+          if (screenBoard && !screenBoard.hidden && boardTab === tab.id) renderBoard();
+        });
+      });
+      tabs.appendChild(btn);
+    });
+    var rows = onlineBoards[boardTab];
+    var account = loadAccount();
+    listEl.replaceChildren();
+    if (!cloudReady()) {
+      var offline = document.createElement('p');
+      offline.className = 'board-empty';
+      offline.textContent = '線上排行還沒接上。把 Firebase 設定貼進 firebase-config.js 後，成績才會記到帳號。';
+      listEl.appendChild(offline);
+    } else if (!rows) {
+      var loading = document.createElement('p');
+      loading.className = 'board-empty';
+      loading.textContent = '正在讀取線上排行…';
+      listEl.appendChild(loading);
+    } else if (!rows.length) {
+      var empty = document.createElement('p');
+      empty.className = 'board-empty';
+      empty.textContent = account ? '本週地獄榜還沒有紀錄。' : '先用 Google 或訪客登入，成績才會記在你的帳號上。';
+      listEl.appendChild(empty);
+    } else {
+    rows.forEach(function (row, index) {
+      var item = document.createElement('li');
+      item.className = 'board-row' + (account && row.uid === account.uid ? ' is-me' : '');
+      var place = rankInRows(rows, index);
+      var rank = document.createElement('span');
+      rank.className = 'board-rank';
+      rank.textContent = String(place);
+      var who = document.createElement('span');
+      paintNamed(who, row.name, place);
+      var wave = document.createElement('span');
+      wave.className = 'board-wave';
+      wave.textContent = '第 ' + row.wave + ' 波';
+      item.appendChild(rank);
+      item.appendChild(who);
+      item.appendChild(wave);
+      listEl.appendChild(item);
+    });
+    }
+    if (cloudReady()) {
+      var note = document.createElement('p');
+      note.className = 'board-empty';
+      var rankNow = bestPlayerRank();
+      note.textContent = weekRemainText() + '。' + (rankNow ? ('你本週最好名次是第 ' + rankNow + '。') : '本週還沒上榜。下週沒有名次，光環和稱號會消失。');
+      listEl.appendChild(note);
+    }
+  }
+
+  function openBoard() {
+    state.phase = 'menu';
+    hideStoryScreens();
+    if (screenBoard) screenBoard.hidden = false;
+    var line = document.getElementById('board-account');
+    var account = loadAccount();
+    if (line) line.textContent = account ? ('登入帳號：' + account.name) : '尚未登入。用 Google 或訪客進入後，成績才記入排行。';
+    renderBoard();
+    refreshBoard(boardTab).then(function () {
+      if (screenBoard && !screenBoard.hidden) renderBoard();
+    });
   }
 
   function toast(message) {
@@ -2152,7 +2757,7 @@ function selectedTower() {
     state.banner = plan.boss
       ? { text: '第 ' + n + ' 波 · ' + plan.boss.name, sub: deffText || plan.boss.blurb, life: 3.2 }
       : { text: '第 ' + n + ' 波', sub: deffText || compositionText(plan), life: 2.2 };
-    if (state.mode === 'infinite') markBest(n);
+    if (state.mode === 'infinite' || state.mode === 'custom') markBest(n);
     if (plan.boss) Sfx.boss();
     else Sfx.fanfare();
     syncHud();
@@ -2192,6 +2797,7 @@ function selectedTower() {
     for (var i = 0; i < state.enemies.length; i++) {
       var enemy = state.enemies[i];
       if (enemy.dead || state.phase !== 'combat') continue;
+      tightenShield(enemy);
       if (enemy.jumpCd > 0) enemy.jumpCd -= dt;
       if (enemy.jumping) {
         enemy.jumping.t += dt / enemy.jumping.dur;
@@ -2238,7 +2844,7 @@ function selectedTower() {
         if (healBlocked(enemy)) {
           triggerPoisonCounter(enemy);
         } else {
-          enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * regenRate * dt);
+          enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * regenRate * dt * healScale(enemy));
         }
       }
       var enrageMul = hellDeffValue('enrage');
@@ -2399,7 +3005,7 @@ function selectedTower() {
         enemy.regenShow = (enemy.regenShow || 0) - dt;
       } else {
         var before = enemy.hp;
-        enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.025 * dt);
+        enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.025 * dt * healScale(enemy));
         enemy.regenShow = (enemy.regenShow || 0) - dt;
         if (enemy.hp > before && enemy.hp < enemy.maxHp && enemy.regenShow <= 0) {
           enemy.regenShow = 1.15;
@@ -2426,6 +3032,8 @@ function selectedTower() {
       if (enemy.abilityTimer <= 0 && enemy.shield <= 0) {
         enemy.abilityTimer = 7;
         enemy.shield = Math.round(enemy.maxHp * 0.2);
+        enemy.shieldCut = 1;
+        tightenShield(enemy);
         spawnFloater(pos.x, pos.y - 0.6, '護盾', '#67e8f9');
       }
     } else if (enemy.bossId === 'frost') {
@@ -2460,7 +3068,7 @@ function selectedTower() {
           }
           continue;
         }
-        var heal = Math.min(other.maxHp - other.hp, enemy.mendPower);
+        var heal = Math.min(other.maxHp - other.hp, enemy.mendPower * healScale(other));
         other.hp += heal;
         if (state.time - (other.lastMend || 0) > 0.9) {
           other.lastMend = state.time;
@@ -2554,7 +3162,7 @@ function selectedTower() {
       stats = def.levels[Math.min(def.levels.length - 1, tower.level)];
     }
     if (tower.level >= 5) stats = rankBoost(stats);
-    return applySupport(stats, tower);
+    return applyDivine(applySupport(stats, tower), tower);
   }
 
   function isArrowPath(tower) {
@@ -2591,6 +3199,8 @@ function selectedTower() {
     if (id === 'archer') return '叢林獵手';
     if (id === 'mage') return '萬象法師';
     if (id === 'priest') return '戰靈樂手';
+    if (id === 'god') return '全知全能的神';
+    if (id === 'herald') return '光之神使';
     return '英雄';
   }
 
@@ -2599,6 +3209,7 @@ function selectedTower() {
     if (id === 'archer') return '致命毒霧';
     if (id === 'mage') return '隕石術';
     if (id === 'priest') return '致命節奏';
+    if (id === 'god' || id === 'herald') return '';
     return '技能';
   }
 
@@ -2645,7 +3256,11 @@ function selectedTower() {
   function heroStats(tower) {
     var lv = tower.level;
     var stats;
-    if (tower.hero === 'priest') {
+    if (tower.hero === 'god') {
+      stats = { range: 0, damage: 0, cooldown: 1, targets: 0 };
+    } else if (tower.hero === 'herald') {
+      stats = { range: HERALD_RADIUS, damage: 0, cooldown: 1, targets: 0 };
+    } else if (tower.hero === 'priest') {
       stats = { range: priestAura(tower).radius, damage: 0, cooldown: 1, targets: 0 };
     } else if (tower.hero === 'sword') {
       stats = {
@@ -2671,8 +3286,8 @@ function selectedTower() {
         targets: 1,
       };
     }
-    if (tower.hero !== 'priest') stats = applySupport(stats, tower);
-    return stats;
+    if (tower.hero !== 'priest' && tower.hero !== 'god' && tower.hero !== 'herald') stats = applySupport(stats, tower);
+    return applyDivine(stats, tower);
   }
 
   function heroBlurb(tower) {
@@ -2681,6 +3296,8 @@ function selectedTower() {
     if (tower.hero === 'sword') return '走到射程內的路上追砍，刀路傷敵。每三下半月劍氣。主動：修羅附體。' + xp;
     if (tower.hero === 'archer') return '超遠單箭，打穿護盾、鐵甲並打掉抗性。主動：致命毒霧。' + xp;
     if (tower.hero === 'mage') return '火破盾、冰緩速、風擊退。主動：隕石術，全圖持續。' + xp;
+    if (tower.hero === 'god') return '不攻擊。全場怪物減速 10%，回血與護盾減半。全體塔攻速 +20%、攻擊 +10%。';
+    if (tower.hero === 'herald') return '不攻擊。半張圖光環內是神之力的一半：減速 5%，回血與護盾剩 75%，塔攻速 +10%、攻擊 +5%。';
     var aura = priestAura(tower);
     return '不攻擊。光環半徑 ' + fmt(aura.radius) + '，攻擊 +' + Math.round(aura.bonus * 100) + '%、攻速 +' + Math.round(aura.haste * 100) + '%。主動：致命節奏。' + xp;
   }
@@ -2698,6 +3315,61 @@ function selectedTower() {
       if (state.towers[i].type === 'hero' && state.towers[i].hero === id) return true;
     }
     return false;
+  }
+
+  function heraldTower() {
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (tower.type === 'hero' && tower.hero === 'herald') return tower;
+    }
+    return null;
+  }
+
+  function inHerald(x, y) {
+    var herald = heraldTower();
+    if (!herald) return false;
+    return Math.hypot(x - (herald.c + 0.5), y - (herald.r + 0.5)) <= HERALD_RADIUS + 0.001;
+  }
+
+  function divineTowerBuff(tower) {
+    if (!tower || (tower.type === 'hero' && (tower.hero === 'god' || tower.hero === 'herald'))) {
+      return { power: 0, haste: 0 };
+    }
+    if (hasHeroId('god')) return { power: 0.1, haste: 0.2 };
+    if (inHerald(tower.c + 0.5, tower.r + 0.5)) return { power: 0.05, haste: 0.1 };
+    return { power: 0, haste: 0 };
+  }
+
+  function applyDivine(stats, tower) {
+    var buff = divineTowerBuff(tower);
+    if (!buff.power && !buff.haste) return stats;
+    var copy = cloneStats(stats);
+    if (copy.damage) copy.damage = Math.max(1, Math.round(copy.damage * (1 + buff.power)));
+    if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + buff.haste);
+    return copy;
+  }
+
+  function healScale(enemy) {
+    if (hasHeroId('god')) return 0.5;
+    var pos = enemyPos(enemy);
+    if (inHerald(pos.x, pos.y)) return 0.75;
+    return 1;
+  }
+
+  function shieldFactor(enemy) {
+    if (hasHeroId('god')) return 0.5;
+    var pos = enemyPos(enemy);
+    if (inHerald(pos.x, pos.y)) return 0.75;
+    return 1;
+  }
+
+  function tightenShield(enemy) {
+    if (!enemy) return;
+    var factor = shieldFactor(enemy);
+    var prev = enemy.shieldCut == null ? 1 : enemy.shieldCut;
+    if (Math.abs(factor - prev) < 0.001) return;
+    if (enemy.shield > 0) enemy.shield = Math.max(0, Math.round(enemy.shield * (factor / prev)));
+    enemy.shieldCut = factor;
   }
 
   function heroRosterFull() {
@@ -3137,7 +3809,7 @@ function selectedTower() {
   function updateHero(tower, dt) {
     if (tower.skillCd > 0) tower.skillCd -= dt;
     if (tower.buffTime > 0) tower.buffTime -= dt;
-    if (tower.hero === 'priest') return;
+    if (tower.hero === 'priest' || tower.hero === 'god' || tower.hero === 'herald') return;
     var stats = heroStats(tower);
     if (tower.hero === 'sword') {
       updateSword(tower, dt, stats);
@@ -3155,6 +3827,7 @@ function selectedTower() {
 
   function castHeroSkill(tower) {
     if (!tower || tower.type !== 'hero') return;
+    if (tower.hero === 'god' || tower.hero === 'herald') return;
     if (state.phase !== 'combat') { toast('戰鬥中才能施放'); return; }
     if (tower.skillCd > 0) return;
     var lv = tower.level;
@@ -3323,6 +3996,7 @@ function selectedTower() {
   }
 
   function summonHero(id) {
+    if ((id === 'god' || id === 'herald') && !rankHeroUnlocked(id)) { toast('名次不夠，不能召喚'); return; }
     if (hasHeroId(id)) { toast('這位英雄已在場上'); return; }
     if (state.gold < HERO_COST) { toast('需要 ' + HERO_COST + ' 金幣'); return; }
     var cell = heroSpawnCell();
@@ -3335,29 +4009,39 @@ function selectedTower() {
   }
 
   function heroCatalog() {
-    return [
+    var list = [
       { id: 'sword', name: '緋紅劍客', desc: '追砍刀路，三下半月劍氣。1000 金' },
       { id: 'archer', name: '叢林獵手', desc: '超遠貫甲，毒霧禁療。1000 金' },
       { id: 'mage', name: '萬象法師', desc: '火破盾、冰緩、風退。1000 金' },
       { id: 'priest', name: '戰靈樂手', desc: '光環加攻與攻速。1000 金' },
+      { id: 'god', name: '全知全能的神', desc: '第 1 到 3 名。全場減速、回血與盾減半。1000 金', locked: !rankHeroUnlocked('god') },
+      { id: 'herald', name: '光之神使', desc: '第 4 到 10 名。半張圖，神之力的一半。1000 金', locked: !rankHeroUnlocked('herald') },
     ];
+    return list;
   }
 
   function openAltar() {
     var classes = heroCatalog().filter(function (hero) { return !hasHeroId(hero.id); });
-    if (!classes.length) { toast('四位英雄都在場上'); return; }
+    if (!classes.length) { toast('沒有可召喚的英雄'); return; }
     openModal({
       tone: 'reward',
+      shop: true,
       kicker: '祭壇',
       title: '召喚英雄',
-      desc: '每位 1000 金幣，同一種只能有一隻。登場後可拖曳換位。',
+      desc: '點商品即可召喚。同一種只能有一隻，放好後可拖曳換位。',
       actions: classes.map(function (hero) {
+        var locked = !!hero.locked;
         return {
-          label: hero.name + '　' + hero.desc,
-          className: state.gold < HERO_COST ? 'btn-ghost' : 'btn-mint',
-          onClick: function () { summonHero(hero.id); },
+          heroId: hero.id,
+          title: hero.name,
+          note: hero.desc.replace(/[。．]?\s*\d+\s*金\s*$/, ''),
+          side: locked ? '未解鎖' : (HERO_COST + ' 金'),
+          label: hero.name,
+          className: 'hero-pick' + (locked ? ' is-locked' : ''),
+          disabled: locked,
+          onClick: function () { if (!locked) summonHero(hero.id); },
         };
-      }),
+      }).concat([{ label: '退出', className: 'btn-ghost is-exit', onClick: closeModal }]),
     });
   }
 
@@ -3448,8 +4132,10 @@ function selectedTower() {
   }
 
   function openHeroPick() {
-    var classes = heroCatalog().filter(function (hero) { return !hasHeroId(hero.id); });
-    if (!classes.length) { toast('四位英雄都在場上'); return; }
+    var classes = heroCatalog().filter(function (hero) {
+      return HERO_IDS.indexOf(hero.id) >= 0 && !hasHeroId(hero.id);
+    });
+    if (!classes.length) { toast('沒有可召喚的英雄'); return; }
     openModal({
       tone: 'reward',
       kicker: '英雄',
@@ -3577,6 +4263,11 @@ function selectedTower() {
     if (enemy.freeze > 0) return 0;
     var speed = enemy.speed;
     if (enemy.slowTime > 0) speed *= 1 - (enemy.slow || 0);
+    if (hasHeroId('god')) speed *= 0.9;
+    else {
+      var pos = enemyPos(enemy);
+      if (inHerald(pos.x, pos.y)) speed *= 0.95;
+    }
     return speed;
   }
 
@@ -3643,7 +4334,7 @@ function selectedTower() {
     return found;
   }
 
-  function launchShell(tower, enemy, stats, look, volleyId) {
+  function launchShell(tower, enemy, stats, volleyId) {
     var originX = tower.c + 0.5;
     var originY = tower.r + 0.5;
     var pos = pointAt(enemy.dist);
@@ -3674,8 +4365,6 @@ function selectedTower() {
       bomb: tower.type === 'fire',
       falloff: isCannonPath(tower) || tower.type === 'fire',
       volleyId: volleyId || 0,
-      artSheet: look.sheet,
-      artRow: look.row,
     });
   }
 
@@ -3683,7 +4372,6 @@ function selectedTower() {
     var originX = tower.c + 0.5;
     var originY = tower.r + 0.5;
     tower.flash = 1;
-    var look = towerLook(tower);
     if (tower.type === 'bolt') {
       var chain = chainFrom(targets[0], stats.chain || 1, stats.chainRange || 1.8);
       if (!chain.length) {
@@ -3724,8 +4412,6 @@ function selectedTower() {
           dead: false,
           life: 1.5,
           ownerId: tower.id,
-          artSheet: look.sheet,
-          artRow: look.row,
         });
       }
       Sfx.arrow();
@@ -3776,7 +4462,7 @@ function selectedTower() {
       var volleyId = state.nextId++;
       state.splashLedger[volleyId] = {};
       var shots = Math.min(3, stats.shots || 1, targets.length);
-      for (var s = 0; s < shots; s++) launchShell(tower, targets[s], stats, look, volleyId);
+      for (var s = 0; s < shots; s++) launchShell(tower, targets[s], stats, volleyId);
       Sfx.cannon();
       vibrate(16);
       return;
@@ -3784,7 +4470,7 @@ function selectedTower() {
     if (tower.type === 'fire') {
       var fireVolley = state.nextId++;
       state.splashLedger[fireVolley] = {};
-      launchShell(tower, targets[0], stats, look, fireVolley);
+      launchShell(tower, targets[0], stats, fireVolley);
       Sfx.cannon();
       vibrate(16);
       return;
@@ -3957,8 +4643,6 @@ function selectedTower() {
       color: shot.color || '#ffb15a',
       rings: shot.rings || 1,
       bomb: shot.bomb,
-      artSheet: shot.artSheet,
-      artRow: shot.artRow,
     });
     for (var i = 0; i < state.enemies.length; i++) {
       var enemy = state.enemies[i];
@@ -4537,6 +5221,12 @@ function selectedTower() {
     var record = (state.mode === 'infinite' || state.mode === 'custom') && state.best > 0
       ? (state.difficulty === 'hell' ? '地獄' : '普通') + '最遠第 ' + state.best + ' 波。'
       : '';
+    if (record && (state.mode === 'infinite' || state.mode === 'custom')) {
+      var rankId = (state.mode === 'custom' ? 'custom-' : 'infinite-') + (state.difficulty === 'hell' ? 'hell' : 'normal');
+      var rank = boardRank(rankId);
+      if (!loadAccount()) record += '尚未登入，未記入線上排行。';
+      else if (rank) record += '線上排行第 ' + rank + '。';
+    }
     var where = state.mode === 'campaign' ? state.level + ' ' + state.chapterName + ' ' + state.levelName + '，' : '';
     openModal({
       tone: 'over',
@@ -4577,8 +5267,9 @@ function selectedTower() {
   }
 
   function openModal(options) {
-    modal.classList.remove('is-over', 'is-reward');
+    modal.classList.remove('is-over', 'is-reward', 'is-shop');
     modal.classList.add(options.tone === 'over' ? 'is-over' : 'is-reward');
+    if (options.shop) modal.classList.add('is-shop');
     modalKicker.textContent = options.kicker;
     modalTitle.textContent = options.title;
     modalDesc.textContent = options.desc;
@@ -4591,8 +5282,29 @@ function selectedTower() {
   }
 
   function closeModal() {
-    modal.classList.remove('is-open', 'is-over', 'is-reward');
+    modal.classList.remove('is-open', 'is-over', 'is-reward', 'is-shop');
     modal.setAttribute('aria-hidden', 'true');
+  }
+
+  function heroShopThumb(id) {
+    var canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    canvas.className = 'hero-shop-art';
+    canvas.setAttribute('aria-hidden', 'true');
+    var g = canvas.getContext('2d');
+    if (!g) return canvas;
+    var prev = ctx;
+    ctx = g;
+    try {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, 64, 64);
+      g.translate(32, 34);
+      drawHeroGlyph(id, 20);
+    } finally {
+      ctx = prev;
+    }
+    return canvas;
   }
 
   function actionButton(action) {
@@ -4605,7 +5317,25 @@ function selectedTower() {
       tag.textContent = 'AD';
       btn.appendChild(tag);
     }
-    btn.appendChild(document.createTextNode(action.label));
+    if (action.title) {
+      if (action.heroId) btn.appendChild(heroShopThumb(action.heroId));
+      var copy = document.createElement('span');
+      copy.className = 'hero-pick-copy';
+      var name = document.createElement('strong');
+      name.textContent = action.title;
+      var note = document.createElement('small');
+      note.textContent = action.note || '';
+      copy.appendChild(name);
+      copy.appendChild(note);
+      btn.appendChild(copy);
+      var side = document.createElement('b');
+      side.className = 'hero-price';
+      side.textContent = action.side || '';
+      btn.appendChild(side);
+    } else {
+      btn.appendChild(document.createTextNode(action.label));
+    }
+    if (action.disabled) btn.disabled = true;
     btn.addEventListener('click', action.onClick);
     return btn;
   }
@@ -4956,12 +5686,11 @@ function selectedTower() {
 
   function hideStoryScreens() {
     if (screenWelcome) screenWelcome.hidden = true;
-    if (screenCodex) screenCodex.hidden = true;
-    if (screenTowersInfo) screenTowersInfo.hidden = true;
-    if (screenHell) screenHell.hidden = true;
+    if (screenIndex) screenIndex.hidden = true;
+    if (screenBoard) screenBoard.hidden = true;
+    if (screenFriends) screenFriends.hidden = true;
+    if (screenAura) screenAura.hidden = true;
     screenMenu.hidden = true;
-    screenChapters.hidden = true;
-    screenStages.hidden = true;
     screenDifficulty.hidden = true;
   }
 
@@ -5083,6 +5812,146 @@ function selectedTower() {
     renderDifficulties();
   }
 
+  function initCloud() {
+    if (!cloudReady()) return;
+    if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+    cloudDb = firebase.firestore();
+    firebase.auth().onAuthStateChanged(function (user) {
+      if (!user) {
+        clearAccount();
+        onlineBoards = {};
+        onlineRanks = {};
+        paintAccount();
+        return;
+      }
+      var named = String(user.displayName || user.email || '').trim();
+      var prevId = keptFriendId(user.uid);
+      saveAccount({
+        uid: user.uid,
+        name: (user.isAnonymous || !named ? guestLabel() : named).slice(0, 24),
+        email: user.email || '',
+        picture: user.photoURL || '',
+        guest: !!user.isAnonymous,
+        friendId: prevId,
+      });
+      paintAccount();
+      refreshAllBoards();
+    });
+  }
+
+  function paintAccount() {
+    var account = loadAccount();
+    var welcomeUser = document.getElementById('welcome-user');
+    var welcomeName = document.getElementById('welcome-user-name');
+    var welcomeAvatar = document.getElementById('welcome-avatar');
+    var welcomeAccount = document.getElementById('btn-welcome-account');
+    var welcomeGuest = document.getElementById('btn-welcome-guest');
+    var welcomeStart = document.getElementById('btn-welcome-start');
+    var chip = document.getElementById('account-chip');
+    var chipName = document.getElementById('account-name');
+    var chipAvatar = document.getElementById('account-avatar');
+    if (welcomeUser) welcomeUser.hidden = !account;
+    if (welcomeAccount) welcomeAccount.hidden = !!account;
+    if (welcomeGuest) welcomeGuest.hidden = !!account;
+    if (welcomeStart) welcomeStart.hidden = !account;
+    if (chip) chip.hidden = !account;
+    paintPlayerCard();
+    if (!account) return;
+    if (welcomeName) welcomeName.textContent = account.name + (rankEpithet(hellRank()) ? ('　' + rankEpithet(hellRank())) : '');
+    if (chipName) chipName.textContent = account.name;
+    if (welcomeAvatar) {
+      welcomeAvatar.hidden = !account.picture;
+      if (account.picture) welcomeAvatar.src = account.picture;
+    }
+    if (chipAvatar) {
+      chipAvatar.hidden = !account.picture;
+      if (account.picture) chipAvatar.src = account.picture;
+    }
+  }
+
+  function beginGoogleSignIn() {
+    if (!cloudReady()) {
+      openModal({
+        tone: 'reward',
+        kicker: 'Google',
+        title: '線上排行還沒接上',
+        desc: '成績要用 Google 帳號寫進 Firebase。把專案設定貼進 firebase-config.js，並開啟 Google 登入。現在先可以玩，成績不會記到帳號。',
+        actions: [
+          { label: '先開始遊戲', className: 'btn-mint', onClick: function () { closeModal(); showMenu(); } },
+          { label: '返回', className: 'btn-ghost', onClick: closeModal },
+        ],
+      });
+      return;
+    }
+    var provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    firebase.auth().signInWithPopup(provider).then(function () {
+      closeModal();
+      showMenu();
+      toast('已登入，成績會記到這個帳號');
+    }).catch(function (error) {
+      var code = error && error.code;
+      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+        firebase.auth().signInWithRedirect(provider);
+        return;
+      }
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+      toast('登入失敗');
+    });
+  }
+
+  function beginGuestSignIn() {
+    if (cloudReady()) {
+      firebase.auth().signInAnonymously().then(function () {
+        closeModal();
+        showMenu();
+        toast('已用訪客進入');
+      }).catch(function () {
+        toast('訪客登入失敗');
+      });
+      return;
+    }
+    var id = '';
+    try { id = localStorage.getItem('symbols-td-guest-id') || ''; } catch (error) { id = ''; }
+    if (!id) {
+      id = 'guest-' + Date.now().toString(36);
+      try { localStorage.setItem('symbols-td-guest-id', id); } catch (error) { /* ignore */ }
+    }
+    saveAccount({ uid: id, name: guestLabel(), email: '', picture: '', guest: true, friendId: keptFriendId(id) });
+    paintAccount();
+    showMenu();
+    toast('已用訪客進入');
+  }
+
+  function openAccountCard() {
+    var account = loadAccount();
+    if (!account) return;
+    var epithet = rankEpithet(hellRank());
+    openModal({
+      tone: 'reward',
+      kicker: '帳號',
+      title: account.name + (epithet ? ('　' + epithet) : ''),
+      desc: 'ID　' + account.friendId + '。加好友時把這組 ID 給對方。' + (account.guest
+        ? '這是訪客。同一台裝置會留著這個名字。換手機要改用 Google，才看得到同一筆成績。'
+        : (account.email || '已用 Google 登入') + '。成績記在這個帳號，換手機登入同一個帳號看得到。'),
+      actions: [
+        { label: '登出', className: 'btn-ghost', onClick: function () {
+          var done = function () {
+            clearAccount();
+            onlineBoards = {};
+            onlineRanks = {};
+            closeModal();
+            paintAccount();
+            toast('已登出');
+          };
+          if (cloudReady()) firebase.auth().signOut().then(done).catch(done);
+          else done();
+        } },
+        { label: '關閉', className: 'btn-mint', onClick: closeModal },
+      ],
+    });
+  }
+
   function showWelcome() {
     state.phase = 'menu';
     state.paused = true;
@@ -5090,9 +5959,95 @@ function selectedTower() {
     closeModal();
     hideStoryScreens();
     if (screenDifficulty) screenDifficulty.hidden = true;
-    if (screenStages) screenStages.hidden = true;
     if (screenWelcome) screenWelcome.hidden = false;
+    paintAccount();
     syncRouteBar();
+  }
+
+  var homePick = null;
+
+  function firstOpenStage() {
+    var last = STAGES[0];
+    for (var i = 0; i < STAGES.length; i++) {
+      if (!stageUnlocked(STAGES[i])) continue;
+      last = STAGES[i];
+      if ((state.stars[STAGES[i].stageId] || 0) < 1) return STAGES[i];
+    }
+    return last;
+  }
+
+  function ensureHomePick() {
+    if (homePick) {
+      var current = stageById(homePick.chapter + '-' + homePick.index);
+      if (current) return current;
+    }
+    var stage = firstOpenStage();
+    homePick = { chapter: stage.chapter, index: stage.index };
+    return stage;
+  }
+
+  function starSum() {
+    var total = 0;
+    for (var i = 0; i < STAGES.length; i++) total += state.stars[STAGES[i].stageId] || 0;
+    return total;
+  }
+
+  function clearedStageCount() {
+    var total = 0;
+    for (var i = 0; i < STAGES.length; i++) if ((state.stars[STAGES[i].stageId] || 0) >= 1) total += 1;
+    return total;
+  }
+
+  function drawHomeArt(chapter) {
+    var img = document.getElementById('home-art');
+    if (!img) return;
+    img.src = 'assets/ui/chapters/' + chapter + '.jpg?v=3';
+    img.alt = '';
+  }
+
+  function paintPlayHome() {
+    var stage = ensureHomePick();
+    var chapter = chapterById(stage.chapter);
+    var kicker = document.getElementById('home-chapter-kicker');
+    var title = document.getElementById('home-chapter-name');
+    var progress = document.getElementById('home-progress');
+    var stars = document.getElementById('home-stars');
+    var clear = document.getElementById('home-clear');
+    var waves = document.getElementById('home-waves');
+    var gold = document.getElementById('home-gold');
+    var boss = document.getElementById('home-boss');
+    var lock = document.getElementById('home-lock');
+    var start = document.getElementById('btn-home-start');
+    var box = document.getElementById('home-stages');
+    var unlocked = stageUnlocked(stage);
+    var done = 0;
+    for (var s = 1; s <= 5; s++) if ((state.stars[stage.chapter + '-' + s] || 0) >= 1) done += 1;
+    if (kicker) kicker.textContent = '章節 ' + chapter.id;
+    if (title) title.textContent = chapter.name;
+    if (progress) progress.textContent = stage.stageId + ' ' + stage.name + ' · 進度 ' + done + '/5';
+    if (stars) stars.textContent = '★ ' + starSum();
+    if (clear) clear.textContent = '通關 ' + clearedStageCount() + '/40';
+    if (waves) waves.textContent = String(stage.waves.length);
+    if (gold) gold.textContent = String(stage.initialGold);
+    if (boss) boss.textContent = chapter.boss.replace(/王$/, '');
+    if (lock) lock.hidden = chapterUnlocked(chapter.id);
+    if (start) {
+      start.disabled = !unlocked;
+      start.textContent = unlocked ? '開始' : '未解鎖';
+    }
+    drawHomeArt(chapter.id);
+    if (!box) return;
+    box.replaceChildren();
+    for (var n = 1; n <= 5; n++) {
+      var node = stageById(chapter.id + '-' + n);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'home-node sketch-circle' + (n === stage.index ? ' is-on sketch-circle-dark' : '');
+      btn.disabled = !stageUnlocked(node);
+      btn.setAttribute('data-stage', node.stageId);
+      btn.textContent = String(n);
+      box.appendChild(btn);
+    }
   }
 
   function showMenu() {
@@ -5102,8 +6057,9 @@ function selectedTower() {
     closeModal();
     hideStoryScreens();
     if (screenDifficulty) screenDifficulty.hidden = true;
-    if (screenStages) screenStages.hidden = true;
     screenMenu.hidden = false;
+    paintAccount();
+    paintPlayHome();
     syncRouteBar();
   }
 
@@ -5169,7 +6125,7 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '快怪', paint: { kind: 'enemy', type: 'swift', color: '#f0a202' },
-        desc: '蝙蝠俠標誌風蝙蝠，翅膀會扇動，擅長衝線。',
+        desc: '手繪幽靈，會飄，擅長衝線。',
         stats: [
           '<strong>血量</strong>：普通怪 ×0.62',
           '<strong>移速</strong>：普通怪 ×1.55（較快）',
@@ -5179,7 +6135,7 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '精英怪', paint: { kind: 'enemy', type: 'brute', color: '#8d6bff' },
-        desc: '手繪石怪，厚重肉盾。',
+        desc: '手繪裝甲獸，厚重肉盾。',
         stats: [
           '<strong>血量</strong>：普通怪 ×7.5',
           '<strong>移速</strong>：普通怪 ×0.52（很慢）',
@@ -5200,7 +6156,7 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '小惡魔', paint: { kind: 'enemy', type: 'devil', color: '#c62828' },
-        desc: '塗鴉風小惡魔（翅膀＋紅叉）。惡咒鎖塔時會把紅叉插在塔旁。漏關還會偷金幣。',
+        desc: '手繪飛天小惡魔。惡咒鎖塔時會把紅叉插在塔旁。漏關還會偷金幣。',
         stats: [
           '<strong>血量</strong>：普通怪 ×0.95',
           '<strong>移速</strong>：略快於普通怪',
@@ -5391,6 +6347,29 @@ function selectedTower() {
       desc: '不攻擊。光環提升裡面每座塔的攻擊與攻速，滿等大約蓋住半張圖。',
       stats: ['<strong>光環</strong>：攻擊約 +8%～22%，攻速約 +6%～18%', '<strong>主動</strong>：致命節奏，光環內攻擊改打總血量%'],
     });
+    appendInfoCard(list, {
+      tag: '英雄', title: '全知全能的神', paint: { kind: 'hero', hero: 'god' },
+      desc: '本週地獄榜第 1 到 3 名可在祭壇召喚。下週沒有這個名次就不能再招。不攻擊，沒有主動技。放上後整張圖生效。名次不夠時，祭壇裡這顆按鈕是灰色的。',
+      stats: [
+        '<strong>解鎖</strong>：本週地獄榜第 1、2、3 名，下週沒有這個名次就不能召喚',
+        '<strong>費用</strong>：1000 金幣，全場只能一隻，可拖曳換位',
+        '<strong>怪物</strong>：移動速度 -10%',
+        '<strong>怪物</strong>：回血效果減半，護盾減半',
+        '<strong>其他塔</strong>：攻速 +20%，攻擊 +10%',
+        '<strong>自己</strong>：不受這份加成',
+      ],
+    });
+    appendInfoCard(list, {
+      tag: '英雄', title: '光之神使', paint: { kind: 'hero', hero: 'herald' },
+      desc: '本週地獄榜第 4 到 10 名可在祭壇召喚。下週沒有這個名次就不能再招。不攻擊。光環大約蓋住半張圖，裡面是神之力的一半。場上若已有全知全能的神，以神的全圖效果為準。',
+      stats: [
+        '<strong>解鎖</strong>：本週地獄榜第 4 到 10 名，下週沒有這個名次就不能召喚',
+        '<strong>費用</strong>：1000 金幣，全場只能一隻，可拖曳換位',
+        '<strong>光環</strong>：半徑約 4.5 格，大約半張圖',
+        '<strong>光環內怪物</strong>：移速 -5%，回血剩 75%，護盾剩 75%',
+        '<strong>光環內其他塔</strong>：攻速 +10%，攻擊 +5%',
+      ],
+    });
   }
 
   function renderHellInfo() {
@@ -5428,23 +6407,38 @@ function selectedTower() {
     }
   }
 
-  function openCodex() {
+  var indexTab = 'codex';
+  var INDEX_NOTES = {
+    codex: '先看清楚怪的特性與克制，再開戰。',
+    towers: '各塔效果、分支與克制一覽。',
+    hell: '地獄難度會疊加詞綴。毒克制回血，火克制厚皮。',
+  };
+
+  function showIndex(tab) {
     hideStoryScreens();
-    renderCodex();
-    if (screenCodex) screenCodex.hidden = false;
+    indexTab = tab === 'towers' || tab === 'hell' ? tab : 'codex';
+    if (indexTab === 'towers') renderTowerInfo();
+    else if (indexTab === 'hell') renderHellInfo();
+    else renderCodex();
+    var tabs = document.querySelectorAll('.index-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('is-on', tabs[i].getAttribute('data-index') === indexTab);
+    }
+    var panels = document.querySelectorAll('.index-panel');
+    for (var p = 0; p < panels.length; p++) {
+      panels[p].hidden = panels[p].getAttribute('data-index-panel') !== indexTab;
+    }
+    var note = document.getElementById('index-note');
+    if (note) note.textContent = INDEX_NOTES[indexTab];
+    if (screenIndex) {
+      screenIndex.hidden = false;
+      screenIndex.scrollTop = 0;
+    }
   }
 
-  function openHellInfo() {
-    hideStoryScreens();
-    renderHellInfo();
-    if (screenHell) screenHell.hidden = false;
-  }
-
-  function openTowerInfo() {
-    hideStoryScreens();
-    renderTowerInfo();
-    if (screenTowersInfo) screenTowersInfo.hidden = false;
-  }
+  function openCodex() { showIndex('codex'); }
+  function openHellInfo() { showIndex('hell'); }
+  function openTowerInfo() { showIndex('towers'); }
 
   function togglePause() {
     if (state.phase === 'menu' || state.phase === 'gameover' || state.phase === 'victory') return;
@@ -5471,123 +6465,30 @@ function selectedTower() {
     });
   }
 
-  function openChapters() {
-    state.phase = 'menu';
-    state.paused = true;
-    closeModal();
-    hideStoryScreens();
-    screenChapters.hidden = false;
-    renderChapters();
-    requestAnimationFrame(function () { chapterList.scrollTop = chapterList.scrollHeight; });
-  }
-
-  function themeTileUrl(chapter) {
-    if (!envReady) return '';
-    if (!themeTileUrl.cache) themeTileUrl.cache = {};
-    if (themeTileUrl.cache[chapter]) return themeTileUrl.cache[chapter];
-    var frame = themeFrameFor(chapter, 'ground');
-    var stamp = document.createElement('canvas');
-    stamp.width = frame.sw;
-    stamp.height = frame.sh;
-    var g = stamp.getContext('2d');
-    g.drawImage(envSheet, frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, frame.sw, frame.sh);
-    themeTileUrl.cache[chapter] = stamp.toDataURL('image/png');
-    return themeTileUrl.cache[chapter];
-  }
-
-  function paintStageBackdrop() {
-    screenStages.style.backgroundColor = '#f6f3ec';
-    screenStages.style.backgroundImage = '';
-  }
-
-  function themeThumbStyle() {
-    return '';
-  }
-
-  function renderChapters() {
-    chapterList.replaceChildren();
-    for (var i = CHAPTERS.length - 1; i >= 0; i--) {
-      var chapter = CHAPTERS[i];
-      var unlocked = chapterUnlocked(chapter.id);
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'chapter-card';
-      btn.disabled = !unlocked;
-      var thumb = document.createElement('span');
-      thumb.className = 'ch-thumb';
-      thumb.style.cssText = themeThumbStyle(chapter.id);
-      var copy = document.createElement('span');
-      copy.className = 'ch-copy';
-      var title = document.createElement('strong');
-      title.textContent = chapter.id + '. ' + chapter.name;
-      var sub = document.createElement('small');
-      sub.textContent = unlocked ? '首領 ' + chapter.boss : '通過 ' + (chapter.id - 1) + '-5 後解鎖';
-      copy.appendChild(title);
-      copy.appendChild(sub);
-      var stars = document.createElement('span');
-      stars.className = 'ch-stars';
-      stars.textContent = unlocked ? ('獲得 ' + chapterStarTotal(chapter.id) + '/15 ★') : '鎖';
-      btn.appendChild(thumb);
-      btn.appendChild(copy);
-      btn.appendChild(stars);
-      btn.addEventListener('click', (function (id) {
-        return function () { openStages(id); };
-      })(chapter.id));
-      chapterList.appendChild(btn);
+  function focusHomeChapter(chapterId) {
+    var chapter = chapterId || state.chapter || 1;
+    var picked = null;
+    if (state.level) {
+      var current = stageById(state.level);
+      if (current && current.chapter === chapter) picked = current;
     }
+    if (!picked) {
+      for (var s = 1; s <= 5; s++) {
+        var node = stageById(chapter + '-' + s);
+        if (node && stageUnlocked(node)) picked = node;
+      }
+    }
+    if (!picked) picked = stageById(chapter + '-1');
+    if (picked) homePick = { chapter: picked.chapter, index: picked.index };
+  }
+
+  function openChapters() {
+    showMenu();
   }
 
   function openStages(chapterId) {
-    state.phase = 'menu';
-    state.paused = true;
-    closeModal();
-    hideStoryScreens();
-    screenStages.hidden = false;
-    var chapter = chapterById(chapterId);
-    stageKicker.textContent = '第 ' + chapter.id + ' 章';
-    stageTitle.textContent = chapter.name;
-    var pair = chapterPair(chapter.id);
-    stageNote.textContent = '小怪是' + pair[0].name + '與' + pair[1].name + '。首領是' + chapter.boss + '。獲得 ' + chapterStarTotal(chapter.id) + '/15 ★';
-    paintStageBackdrop(chapter.id);
-    renderStages(chapterId);
-    requestAnimationFrame(function () { stageTrack.scrollTop = stageTrack.scrollHeight; });
-  }
-
-  function renderStages(chapterId) {
-    stageTrack.replaceChildren();
-    for (var s = 5; s >= 1; s--) {
-      var stage = stageById(chapterId + '-' + s);
-      var unlocked = stageUnlocked(stage);
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'stage-node' + (s === 5 ? ' is-boss' : '');
-      btn.disabled = !unlocked;
-      var copy = document.createElement('span');
-      copy.className = 'node-copy';
-      var title = document.createElement('strong');
-      title.textContent = stage.stageId + '  ' + stage.name;
-      if (s === 5) {
-        var badge = document.createElement('span');
-        badge.className = 'node-badge';
-        badge.textContent = 'Boss';
-        title.appendChild(badge);
-      }
-      var sub = document.createElement('small');
-      sub.textContent = unlocked
-        ? (stage.waves.length + ' 波 · 起始 ' + stage.initialGold + ' 金')
-        : '完成上一關後解鎖';
-      copy.appendChild(title);
-      copy.appendChild(sub);
-      var stars = document.createElement('span');
-      stars.className = 'node-stars';
-      stars.textContent = unlocked ? starGlyph(state.stars[stage.stageId] || 0) : '鎖';
-      btn.appendChild(copy);
-      btn.appendChild(stars);
-      btn.addEventListener('click', (function (id) {
-        return function () { startRun('campaign', id); };
-      })(stage.stageId));
-      stageTrack.appendChild(btn);
-    }
+    focusHomeChapter(chapterId);
+    showMenu();
   }
 
   function startRun(mode, levelIndex) {
@@ -5890,13 +6791,15 @@ function selectedTower() {
       inspectTitle.textContent = heroName(tower.hero) + '  Lv.' + (tower.level + 1);
       inspectMeta.textContent = heroBlurb(tower);
       var skillName = heroSkillName(tower.hero);
-      var cd = tower.skillCd || 0;
-      var skillLabel = state.pickMode === 'fog' && state.fogHeroId === tower.id
-        ? '點地圖施放'
-        : (cd > 0 ? skillName + ' ' + Math.ceil(cd) + '秒' : skillName);
-      var skill = makeActButton(skillLabel, 'btn-mint btn-primary-act', 'skill');
-      skill.disabled = cd > 0 || state.phase !== 'combat';
-      inspectActions.appendChild(skill);
+      if (skillName) {
+        var cd = tower.skillCd || 0;
+        var skillLabel = state.pickMode === 'fog' && state.fogHeroId === tower.id
+          ? '點地圖施放'
+          : (cd > 0 ? skillName + ' ' + Math.ceil(cd) + '秒' : skillName);
+        var skill = makeActButton(skillLabel, 'btn-mint btn-primary-act', 'skill');
+        skill.disabled = cd > 0 || state.phase !== 'combat';
+        inspectActions.appendChild(skill);
+      }
       appendSellRow(Math.floor(tower.invested * sellRatio()));
       return;
     }
@@ -6086,7 +6989,6 @@ function selectedTower() {
 
   function syncSoundButton() {
     soundBtn.setAttribute('aria-pressed', Sfx.muted ? 'true' : 'false');
-    soundBtn.textContent = Sfx.muted ? '×' : '♪';
     soundBtn.setAttribute('aria-label', Sfx.muted ? '開啟音效' : '關閉音效');
   }
 
@@ -6152,8 +7054,24 @@ function selectedTower() {
   }
 
   function drawPriestAuras() {
+    if (hasHeroId('god')) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(201, 162, 39, 0.7)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(worldX(0) + 3, worldY(0) + 3, COLS * view.tile - 6, ROWS * view.tile - 6);
+      ctx.restore();
+    }
     for (var i = 0; i < state.towers.length; i++) {
       var tower = state.towers[i];
+      if (tower.type === 'hero' && tower.hero === 'herald') {
+        ctx.beginPath();
+        ctx.arc(worldX(tower.c + 0.5), worldY(tower.r + 0.5), HERALD_RADIUS * view.tile, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 214, 90, 0.14)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(201, 162, 39, 0.85)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
       if (tower.type !== 'hero' || tower.hero !== 'priest') continue;
       var aura = priestAura(tower);
       var alpha = tower.buffTime > 0 ? 0.16 : 0.07;
@@ -6488,6 +7406,21 @@ function selectedTower() {
       ctx.lineTo(-s * 0.28, -s * 0.32);
       ctx.closePath();
       ctx.fill();
+    } else if (hero === 'god') {
+      inkCircle(0, 0, s * 0.28, 12);
+      inkStroke();
+      inkCircle(0, 0, s * 0.55, 16);
+      inkStroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.72, -1.15, -0.15);
+      inkStroke();
+    } else if (hero === 'herald') {
+      inkCircle(0, -s * 0.22, s * 0.24, 12);
+      inkStroke();
+      inkLine(-s * 0.5, -s * 0.22, s * 0.5, -s * 0.22, 2);
+      inkStroke();
+      inkLine(0, s * 0.05, 0, s * 0.62, 3);
+      inkStroke();
     } else {
       inkCircle(0, -s * 0.55, s * 0.22, 12);
       inkStroke();
@@ -6584,555 +7517,6 @@ function selectedTower() {
       ctx.fillStyle = marks[i].kind === 'undo' ? 'rgba(242, 193, 78, 0.28)' : 'rgba(125, 206, 160, 0.28)';
       ctx.fillRect(worldX(marks[i].c) + 3, worldY(marks[i].r) + 3, view.tile - 6, view.tile - 6);
     }
-  }
-
-  function drawFrame(image, frame, dx, dy, dw, dh) {
-    if (!frame || !image || !image.complete || !image.naturalWidth) return false;
-    ctx.drawImage(image, frame.sx, frame.sy, frame.sw, frame.sh, dx, dy, dw, dh);
-    return true;
-  }
-
-  var TOWER_ROW_Y = [96, 224, 356, 488];
-
-  function towerLook(tower) {
-    var shown = tower.level + 1;
-    if (isArrowPath(tower) || tower.type === 'bolt') {
-      if (tower.spec === 'arrow') {
-        if (shown <= 3) return { sheet: 0, row: 2 };
-        if (shown === 4) return { sheet: 0, row: 3 };
-        if (shown === 5) return { sheet: 1, row: 0 };
-        return { sheet: 1, row: 3 };
-      }
-      if (tower.type === 'bolt') return { sheet: 0, row: shown <= 3 ? 2 : 3 };
-      return { sheet: 0, row: shown <= 1 ? 0 : 1 };
-    }
-    if (tower.type === 'fire') {
-      if (shown <= 3) return { sheet: 3, row: 2 };
-      if (shown === 4) return { sheet: 3, row: 3 };
-      return { sheet: 2, row: 0 };
-    }
-    if (tower.type === 'ice') {
-      if (shown <= 3) return { sheet: 2, row: 1 };
-      if (shown === 4) return { sheet: 2, row: 2 };
-      return { sheet: 4, row: 0 };
-    }
-    if (tower.type === 'poison') return { sheet: 3, row: shown <= 2 ? 0 : 1 };
-    if (isCannonPath(tower)) {
-      if (shown <= 3) return { sheet: 2, row: 3 };
-      if (shown === 4) return { sheet: 4, row: 2 };
-      return { sheet: 4, row: 3 };
-    }
-    return { sheet: 3, row: shown <= 1 ? 0 : 1 };
-  }
-
-  function towerFrame(sheet, row, pose, index) {
-    var y = TOWER_ROW_Y[row];
-    if (pose === 'attack') return { sheet: sheet, sx: 416 + index * 80, sy: y + 4, sw: 86, sh: 62 };
-    if (pose === 'bolt') return { sheet: sheet, sx: 868, sy: y - 4, sw: 128, sh: 40 };
-    if (pose === 'shell') return { sheet: sheet, sx: 860, sy: y + 16, sw: 78, sh: 48 };
-    if (pose === 'impact') return { sheet: sheet, sx: 940, sy: y + 12, sw: 80, sh: 56 };
-    return { sheet: sheet, sx: 18 + index * 80, sy: y, sw: 76, sh: 72 };
-  }
-
-  function towerPose(tower) {
-    var flip = Math.cos(tower.aim) < 0;
-    var elev = Math.abs(Math.atan2(Math.sin(tower.aim), Math.abs(Math.cos(tower.aim))));
-    var index = 4 - Math.round((elev / (Math.PI / 2)) * 4);
-    if (index < 0) index = 0;
-    if (index > 4) index = 4;
-    return { index: index, flip: flip, attack: tower.flash > 0.12 };
-  }
-
-  function towerStamp(frame) {
-    var key = frame.sheet + ':' + frame.sx + ',' + frame.sy + ',' + frame.sw + ',' + frame.sh;
-    if (towerStampCache[key]) return towerStampCache[key];
-    var stamp = keyedStamp(towerSheets[frame.sheet], frame, null);
-    if (stamp) towerStampCache[key] = stamp;
-    return stamp;
-  }
-
-  function drawTowerArt(tower, x, y, tile) {
-    if (!towerArtReady) return false;
-    var look = towerLook(tower);
-    var pose = towerPose(tower);
-    var stamp = towerStamp(towerFrame(look.sheet, look.row, pose.attack ? 'attack' : 'idle', pose.index));
-    if (!stamp) return false;
-    ctx.save();
-    ctx.translate(x, y + tile * 0.06);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(0, tile * 0.24, tile * 0.3, tile * 0.1, 0, 0, Math.PI * 2);
-    ctx.fill();
-    if (pose.flip) ctx.scale(-1, 1);
-    var dw = tile * 0.98;
-    var dh = dw * (stamp.height / stamp.width);
-    if (dh > tile * 1.08) {
-      dh = tile * 1.08;
-      dw = dh * (stamp.width / stamp.height);
-    }
-    ctx.drawImage(stamp, -dw / 2, -dh + tile * 0.3, dw, dh);
-    ctx.restore();
-    return true;
-  }
-
-  function drawBoltSprite(sheet, row, pose, x, y, angle, width, anchor) {
-    if (!towerArtReady || sheet == null || row == null) return false;
-    var stamp = towerStamp(towerFrame(sheet, row, pose, 0));
-    if (!stamp) return false;
-    ctx.save();
-    ctx.translate(x, y);
-    if (angle) ctx.rotate(angle);
-    var w = width;
-    var h = w * (stamp.height / stamp.width);
-    ctx.drawImage(stamp, -w * anchor, -h / 2, w, h);
-    ctx.restore();
-    return true;
-  }
-
-  function towerSpriteKey(tower) {
-    var shown = Math.min(5, tower.level + 1);
-    if (isArrowPath(tower) || tower.type === 'bolt') {
-      if (tower.spec === 'arrow' && shown >= 5) return 'twin' + Math.min(5, shown);
-      if (tower.spec === 'arrow') return 'heavy' + Math.min(5, Math.max(3, shown));
-      return shown <= 1 ? 'arrow1' : 'arrow2';
-    }
-    if (tower.type === 'ice') return shown >= 5 ? 'ice4' : 'ice' + Math.max(3, shown);
-    if (tower.type === 'fire') return 'fire5';
-    if (tower.type === 'poison') return shown <= 1 ? 'cannon1' : 'cannon2';
-    if (isCannonPath(tower)) return 'stone' + Math.min(5, Math.max(3, shown));
-    return shown <= 1 ? 'cannon1' : 'cannon2';
-  }
-
-  function themeFrameFor(chapter, key) {
-    var local = THEME_LOCAL[key];
-    var col = (chapter - 1) % 4;
-    var row = Math.floor((chapter - 1) / 4);
-    return {
-      sx: col * 256 + local.dx,
-      sy: row * 285 + local.dy,
-      sw: local.sw,
-      sh: local.sh,
-    };
-  }
-
-  function drawFrameRot(image, frame, dx, dy, dw, dh, rot) {
-    if (!rot) return drawFrame(image, frame, dx, dy, dw, dh);
-    ctx.save();
-    ctx.translate(dx + dw / 2, dy + dh / 2);
-    ctx.rotate(rot);
-    var ok = drawFrame(image, frame, -dw / 2, -dh / 2, dw, dh);
-    ctx.restore();
-    return ok;
-  }
-
-  function roadKind(c, r) {
-    var up = isPath(c, r - 1);
-    var down = isPath(c, r + 1);
-    var left = isPath(c - 1, r);
-    var right = isPath(c + 1, r);
-    if (up && left && !down && !right) return 'cornerUL';
-    if (up && right && !down && !left) return 'cornerUR';
-    if (down && left && !up && !right) return 'cornerDL';
-    if (down && right && !up && !left) return 'cornerDR';
-    if ((left || right) && !up && !down) return 'horiz';
-    return 'vert';
-  }
-
-  function pathKind(c, r, index) {
-    if (index === route.cells.length - 1) return 'end';
-    var up = isPath(c, r - 1);
-    var down = isPath(c, r + 1);
-    var left = isPath(c - 1, r);
-    var right = isPath(c + 1, r);
-    if (up && left) return 'cornerUL';
-    if (up && right) return 'cornerUR';
-    if (down && left) return 'cornerDL';
-    if (down && right) return 'cornerDR';
-    if (left && right) return 'horiz';
-    return 'vert';
-  }
-
-  function pathFrame(c, r, index) {
-    if (index === 0) return SPRITE_MAP.portal;
-    if (index === route.cells.length - 1) return SPRITE_MAP.chest;
-    var up = isPath(c, r - 1);
-    var down = isPath(c, r + 1);
-    var left = isPath(c - 1, r);
-    var right = isPath(c + 1, r);
-    if (up && down) return SPRITE_MAP.vert;
-    if (left && right) return SPRITE_MAP.horiz;
-    if (up && left) return SPRITE_MAP.cornerUL;
-    if (up && right) return SPRITE_MAP.cornerUR;
-    if (down && left) return SPRITE_MAP.cornerDL;
-    if (down && right) return SPRITE_MAP.cornerDR;
-    if (up || down) return SPRITE_MAP.vert;
-    return SPRITE_MAP.horiz;
-  }
-
-  function drawFlowArrows(alpha) {
-    var tile = view.tile;
-    var max = WAYPOINTS.length - 1;
-    if (max < 1) return;
-    var offset = reduceMotion ? 0.2 : (state.time * 0.9) % 0.8;
-    ctx.fillStyle = 'rgba(236, 214, 170, ' + alpha + ')';
-    for (var d = offset; d < max - 0.2; d += 0.8) {
-      var a = pointAt(d);
-      var b = pointAt(d + 0.08);
-      ctx.save();
-      ctx.translate(worldX(a.x), worldY(a.y));
-      ctx.rotate(Math.atan2(b.y - a.y, b.x - a.x));
-      ctx.beginPath();
-      ctx.moveTo(tile * 0.11, 0);
-      ctx.lineTo(-tile * 0.06, tile * 0.065);
-      ctx.lineTo(-tile * 0.06, -tile * 0.065);
-      ctx.fill();
-      ctx.restore();
-    }
-  }
-
-  function drawThemePaths() {
-    if (!envReady || state.mode !== 'campaign' || !state.chapter) return false;
-    var tile = view.tile;
-    for (var i = 0; i < route.cells.length; i++) {
-      var cell = route.cells[i];
-      var kind = pathKind(cell.c, cell.r, i);
-      var key = 'road';
-      var rot = 0;
-      if (kind === 'end') key = 'goal';
-      else if (kind === 'horiz') rot = Math.PI / 2;
-      else if (kind === 'cornerDL') key = 'bend';
-      else if (kind === 'cornerUL') { key = 'bend'; rot = Math.PI / 2; }
-      else if (kind === 'cornerUR') { key = 'bend'; rot = Math.PI; }
-      else if (kind === 'cornerDR') { key = 'bend'; rot = -Math.PI / 2; }
-      var grow = kind === 'end' ? tile * 0.12 : 0;
-      if (!drawFrameRot(envSheet, themeFrameFor(state.chapter, key), worldX(cell.c) - grow / 2, worldY(cell.r) - grow / 2, tile + grow, tile + grow, rot)) return false;
-      if (i === 0 && spritesReady) {
-        drawFrame(gameSheet, SPRITE_MAP.portal, worldX(cell.c) + tile * 0.14, worldY(cell.r) + tile * 0.1, tile * 0.72, tile * 0.72);
-      }
-    }
-    var end = route.cells[route.cells.length - 1];
-    var x = worldX(end.c + 0.5);
-    var y = worldY(end.r + 0.5);
-    ctx.font = '700 ' + Math.max(11, Math.round(tile * 0.26)) + 'px ' + FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-    ctx.strokeText(String(Math.max(0, state.lives)), x, y + tile * 0.12);
-    ctx.fillStyle = '#fff6e4';
-    ctx.fillText(String(Math.max(0, state.lives)), x, y + tile * 0.12);
-    drawFlowArrows(0.7);
-    return true;
-  }
-
-  var PATH_TILE = {
-    stone: { sx: 48, sy: 386, sw: 100, sh: 100 },
-    portal: { sx: 744, sy: 376, sw: 112, sh: 146 },
-    chest: { sx: 908, sy: 396, sw: 108, sh: 108 },
-  };
-
-  var CAST_BOSS_Y = [28, 170, 312, 454];
-  var CAST_MINION_Y = [50, 192, 334, 468];
-  var CAST_LEFT_X = [16, 146, 270, 388];
-  var CAST_RIGHT_X = [520, 648, 776, 896];
-  var CAST_MIN_LEFT = [24, 142, 266, 392];
-  var CAST_MIN_RIGHT = [526, 652, 786, 914];
-
-  var CAST_BOSS_INDEX = { regen: 0, rush: 1, summon: 2, ward: 3, split: 4, mend: 5, frost: 6, armor: 7 };
-  var CAST_MINION_SLOT = {
-    slime: [0, 0], skel: [0, 1], goblin: [1, 0], tort: [1, 1],
-    mini: [2, 0], acolyte: [2, 1], frost: [3, 0], beetle: [3, 1],
-  };
-
-  function castBossFrameFor(enemy, pos, ahead) {
-    if (!castReady || CAST_BOSS_INDEX[enemy.bossId] == null) return null;
-    var index = CAST_BOSS_INDEX[enemy.bossId];
-    var pose = 0;
-    if (enemy.bossId === 'rush' && enemy.enraged) pose = 3;
-    else if (enemy.bossId === 'ward' && enemy.shield > 0) pose = 3;
-    else if (enemy.bossId === 'regen' && enemy.regenShow > 0) pose = 3;
-    else if (enemy.bossId === 'frost' && enemy.abilityTimer > 4.6) pose = 3;
-    else if (enemy.bossId === 'summon' && enemy.abilityTimer > 3.6) pose = 3;
-    else if ((enemy.bossId === 'split' || enemy.bossId === 'armor') && enemy.hitFlash > 0) pose = 3;
-    else if (enemy.bossId === 'mend' && enemy.mendAcc < 0.15) pose = 3;
-    else if (ahead.x < pos.x - 0.04) pose = 1;
-    else if (ahead.x > pos.x + 0.04) pose = 2;
-    var xs = index % 2 ? CAST_RIGHT_X : CAST_LEFT_X;
-    return { sx: xs[pose], sy: CAST_BOSS_Y[Math.floor(index / 2)], sw: 110, sh: 86 };
-  }
-
-  function castMinionFrameFor(kind, pose) {
-    if (!castMinionReady || !CAST_MINION_SLOT[kind]) return null;
-    var slot = CAST_MINION_SLOT[kind];
-    var xs = slot[1] ? CAST_MIN_RIGHT : CAST_MIN_LEFT;
-    return { sx: xs[pose], sy: CAST_MINION_Y[slot[0]], sw: 90, sh: 62 };
-  }
-
-  function fieldGround(chapter) {
-    var col = (chapter - 1) % 4;
-    var row = Math.floor((chapter - 1) / 4);
-    return { sx: col * 256 + 90, sy: row * 285 + 84, sw: 76, sh: 64 };
-  }
-
-  function sheetBackground(r, g, b) {
-    var max = r > g ? (r > b ? r : b) : (g > b ? g : b);
-    var min = r < g ? (r < b ? r : b) : (g < b ? g : b);
-    return (max - min) <= 8 && Math.abs(r - 37) + Math.abs(g - 40) + Math.abs(b - 45) < 52 && max < 70;
-  }
-
-  function keyedStamp(image, frame, cache) {
-    if (!image || !image.complete || !image.naturalWidth) return null;
-    var key = frame.sx + ',' + frame.sy + ',' + frame.sw + ',' + frame.sh;
-    if (cache && cache[key]) return cache[key];
-    var w = frame.sw;
-    var h = frame.sh;
-    var stamp = document.createElement('canvas');
-    stamp.width = w;
-    stamp.height = h;
-    var g = stamp.getContext('2d');
-    g.drawImage(image, frame.sx, frame.sy, w, h, 0, 0, w, h);
-    var pixels = g.getImageData(0, 0, w, h);
-    var px = pixels.data;
-    var bg = new Uint8Array(w * h);
-    var queue = [];
-    function push(i) {
-      if (i < 0 || i >= bg.length || bg[i]) return;
-      var p = i * 4;
-      if (!sheetBackground(px[p], px[p + 1], px[p + 2])) return;
-      bg[i] = 1;
-      queue.push(i);
-    }
-    var x;
-    var y;
-    for (x = 0; x < w; x++) {
-      push(x);
-      push((h - 1) * w + x);
-    }
-    for (y = 0; y < h; y++) {
-      push(y * w);
-      push(y * w + (w - 1));
-    }
-    for (var qi = 0; qi < queue.length; qi++) {
-      var i = queue[qi];
-      var cx = i % w;
-      if (cx > 0) push(i - 1);
-      if (cx + 1 < w) push(i + 1);
-      if (i >= w) push(i - w);
-      if (i + w < bg.length) push(i + w);
-    }
-    for (i = 0; i < bg.length; i++) {
-      var p = i * 4;
-      if (bg[i]) {
-        px[p + 3] = 0;
-        continue;
-      }
-      cx = i % w;
-      var cy = (i / w) | 0;
-      var touch = (cx > 0 && bg[i - 1]) || (cx + 1 < w && bg[i + 1]) || (cy > 0 && bg[i - w]) || (cy + 1 < h && bg[i + w]);
-      if (!touch) continue;
-      var r = px[p];
-      var gv = px[p + 1];
-      var b = px[p + 2];
-      var max = r > gv ? (r > b ? r : b) : (gv > b ? gv : b);
-      var lo = r < gv ? (r < b ? r : b) : (gv < b ? gv : b);
-      if ((max - lo) <= 14 && Math.abs(r - 37) + Math.abs(gv - 40) + Math.abs(b - 45) < 58 && max < 80) px[p + 3] = 0;
-    }
-    g.putImageData(pixels, 0, 0);
-    if (cache) cache[key] = stamp;
-    return stamp;
-  }
-
-  function punchStamp(image, frame, cache, limit) {
-    if (!image || !image.complete || !image.naturalWidth) return null;
-    var cut = limit == null ? 40 : limit;
-    var key = frame.sx + ',' + frame.sy + ',' + frame.sw + ',' + frame.sh + ',' + cut;
-    if (cache[key]) return cache[key];
-    var stamp = document.createElement('canvas');
-    stamp.width = frame.sw;
-    stamp.height = frame.sh;
-    var g = stamp.getContext('2d');
-    g.drawImage(image, frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, frame.sw, frame.sh);
-    var pixels = g.getImageData(0, 0, frame.sw, frame.sh);
-    var px = pixels.data;
-    for (var p = 0; p < px.length; p += 4) {
-      var dist = Math.abs(px[p] - 37) + Math.abs(px[p + 1] - 40) + Math.abs(px[p + 2] - 45);
-      if (dist < cut) px[p + 3] = 0;
-    }
-    g.putImageData(pixels, 0, 0);
-    cache[key] = stamp;
-    return stamp;
-  }
-
-  function drawPunched(image, frame, cache, dx, dy, dw, dh, rot) {
-    var stamp = punchStamp(image, frame, cache);
-    if (!stamp) return false;
-    ctx.save();
-    ctx.translate(dx + dw / 2, dy + dh / 2);
-    if (rot) ctx.rotate(rot);
-    ctx.drawImage(stamp, -dw / 2, -dh / 2, dw, dh);
-    ctx.restore();
-    return true;
-  }
-
-  function drawKeyed(image, frame, cache, dx, dy, dw, dh) {
-    var stamp = keyedStamp(image, frame, cache);
-    if (!stamp) return false;
-    ctx.drawImage(stamp, dx, dy, dw, dh);
-    return true;
-  }
-
-  function drawContained(image, frame, cache, cx, cy, box) {
-    var stamp = punchStamp(image, frame, cache, 26);
-    if (!stamp) return false;
-    var aspect = frame.sw / frame.sh;
-    var dw = box;
-    var dh = box / aspect;
-    if (dh > box) {
-      dh = box;
-      dw = box * aspect;
-    }
-    ctx.drawImage(stamp, cx - dw / 2, cy - dh / 2, dw, dh);
-    return true;
-  }
-
-  var stoneBare = null;
-
-  function bareStone() {
-    if (stoneBare) return stoneBare;
-    var frame = PATH_TILE.stone;
-    var stamp = document.createElement('canvas');
-    stamp.width = frame.sw;
-    stamp.height = frame.sh;
-    var g = stamp.getContext('2d');
-    g.drawImage(pathSheet, frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, frame.sw, frame.sh);
-    var donor = document.createElement('canvas');
-    donor.width = frame.sw;
-    donor.height = frame.sh;
-    donor.getContext('2d').drawImage(stamp, 0, 0);
-    g.drawImage(donor, 42, 34, 33, 33, 0, 34, 33, 33);
-    stoneBare = stamp;
-    return stamp;
-  }
-
-  function drawStoneCell(cell, rot) {
-    var tile = view.tile;
-    var stamp = bareStone();
-    var x = worldX(cell.c);
-    var y = worldY(cell.r);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x, y, tile, tile);
-    ctx.clip();
-    ctx.translate(x + tile / 2, y + tile / 2);
-    if (rot) ctx.rotate(rot);
-    ctx.drawImage(stamp, -tile / 2, -tile / 2, tile, tile);
-    ctx.restore();
-  }
-
-  function drawSpawnArrow() {
-    if (route.cells.length < 2) return;
-    var from = route.cells[0];
-    var to = route.cells[1];
-    var tile = view.tile;
-    var ang = Math.atan2(to.r - from.r, to.c - from.c);
-    ctx.save();
-    ctx.translate(worldX(to.c + 0.5), worldY(to.r + 0.5));
-    ctx.rotate(ang);
-    var s = tile * 0.24;
-    ctx.beginPath();
-    ctx.moveTo(s, 0);
-    ctx.lineTo(-s * 0.72, s * 0.58);
-    ctx.lineTo(-s * 0.28, 0);
-    ctx.lineTo(-s * 0.72, -s * 0.58);
-    ctx.closePath();
-    ctx.fillStyle = '#fff6e4';
-    ctx.strokeStyle = 'rgba(24, 14, 8, 0.9)';
-    ctx.lineWidth = Math.max(2, tile * 0.045);
-    ctx.lineJoin = 'round';
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function drawStonePaths() {
-    if (!pathReady || !pathSheet.complete) return false;
-    var tile = view.tile;
-    for (var i = 0; i < route.cells.length; i++) {
-      var cell = route.cells[i];
-      drawStoneCell(cell, roadKind(cell.c, cell.r) === 'vert' ? Math.PI / 2 : 0);
-    }
-    var start = route.cells[0];
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(worldX(start.c), worldY(start.r), tile, tile);
-    ctx.clip();
-    drawContained(pathSheet, PATH_TILE.portal, pathStampCache, worldX(start.c + 0.5), worldY(start.r + 0.5), tile * 0.84);
-    ctx.restore();
-    drawSpawnArrow();
-    var end = route.cells[route.cells.length - 1];
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(worldX(end.c), worldY(end.r), tile, tile);
-    ctx.clip();
-    drawContained(pathSheet, PATH_TILE.chest, pathStampCache, worldX(end.c + 0.5), worldY(end.r + 0.42), tile * 0.72);
-    var x = worldX(end.c + 0.5);
-    var y = worldY(end.r + 0.84);
-    ctx.font = '700 ' + Math.max(11, Math.round(tile * 0.24)) + 'px ' + FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-    ctx.strokeText(String(Math.max(0, state.lives)), x, y);
-    ctx.fillStyle = '#fff6e4';
-    ctx.fillText(String(Math.max(0, state.lives)), x, y);
-    ctx.restore();
-    return true;
-  }
-
-  function drawSpritePaths() {
-    if (drawStonePaths()) return true;
-    if (drawThemePaths()) return true;
-    if (!spritesReady) return false;
-    var tile = view.tile;
-    for (var i = 0; i < route.cells.length; i++) {
-      var cell = route.cells[i];
-      var frame = pathFrame(cell.c, cell.r, i);
-      var grow = (i === 0 || i === route.cells.length - 1) ? tile * 0.42 : 0;
-      if (!drawFrame(gameSheet, frame, worldX(cell.c) - grow / 2, worldY(cell.r) - grow / 2, tile + grow, tile + grow)) return false;
-    }
-    var end = route.cells[route.cells.length - 1];
-    var x = worldX(end.c + 0.5);
-    var y = worldY(end.r + 0.5);
-    ctx.font = '700 ' + Math.max(11, Math.round(tile * 0.26)) + 'px ' + FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-    ctx.strokeText(String(Math.max(0, state.lives)), x, y + tile * 0.08);
-    ctx.fillStyle = '#fff6e4';
-    ctx.fillText(String(Math.max(0, state.lives)), x, y + tile * 0.08);
-    drawFlowArrows(0.45);
-    return true;
-  }
-
-  function drawChapterGround(chapter) {
-    if (chapter !== 1 || !groundCh1Ready || !groundCh1.naturalWidth) return false;
-    var sw = groundCh1.naturalWidth;
-    var sh = groundCh1.naturalHeight;
-    var target = COLS / ROWS;
-    var sx = 0;
-    var sy = 0;
-    var cw = sw;
-    var ch = sh;
-    if (sw / sh < target) {
-      ch = sw / target;
-      sy = (sh - ch) / 2;
-    } else if (sw / sh > target) {
-      cw = sh * target;
-      sx = (sw - cw) / 2;
-    }
-    ctx.drawImage(groundCh1, sx, sy, cw, ch, worldX(0), worldY(0), view.tile * COLS, view.tile * ROWS);
-    return true;
   }
 
   function drawBoard() {
@@ -7256,47 +7640,6 @@ function selectedTower() {
       ctx.fill();
       ctx.restore();
     }
-    ctx.restore();
-  }
-
-  function drawPortal() {
-    var p = WAYPOINTS[0];
-    var x = worldX(p.x);
-    var y = worldY(p.y);
-    var pulse = view.tile * (0.3 + Math.sin(state.time * 3) * 0.025);
-    ctx.save();
-    ctx.strokeStyle = 'rgba(142, 231, 255, 0.9)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(x, y, pulse, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(90, 210, 235, 0.16)';
-    ctx.fill();
-    ctx.restore();
-  }
-
-  function drawBase() {
-    var p = WAYPOINTS[WAYPOINTS.length - 1];
-    var x = worldX(p.x);
-    var y = worldY(p.y);
-    var rad = view.tile * 0.4;
-    ctx.save();
-    ctx.fillStyle = '#5c4738';
-    ctx.beginPath();
-    ctx.arc(x, y, rad, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#c9a27a';
-    ctx.stroke();
-    ctx.fillStyle = state.lives <= 6 ? '#ff5d73' : '#ffd3ae';
-    ctx.beginPath();
-    ctx.arc(x, y, rad * 0.58, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#3a2418';
-    ctx.font = '700 ' + Math.max(11, Math.round(view.tile * 0.28)) + 'px ' + FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(Math.max(0, state.lives)), x, y + 0.5);
     ctx.restore();
   }
 
@@ -7492,39 +7835,20 @@ function selectedTower() {
     var spot = altarSpot();
     if (!spot) return;
     var x = worldX(spot.c + 0.5);
-    var y = worldY(spot.r + 0.55);
-    var s = view.tile * 0.28;
+    var y = worldY(spot.r + 0.5);
+    var s = view.tile * 0.36;
     ctx.save();
     ctx.translate(x, y);
     inkSeed = 41;
-    inkSetup(Math.max(2, s * 0.16));
-    ctx.fillStyle = '#efe6d6';
-    ctx.strokeStyle = '#161616';
+    inkSetup(Math.max(2.6, view.tile * 0.07));
+    drawGlyphPlate('circle', s);
     ctx.beginPath();
-    ctx.moveTo(-s * 1.15, s * 0.35);
-    ctx.lineTo(s * 1.15, s * 0.35);
-    ctx.lineTo(s * 0.85, s * 0.95);
-    ctx.lineTo(-s * 0.85, s * 0.95);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(-s * 0.46, s * 0.06);
+    ctx.lineTo(0, -s * 0.52);
+    ctx.lineTo(s * 0.46, s * 0.06);
     inkStroke();
-    ctx.beginPath();
-    ctx.moveTo(-s * 0.7, s * 0.35);
-    ctx.lineTo(s * 0.7, s * 0.35);
-    ctx.lineTo(s * 0.45, -s * 0.15);
-    ctx.lineTo(-s * 0.45, -s * 0.15);
-    ctx.closePath();
-    ctx.fill();
+    inkLine(-s * 0.54, s * 0.4, s * 0.54, s * 0.4, 3);
     inkStroke();
-    ctx.fillStyle = '#e02323';
-    inkCircle(0, -s * 0.55, s * 0.28, 10);
-    ctx.fill();
-    inkStroke();
-    ctx.fillStyle = '#161616';
-    ctx.font = '800 ' + Math.max(10, Math.round(s * 0.7)) + 'px ' + FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('祭', 0, s * 0.15);
     ctx.restore();
   }
 
@@ -7787,276 +8111,178 @@ function selectedTower() {
   }
 
   function drawGruntBody(rad, colors, bob) {
-    // slime: soft blob + drip + cheek highlight
-    inkSeed = Math.round(rad * 40 + 11);
-    ctx.translate(0, bob);
-    inkSetup(Math.max(2.2, rad * 0.17));
+    inkSeed = Math.round(rad * 17 + 3);
+    ctx.translate(0, bob * 0.35);
+    inkSetup(Math.max(2, rad * 0.13));
     ctx.fillStyle = colors.fill;
-    ctx.strokeStyle = colors.rim;
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.85 + inkJitter(1, 0.4), rad * 0.15);
-    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.55, -rad * 0.35, -rad * 0.95);
-    ctx.quadraticCurveTo(0, -rad * 1.12, rad * 0.35, -rad * 0.95);
-    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.55, rad * 0.85 + inkJitter(2, 0.4), rad * 0.15);
-    ctx.quadraticCurveTo(rad * 0.55, rad * 0.95, 0, rad * 0.88);
-    ctx.quadraticCurveTo(-rad * 0.55, rad * 0.95, -rad * 0.85, rad * 0.15);
+    ctx.moveTo(-rad * 0.72, rad * 0.4);
+    ctx.quadraticCurveTo(-rad * 0.98, -rad * 0.05, -rad * 0.42, -rad * 0.48);
+    ctx.quadraticCurveTo(0, -rad * 0.78, rad * 0.48, -rad * 0.42);
+    ctx.quadraticCurveTo(rad * 0.98, rad * 0.02, rad * 0.68, rad * 0.42);
+    ctx.quadraticCurveTo(0.05 * rad, rad * 0.7, -rad * 0.72, rad * 0.4);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    // drip
-    ctx.beginPath();
-    ctx.moveTo(-rad * 0.18, rad * 0.72);
-    ctx.quadraticCurveTo(-rad * 0.05, rad * 1.18, rad * 0.12, rad * 0.78);
-    inkStroke();
-    ctx.fillStyle = colors.accent;
-    ctx.globalAlpha = 0.2;
-    inkCircle(-rad * 0.22, rad * 0.18, rad * 0.28, 10);
+    ctx.fillStyle = '#161616';
+    inkCircle(-rad * 0.2, -rad * 0.02, Math.max(1.5, rad * 0.09), 6);
     ctx.fill();
-    ctx.globalAlpha = 1;
-    drawEnemyEyes(rad, colors.ink, { size: 0.15, gap: 0.28, y: -0.12, shine: true });
-    ctx.strokeStyle = colors.ink;
-    ctx.lineWidth = Math.max(1.5, rad * 0.1);
-    ctx.beginPath();
-    ctx.arc(0, rad * 0.18, rad * 0.22, 0.25, Math.PI - 0.25);
+    inkCircle(rad * 0.24, rad * 0.02, Math.max(1.5, rad * 0.09), 6);
+    ctx.fill();
+    inkLine(-rad * 0.1, rad * 0.26, rad * 0.16, rad * 0.28, 2);
     inkStroke();
   }
 
   function drawSwiftBody(rad, colors, bob) {
-    // batman-logo bat: scalloped wings + pointed ears, wings flap
-    inkSeed = Math.round(rad * 37 + 22);
-    ctx.translate(0, bob * 0.5);
-    inkSetup(Math.max(2.1, rad * 0.15));
-    ctx.fillStyle = colors.fill;
-    ctx.strokeStyle = colors.rim;
-    var flap = Math.sin((state.time || 0) * 16 + rad) * 0.38;
-    // left wing (flaps)
-    ctx.save();
-    ctx.translate(-rad * 0.08, 0);
-    ctx.rotate(-0.12 - flap);
+    inkSeed = Math.round(rad * 19 + 8);
+    ctx.translate(0, bob * 0.25);
+    inkSetup(Math.max(2, rad * 0.12));
+    ctx.fillStyle = '#fffdf8';
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-rad * 0.55, -rad * 0.35);
-    ctx.lineTo(-rad * 1.05, -rad * 0.15);
-    ctx.lineTo(-rad * 1.45, rad * 0.08);
-    ctx.lineTo(-rad * 1.15, rad * 0.22);
-    ctx.quadraticCurveTo(-rad * 0.95, rad * 0.55, -rad * 0.7, rad * 0.2);
-    ctx.quadraticCurveTo(-rad * 0.5, rad * 0.52, -rad * 0.28, rad * 0.18);
-    ctx.quadraticCurveTo(-rad * 0.12, rad * 0.4, 0, rad * 0.08);
+    ctx.moveTo(-rad * 0.58, rad * 0.08);
+    ctx.quadraticCurveTo(-rad * 0.78, -rad * 0.55, inkJitter(1, rad * 0.04), -rad * 0.72);
+    ctx.quadraticCurveTo(rad * 0.8, -rad * 0.5, rad * 0.58, rad * 0.1);
+    ctx.lineTo(rad * 0.4, rad * 0.48);
+    ctx.quadraticCurveTo(rad * 0.16, rad * 0.22, 0, rad * 0.55);
+    ctx.quadraticCurveTo(-rad * 0.2, rad * 0.2, -rad * 0.42, rad * 0.48);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    ctx.restore();
-    // right wing (flaps)
-    ctx.save();
-    ctx.translate(rad * 0.08, 0);
-    ctx.rotate(0.12 + flap);
+    ctx.fillStyle = '#161616';
+    inkCircle(-rad * 0.18, -rad * 0.16, Math.max(1.6, rad * 0.11), 6);
+    ctx.fill();
+    inkCircle(rad * 0.18, -rad * 0.16, Math.max(1.6, rad * 0.11), 6);
+    ctx.fill();
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(rad * 0.55, -rad * 0.35);
-    ctx.lineTo(rad * 1.05, -rad * 0.15);
-    ctx.lineTo(rad * 1.45, rad * 0.08);
-    ctx.lineTo(rad * 1.15, rad * 0.22);
-    ctx.quadraticCurveTo(rad * 0.95, rad * 0.55, rad * 0.7, rad * 0.2);
-    ctx.quadraticCurveTo(rad * 0.5, rad * 0.52, rad * 0.28, rad * 0.18);
-    ctx.quadraticCurveTo(rad * 0.12, rad * 0.4, 0, rad * 0.08);
-    ctx.closePath();
-    ctx.fill();
+    ctx.arc(0, rad * 0.02, rad * 0.16, 0.25, Math.PI - 0.25);
     inkStroke();
-    ctx.restore();
-    // center emblem body
-    ctx.beginPath();
-    ctx.moveTo(0, rad * 0.55);
-    ctx.lineTo(-rad * 0.22, rad * 0.15);
-    ctx.lineTo(-rad * 0.18, -rad * 0.15);
-    ctx.lineTo(-rad * 0.32, -rad * 0.55);
-    ctx.lineTo(-rad * 0.08, -rad * 0.28);
-    ctx.lineTo(0, -rad * 0.72);
-    ctx.lineTo(rad * 0.08, -rad * 0.28);
-    ctx.lineTo(rad * 0.32, -rad * 0.55);
-    ctx.lineTo(rad * 0.18, -rad * 0.15);
-    ctx.lineTo(rad * 0.22, rad * 0.15);
-    ctx.closePath();
-    ctx.fill();
-    inkStroke();
-    // eye dots
-    ctx.fillStyle = colors.ink;
-    inkCircle(-rad * 0.1, -rad * 0.08, Math.max(1.4, rad * 0.08), 6);
-    ctx.fill();
-    inkCircle(rad * 0.1, -rad * 0.08, Math.max(1.4, rad * 0.08), 6);
-    ctx.fill();
   }
 
   function drawBruteBody(rad, colors, bob) {
-    // stone golem: irregular rock + crack
-    inkSeed = Math.round(rad * 29 + 7);
-    ctx.translate(0, bob * 0.35);
-    inkSetup(Math.max(2.4, rad * 0.18));
+    inkSeed = Math.round(rad * 13 + 4);
+    ctx.translate(0, bob * 0.2);
+    inkSetup(Math.max(2.2, rad * 0.14));
     ctx.fillStyle = colors.fill;
-    ctx.strokeStyle = colors.rim;
     ctx.beginPath();
-    var rock = [
-      [-0.78, -0.72], [-0.2, -0.98], [0.55, -0.78], [0.95, -0.2],
-      [0.78, 0.62], [0.15, 0.95], [-0.55, 0.82], [-0.98, 0.15],
-    ];
-    for (var i = 0; i < rock.length; i++) {
-      var rx = rock[i][0] * rad + inkJitter(i + 1, rad * 0.04);
-      var ry = rock[i][1] * rad + inkJitter(i + 9, rad * 0.04);
-      if (i === 0) ctx.moveTo(rx, ry);
-      else ctx.lineTo(rx, ry);
-    }
+    ctx.moveTo(-rad * 0.82, rad * 0.08);
+    ctx.quadraticCurveTo(-rad * 0.95, -rad * 0.35, -rad * 0.25, -rad * 0.38);
+    ctx.lineTo(-rad * 0.05, -rad * 0.68);
+    ctx.lineTo(rad * 0.12, -rad * 0.34);
+    ctx.lineTo(rad * 0.38, -rad * 0.62);
+    ctx.lineTo(rad * 0.48, -rad * 0.28);
+    ctx.quadraticCurveTo(rad * 1.02, rad * 0.02, rad * 0.72, rad * 0.32);
+    ctx.lineTo(rad * 0.4, rad * 0.48);
+    ctx.lineTo(-rad * 0.55, rad * 0.46);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    ctx.strokeStyle = colors.accent;
-    ctx.lineWidth = Math.max(1.8, rad * 0.12);
-    inkLine(-rad * 0.35, -rad * 0.15, rad * 0.2, rad * 0.05, 3);
+    inkLine(-rad * 0.42, rad * 0.44, -rad * 0.48, rad * 0.82, 2);
     inkStroke();
-    inkLine(rad * 0.05, -rad * 0.45, rad * 0.35, rad * 0.25, 3);
+    inkLine(-rad * 0.08, rad * 0.46, -rad * 0.02, rad * 0.86, 2);
     inkStroke();
-    // block eyes
-    ctx.fillStyle = colors.ink;
-    inkRect(-rad * 0.42, -rad * 0.28, rad * 0.22, rad * 0.18);
+    inkLine(rad * 0.28, rad * 0.4, rad * 0.36, rad * 0.78, 2);
+    inkStroke();
+    ctx.fillStyle = '#161616';
+    inkCircle(rad * 0.42, -rad * 0.02, Math.max(1.6, rad * 0.09), 6);
     ctx.fill();
-    inkRect(rad * 0.18, -rad * 0.28, rad * 0.22, rad * 0.18);
+    inkCircle(-rad * 0.28, -rad * 0.08, Math.max(1.4, rad * 0.07), 6);
     ctx.fill();
-    ctx.strokeStyle = colors.ink;
-    inkLine(-rad * 0.22, rad * 0.35, rad * 0.22, rad * 0.35, 2);
-    inkStroke();
   }
 
   function drawHopperBody(rad, colors, bob, jumping) {
-    // spring frog: round body + coil legs + big eyes
-    var stretch = jumping ? 1.14 : 1;
-    inkSeed = Math.round(rad * 33 + 15);
-    ctx.translate(0, bob);
-    ctx.scale(1 / Math.sqrt(stretch), stretch);
-    inkSetup(Math.max(2.1, rad * 0.16));
-    ctx.fillStyle = colors.fill;
-    ctx.strokeStyle = colors.rim;
-    // spring legs
-    ctx.lineWidth = Math.max(1.8, rad * 0.14);
+    inkSeed = Math.round(rad * 23 + 6);
+    ctx.translate(0, bob + (jumping ? -rad * 0.12 : 0));
+    inkSetup(Math.max(2, rad * 0.13));
+    ctx.strokeStyle = '#161616';
+    ctx.lineWidth = Math.max(1.8, rad * 0.12);
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.35, rad * 0.35);
+    ctx.moveTo(-rad * 0.28, rad * 0.28);
     ctx.lineTo(-rad * 0.55, rad * 0.55);
-    ctx.lineTo(-rad * 0.3, rad * 0.7);
+    ctx.lineTo(-rad * 0.22, rad * 0.62);
     ctx.lineTo(-rad * 0.62, rad * 0.95);
     inkStroke();
     ctx.beginPath();
-    ctx.moveTo(rad * 0.35, rad * 0.35);
+    ctx.moveTo(rad * 0.28, rad * 0.28);
     ctx.lineTo(rad * 0.55, rad * 0.55);
-    ctx.lineTo(rad * 0.3, rad * 0.7);
+    ctx.lineTo(rad * 0.22, rad * 0.62);
     ctx.lineTo(rad * 0.62, rad * 0.95);
     inkStroke();
-    // feet
-    inkLine(-rad * 0.78, rad * 0.95, -rad * 0.42, rad * 0.95, 2);
-    inkStroke();
-    inkLine(rad * 0.42, rad * 0.95, rad * 0.78, rad * 0.95, 2);
-    inkStroke();
-    // body
-    inkCircle(0, -rad * 0.05, rad * 0.72, 16);
-    ctx.fill();
-    inkStroke();
-    // belly
-    ctx.fillStyle = colors.accent;
-    ctx.globalAlpha = 0.18;
-    inkCircle(0, rad * 0.18, rad * 0.38, 12);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    // eye bumps
     ctx.fillStyle = colors.fill;
-    ctx.strokeStyle = colors.rim;
-    inkCircle(-rad * 0.32, -rad * 0.62, rad * 0.28, 10);
+    inkCircle(0, rad * 0.02, rad * 0.5, 14);
     ctx.fill();
     inkStroke();
-    inkCircle(rad * 0.32, -rad * 0.62, rad * 0.28, 10);
+    ctx.fillStyle = colors.fill;
+    inkCircle(-rad * 0.28, -rad * 0.48, rad * 0.22, 8);
     ctx.fill();
     inkStroke();
-    ctx.fillStyle = colors.ink;
-    inkCircle(-rad * 0.32, -rad * 0.62, rad * 0.12, 8);
+    inkCircle(rad * 0.28, -rad * 0.48, rad * 0.22, 8);
     ctx.fill();
-    inkCircle(rad * 0.32, -rad * 0.62, rad * 0.12, 8);
+    inkStroke();
+    ctx.fillStyle = '#161616';
+    inkCircle(-rad * 0.28, -rad * 0.48, rad * 0.08, 6);
+    ctx.fill();
+    inkCircle(rad * 0.28, -rad * 0.48, rad * 0.08, 6);
     ctx.fill();
   }
 
   function drawDevilBody(rad, colors, bob) {
-    // doodle imp: wings + round face + horns + red pitchfork
-    inkSeed = Math.round(rad * 41 + 9);
-    ctx.translate(0, bob);
-    inkSetup(Math.max(2.2, rad * 0.17));
+    inkSeed = Math.round(rad * 29 + 2);
+    ctx.translate(0, bob * 0.3);
+    inkSetup(Math.max(2, rad * 0.12));
     ctx.fillStyle = colors.fill;
-    ctx.strokeStyle = colors.rim;
-    // small doodle wings
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.55, rad * 0.05);
-    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.42, -rad * 1.2, rad * 0.12);
-    ctx.quadraticCurveTo(-rad * 0.85, rad * 0.08, -rad * 0.55, rad * 0.32);
+    ctx.moveTo(-rad * 0.35, -rad * 0.05);
+    ctx.quadraticCurveTo(-rad * 0.95, -rad * 0.45, -rad * 1.05, rad * 0.05);
+    ctx.quadraticCurveTo(-rad * 0.7, rad * 0.02, -rad * 0.4, rad * 0.22);
     ctx.closePath();
     ctx.fill();
     inkStroke();
     ctx.beginPath();
-    ctx.moveTo(rad * 0.55, rad * 0.05);
-    ctx.quadraticCurveTo(rad * 1.05, -rad * 0.42, rad * 1.2, rad * 0.12);
-    ctx.quadraticCurveTo(rad * 0.85, rad * 0.08, rad * 0.55, rad * 0.32);
+    ctx.moveTo(rad * 0.35, -rad * 0.05);
+    ctx.quadraticCurveTo(rad * 0.95, -rad * 0.45, rad * 1.05, rad * 0.05);
+    ctx.quadraticCurveTo(rad * 0.7, rad * 0.02, rad * 0.4, rad * 0.22);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    // sharp horns
+    inkCircle(0, rad * 0.08, rad * 0.42, 12);
+    ctx.fill();
+    inkStroke();
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.42, -rad * 0.55);
-    ctx.lineTo(-rad * 0.58, -rad * 1.12);
-    ctx.lineTo(-rad * 0.12, -rad * 0.68);
+    ctx.moveTo(-rad * 0.16, -rad * 0.22);
+    ctx.lineTo(-rad * 0.28, -rad * 0.62);
+    ctx.lineTo(-rad * 0.02, -rad * 0.28);
     ctx.closePath();
     ctx.fill();
     inkStroke();
     ctx.beginPath();
-    ctx.moveTo(rad * 0.42, -rad * 0.55);
-    ctx.lineTo(rad * 0.58, -rad * 1.12);
-    ctx.lineTo(rad * 0.12, -rad * 0.68);
+    ctx.moveTo(rad * 0.16, -rad * 0.22);
+    ctx.lineTo(rad * 0.3, -rad * 0.6);
+    ctx.lineTo(rad * 0.02, -rad * 0.28);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    // round head
-    inkCircle(0, rad * 0.06, rad * 0.78, 16);
+    ctx.fillStyle = '#161616';
+    inkCircle(-rad * 0.14, rad * 0.02, Math.max(1.3, rad * 0.07), 5);
     ctx.fill();
-    inkStroke();
-    // dot eyes + angry brows + grin
-    ctx.fillStyle = colors.ink;
-    inkCircle(-rad * 0.26, -rad * 0.06, Math.max(1.8, rad * 0.11), 8);
+    inkCircle(rad * 0.14, rad * 0.02, Math.max(1.3, rad * 0.07), 5);
     ctx.fill();
-    inkCircle(rad * 0.26, -rad * 0.06, Math.max(1.8, rad * 0.11), 8);
-    ctx.fill();
-    ctx.strokeStyle = colors.ink;
-    ctx.lineWidth = Math.max(1.8, rad * 0.12);
-    inkLine(-rad * 0.46, -rad * 0.28, -rad * 0.12, -rad * 0.18, 2);
-    inkStroke();
-    inkLine(rad * 0.46, -rad * 0.28, rad * 0.12, -rad * 0.18, 2);
-    inkStroke();
     ctx.beginPath();
-    ctx.arc(0, rad * 0.22, rad * 0.3, 0.15, Math.PI - 0.15);
+    ctx.arc(0, rad * 0.14, rad * 0.14, 0.2, Math.PI - 0.2);
     inkStroke();
-    // held red pitchfork (side)
-    ctx.save();
-    ctx.translate(rad * 0.85, rad * 0.15);
-    ctx.rotate(0.35);
-    drawRedPitchfork(rad * 0.7);
-    ctx.restore();
   }
 
   function drawShardBody(rad, colors) {
-    inkSeed = Math.round(rad * 25 + 3);
-    inkSetup(Math.max(2.2, rad * 0.18));
+    inkSeed = Math.round(rad * 11 + 9);
+    inkSetup(Math.max(2, rad * 0.16));
     ctx.fillStyle = colors.fill;
-    ctx.strokeStyle = colors.rim;
     ctx.beginPath();
-    ctx.moveTo(inkJitter(1, 0.3), -rad);
-    ctx.lineTo(rad * 0.7, inkJitter(2, 0.3));
-    ctx.lineTo(inkJitter(3, 0.3), rad);
-    ctx.lineTo(-rad * 0.7, inkJitter(4, 0.3));
+    ctx.moveTo(0, -rad * 0.85);
+    ctx.lineTo(rad * 0.55, rad * 0.15);
+    ctx.lineTo(0, rad * 0.85);
+    ctx.lineTo(-rad * 0.55, rad * 0.1);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    ctx.strokeStyle = colors.accent;
-    inkX(0, 0, rad * 0.4);
   }
 
   function drawBossSilhouette(id, rad, colors) {
@@ -8645,9 +8871,6 @@ function selectedTower() {
         ctx.arc(worldX(shock.x), worldY(shock.y), shock.radius * view.tile * rk, 0, Math.PI * 2);
         ctx.stroke();
       }
-      if (shock.artSheet != null) {
-        drawBoltSprite(shock.artSheet, shock.artRow, 'impact', worldX(shock.x), worldY(shock.y), 0, shock.radius * view.tile * 1.15, 0.5);
-      }
     }
     ctx.restore();
   }
@@ -8948,28 +9171,82 @@ function selectedTower() {
       selectTile(tile.getAttribute('data-tile'));
     });
     var welcomeStart = document.getElementById('btn-welcome-start');
-    var openCodexBtn = document.getElementById('btn-open-codex');
-    var openTowersBtn = document.getElementById('btn-open-towers');
-    var openHellBtn = document.getElementById('btn-open-hell');
+    var welcomeAccount = document.getElementById('btn-welcome-account');
+    var welcomeGuest = document.getElementById('btn-welcome-guest');
+    var accountChip = document.getElementById('account-chip');
+    var openIndexBtn = document.getElementById('btn-open-index');
     var menuBack = document.getElementById('btn-menu-back');
-    var codexBack = document.getElementById('btn-codex-back');
-    var towersBack = document.getElementById('btn-towers-back');
-    var hellBack = document.getElementById('btn-hell-back');
+    var indexBack = document.getElementById('btn-index-back');
+    var indexTabs = document.getElementById('index-tabs');
+    var openBoardBtn = document.getElementById('btn-open-board');
+    var openFriendsBtn = document.getElementById('btn-open-friends');
+    var openAuraBtn = document.getElementById('btn-open-aura');
+    var auraBack = document.getElementById('btn-aura-back');
+    var friendsBack = document.getElementById('btn-friends-back');
+    var addFriendBtn = document.getElementById('btn-add-friend');
+    var copyCodeBtn = document.getElementById('btn-copy-code');
+    var playerCard = document.getElementById('player-card');
+    var boardBack = document.getElementById('btn-board-back');
     if (welcomeStart) welcomeStart.addEventListener('click', showMenu);
-    if (openCodexBtn) openCodexBtn.addEventListener('click', openCodex);
-    if (openTowersBtn) openTowersBtn.addEventListener('click', openTowerInfo);
-    if (openHellBtn) openHellBtn.addEventListener('click', openHellInfo);
+    if (welcomeAccount) welcomeAccount.addEventListener('click', beginGoogleSignIn);
+    if (welcomeGuest) welcomeGuest.addEventListener('click', beginGuestSignIn);
+    if (accountChip) accountChip.addEventListener('click', openAccountCard);
+    paintAccount();
+    if (openIndexBtn) openIndexBtn.addEventListener('click', function () { showIndex('codex'); });
     if (menuBack) menuBack.addEventListener('click', showWelcome);
-    if (codexBack) codexBack.addEventListener('click', showMenu);
-    if (towersBack) towersBack.addEventListener('click', showMenu);
-    if (hellBack) hellBack.addEventListener('click', showMenu);
+    if (indexBack) indexBack.addEventListener('click', showMenu);
+    if (indexTabs) indexTabs.addEventListener('click', function (event) {
+      var tab = event.target.closest('[data-index]');
+      if (!tab) return;
+      showIndex(tab.getAttribute('data-index'));
+    });
+    if (openBoardBtn) openBoardBtn.addEventListener('click', openBoard);
+    if (openFriendsBtn) openFriendsBtn.addEventListener('click', openFriends);
+    if (openAuraBtn) openAuraBtn.addEventListener('click', openAuraPreview);
+    if (auraBack) auraBack.addEventListener('click', showMenu);
+    if (friendsBack) friendsBack.addEventListener('click', showMenu);
+    if (addFriendBtn) addFriendBtn.addEventListener('click', addFriend);
+    if (copyCodeBtn) copyCodeBtn.addEventListener('click', copyFriendCode);
+    if (playerCard) playerCard.addEventListener('click', function () {
+      if (loadAccount()) openAccountCard();
+      else toast('請先在歡迎頁登入');
+    });
+    if (boardBack) boardBack.addEventListener('click', showMenu);
     if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
-    document.getElementById('btn-mode-campaign').addEventListener('click', openChapters);
+    document.getElementById('btn-mode-campaign').addEventListener('click', showMenu);
+    document.getElementById('btn-home-start').addEventListener('click', function () {
+      var stage = ensureHomePick();
+      if (!stageUnlocked(stage)) {
+        toast('這關還沒解鎖');
+        return;
+      }
+      startRun('campaign', stage.stageId);
+    });
+    document.getElementById('home-prev').addEventListener('click', function () {
+      var stage = ensureHomePick();
+      var id = Math.max(1, stage.chapter - 1);
+      var pick = stageById(id + '-1');
+      homePick = { chapter: pick.chapter, index: pick.index };
+      paintPlayHome();
+    });
+    document.getElementById('home-next').addEventListener('click', function () {
+      var stage = ensureHomePick();
+      var id = Math.min(8, stage.chapter + 1);
+      var pick = stageById(id + '-1');
+      homePick = { chapter: pick.chapter, index: pick.index };
+      paintPlayHome();
+    });
+    document.getElementById('home-stages').addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-stage]');
+      if (!btn || btn.disabled) return;
+      var stage = stageById(btn.getAttribute('data-stage'));
+      if (!stage) return;
+      homePick = { chapter: stage.chapter, index: stage.index };
+      paintPlayHome();
+    });
     document.getElementById('btn-mode-custom').addEventListener('click', function () { openDifficulty('custom'); });
     document.getElementById('btn-mode-infinite').addEventListener('click', function () { openDifficulty('infinite'); });
     document.getElementById('btn-difficulty-back').addEventListener('click', showMenu);
-    document.getElementById('btn-chapters-back').addEventListener('click', showMenu);
-    document.getElementById('btn-stages-back').addEventListener('click', openChapters);
     backBtn.addEventListener('click', requestMenu);
     inspectActions.addEventListener('click', function (event) {
       var btn = event.target.closest('[data-act]');
@@ -9001,7 +9278,7 @@ function selectedTower() {
         return;
       }
       if (event.target.closest && event.target.closest('button')) return;
-      if ((event.key === ' ' || event.key === 'Enter') && state.phase === 'prep' && !state.pickMode && !state.adBusy && !state.hellWheel && screenMenu.hidden && screenChapters.hidden && screenStages.hidden && screenDifficulty.hidden) {
+      if ((event.key === ' ' || event.key === 'Enter') && state.phase === 'prep' && !state.pickMode && !state.adBusy && !state.hellWheel && screenMenu.hidden && screenDifficulty.hidden) {
         event.preventDefault();
         requestStartWave(state.wave + 1);
       } else if (event.key === '1') placeChosen('basic');
@@ -9072,16 +9349,6 @@ function selectedTower() {
     showWelcome();
   }
 
-  function punchMinions() {
-    for (var i = 0; i < MINION_PAIRS.length; i++) {
-      for (var k = 0; k < MINION_PAIRS[i].length; k++) {
-        var minion = MINION_PAIRS[i][k];
-        var frame = minion.frame;
-        minion.stamp = keyedStamp(minionSheet, frame, null);
-      }
-    }
-  }
-
   function loadSheets(done) {
     done();
   }
@@ -9093,6 +9360,9 @@ function selectedTower() {
     showWelcome();
     syncSpeedButton();
     syncSoundButton();
+    initCloud();
+    ensureWeek();
+    window.setInterval(ensureWeek, 30000);
     Ads.init().catch(function () {});
     loadSheets(function () { requestAnimationFrame(frame); });
   }
