@@ -3358,36 +3358,29 @@ function selectedTower() {
 
   function triggerFireCounter(enemy) {
     if (!enemy || enemy.dead) return;
-    if (enemy.fireCounterAt && state.time - enemy.fireCounterAt < 0.85) {
-      if (enemy.shield > 0) {
-        enemy.shield = 0;
-        var early = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
-        spawnFloater(early.x, early.y - 0.55, '破盾', '#e02323');
-        shatterShieldFx(early.x, early.y);
-      }
-      return;
-    }
-    enemy.fireCounterAt = state.time;
     var pos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
-    var triggered = false;
+    var fresh = false;
     if (enemy.shield > 0) {
       enemy.shield = 0;
-      triggered = true;
+      fresh = !enemy.fireShieldPaid;
+      enemy.fireShieldPaid = true;
       spawnFloater(pos.x, pos.y - 0.55, '破盾', '#e02323');
       shatterShieldFx(pos.x, pos.y);
     }
-    if (enemy.bossId === 'armor') {
+    if (enemy.bossId === 'armor' && !enemy.firePierce) {
       enemy.firePierce = true;
-      triggered = true;
+      fresh = true;
       spawnFloater(pos.x, pos.y - 0.75, '破甲', '#e02323');
     }
-    if (hasHellDeff('thick')) {
-      triggered = true;
+    if (hasHellDeff('thick') && !enemy.fireThickPaid) {
+      enemy.fireThickPaid = true;
+      fresh = true;
       spawnFloater(pos.x, pos.y - 0.95, '克制厚皮', '#e02323');
     }
-    if (!triggered) return;
-    var pct = Math.max(1, Math.round(enemy.maxHp * 0.1));
-    hurtEnemy(enemy, pct, null, { pierce: true, ignoreShield: true });
+    if (!fresh) return;
+    if (enemy.firePctAt && state.time - enemy.firePctAt < 0.85) return;
+    enemy.firePctAt = state.time;
+    hurtEnemy(enemy, Math.max(1, Math.round(enemy.maxHp * 0.06)), null, { pierce: true, ignoreShield: true });
   }
 
   function healBlocked(enemy) {
@@ -3616,7 +3609,7 @@ function selectedTower() {
     var radius = 2.15 + tower.level * (2.45 / 9);
     var bonus = 0.08 + tower.level * (0.14 / 9);
     var haste = 0.06 + tower.level * (0.12 / 9);
-    var tempo = 0.028 + tower.level * (0.036 / 9);
+    var tempo = 0.005 + tower.level * (0.006 / 9);
     return { radius: radius, bonus: bonus, haste: haste, tempo: tempo };
   }
 
@@ -4032,7 +4025,7 @@ function selectedTower() {
     var asura = tower.buffTime > 0;
     var reach = asura ? 1.5 : 1.15;
     var arc = asura ? 1.4 : 1.05;
-    var hpPct = asura ? (0.0045 + tower.level * 0.0005) : 0;
+    var hpPct = asura ? (0.0014 + tower.level * (0.0004 / 9)) : 0;
     tower.shots = (tower.shots || 0) + 1;
     tower.swing = 1;
     state.projectiles.push({
@@ -4171,7 +4164,7 @@ function selectedTower() {
     var opts = { pierce: true, ignoreShield: true };
     var amount = damage;
     if (hunterGuarded(enemy)) {
-      amount = Math.max(damage, enemy.maxHp * (0.05 + tower.level * 0.004));
+      amount = Math.max(damage, enemy.maxHp * (0.012 + tower.level * 0.0011));
       var pos = enemyPos(enemy);
       if (enemy.shield > 0) enemy.shield = 0;
       if (enemy.resist) enemy.resist = '';
@@ -4251,7 +4244,7 @@ function selectedTower() {
       state.meteor = {
         life: 7,
         tick: 0.05,
-        pct: 0.012 + (lv / 9) * 0.014,
+        pct: 0.004 + (lv / 9) * 0.0045,
         ownerId: tower.id,
         rocks: [],
       };
@@ -4498,7 +4491,7 @@ function selectedTower() {
         y: cell.r + 0.5,
         radius: 1.35 + hero.level * 0.08,
         life: 10,
-        pct: 0.025 + hero.level * 0.003,
+        pct: 0.008 + hero.level * 0.0009,
         ownerId: hero.id,
       });
       hero.skillCd = 30;
@@ -6814,7 +6807,7 @@ function selectedTower() {
         stats: [
           '<strong>造價</strong> 90',
           '<strong>爆</strong> 48→114',
-          '<strong>克制</strong> 護盾／鐵甲／厚皮 +10%血',
+          '<strong>克制</strong> 破盾、破甲、厚皮時打一次總血 6%',
         ],
       },
       {
@@ -6854,22 +6847,22 @@ function selectedTower() {
     appendInfoCard(list, {
       tag: '英雄', title: '緋紅劍客', paint: { kind: 'hero', hero: 'sword' },
       desc: '走到放置點的射程內追砍。刀揮過的怪都會受傷，每三下射出旋轉半月劍氣。主動：修羅附體。',
-      stats: ['<strong>主動</strong>：移速與攻速 +1000%，攻擊改為血量%，最多 5 秒', '<strong>操作</strong>：可拖曳換位，技能點放置處'],
+      stats: ['<strong>主動</strong>：攻速約 11 倍，每下總血 0.14%→0.18%，最多 5 秒', '<strong>操作</strong>：可拖曳換位，技能點放置處'],
     });
     appendInfoCard(list, {
       tag: '英雄', title: '叢林獵手', paint: { kind: 'hero', hero: 'archer' },
-      desc: '最遠的單體貫穿。打到護盾、鐵甲或抗性時改為血量傷害，並打掉那層抗性。',
-      stats: ['<strong>滿等</strong>：射程幾乎蓋住全圖', '<strong>主動</strong>：致命毒霧，禁療並每秒扣血，10 秒，冷卻 30 秒'],
+      desc: '最遠的單體貫穿。打到護盾、鐵甲或抗性時，那一發改打總血，並打掉那層。',
+      stats: ['<strong>貫甲</strong>：每發總血 1.2%→2.2%', '<strong>主動</strong>：致命毒霧，每秒總血 0.8%→1.6%，禁療 10 秒'],
     });
     appendInfoCard(list, {
       tag: '英雄', title: '萬象法師', paint: { kind: 'hero', hero: 'mage' },
       desc: '火破盾、冰緩速、風把怪沿路推回去。主動：隕石術，全圖持續落下。',
-      stats: ['<strong>普攻</strong>：三系輪流', '<strong>主動</strong>：全圖血量傷害'],
+      stats: ['<strong>普攻</strong>：三系輪流', '<strong>主動</strong>：每 0.5 秒全圖總血 0.4%→0.85%，共 7 秒'],
     });
     appendInfoCard(list, {
       tag: '英雄', title: '戰靈樂手', paint: { kind: 'hero', hero: 'priest' },
       desc: '不攻擊。光環提升裡面每座塔的攻擊與攻速，滿等大約蓋住半張圖。',
-      stats: ['<strong>光環</strong>：攻擊約 +8%～22%，攻速約 +6%～18%', '<strong>主動</strong>：致命節奏，光環內攻擊改打總血量%'],
+      stats: ['<strong>光環</strong>：攻擊約 +8%～22%，攻速約 +6%～18%', '<strong>主動</strong>：每座塔每秒總血 0.5%→1.1%，5 秒，不疊原本傷害'],
     });
     appendInfoCard(list, {
       tag: '英雄', title: '全知全能的神', paint: { kind: 'hero', hero: 'god' },
