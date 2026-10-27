@@ -5787,7 +5787,7 @@ function selectedTower() {
     },
   ];
 
-  function renderPatchNotes(notes) {
+  function renderPatchNotes(notes, page) {
     var list = document.getElementById('modal-notes');
     if (!list) return;
     list.replaceChildren();
@@ -5796,7 +5796,10 @@ function selectedTower() {
       return;
     }
     list.hidden = false;
-    notes.forEach(function (note) {
+    var pageSize = 5;
+    var pages = Math.max(1, Math.ceil(notes.length / pageSize));
+    var index = Math.max(0, Math.min(pages - 1, page || 0));
+    notes.slice(index * pageSize, index * pageSize + pageSize).forEach(function (note) {
       var item = document.createElement('button');
       item.type = 'button';
       item.className = 'notice-item';
@@ -5824,6 +5827,27 @@ function selectedTower() {
       });
       list.appendChild(item);
     });
+    if (pages < 2) return;
+    var pager = document.createElement('div');
+    pager.className = 'notice-pager';
+    function pageButton(label, target, flags) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'notice-page' + (flags.current ? ' is-on' : '');
+      btn.textContent = label;
+      btn.disabled = !!flags.disabled;
+      if (flags.current) btn.setAttribute('aria-current', 'page');
+      if (!flags.disabled && !flags.current) {
+        btn.addEventListener('click', function () { renderPatchNotes(notes, target); });
+      }
+      return btn;
+    }
+    pager.appendChild(pageButton('上一頁', index - 1, { disabled: index === 0 }));
+    for (var p = 0; p < pages; p++) {
+      pager.appendChild(pageButton(String(p + 1), p, { current: p === index }));
+    }
+    pager.appendChild(pageButton('下一頁', index + 1, { disabled: index >= pages - 1 }));
+    list.appendChild(pager);
   }
 
   function openPatchNotes() {
@@ -5831,7 +5855,7 @@ function selectedTower() {
       tone: 'reward',
       kicker: '公告',
       title: '更新資訊',
-      desc: '這幾天改過的地方。點一則就能看細項。',
+      desc: '一頁五則。點一則就能看細項。',
       notes: PATCH_NOTES,
       actions: [{ label: '知道了', className: 'btn-ghost is-exit', onClick: closeModal }],
     });

@@ -617,6 +617,20 @@ canvas[hidden] { display: none !important; }
   color: #3a3a3a;
 }
 .modal.is-notice .notice-item.is-open .notice-detail { display: block; }
+.notice-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.notice-page {
+  min-width: 42px;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.notice-page:disabled { opacity: 0.38; }
 .modal-actions { display: grid; gap: 8px; }
 .modal-actions .btn { text-align: left; }
 .modal-actions .btn.is-locked {
@@ -2728,6 +2742,7 @@ button.icon-btn::before {
 }
 button.index-tab.is-on::before,
 button.board-tab.is-on::before,
+button.notice-page.is-on::before,
 button.btn-mint::before,
 button.btn-gold::before,
 button.wave-btn:not(:disabled)::before,
@@ -2737,6 +2752,7 @@ button.tile-btn.is-selected::before {
 }
 button.index-tab.is-on,
 button.board-tab.is-on,
+button.notice-page.is-on,
 button.btn-mint,
 button.btn-gold,
 button.wave-btn:not(:disabled),
