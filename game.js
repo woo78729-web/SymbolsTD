@@ -22,7 +22,7 @@
       cost: 40,
       color: '#9aa69a',
       category: 'neutral',
-      upgradeCost: [35, 60, 95, 135, 180],
+      upgradeCost: [35, 60, 95, 135, 180, 250, 340, 460, 620],
       levels: [
         { damage: 16, range: 2.35, cooldown: 0.38, splash: 0, targets: 1 },
         { damage: 26, range: 2.5, cooldown: 0.32, splash: 0, targets: 1 },
@@ -58,7 +58,7 @@
       cost: 80,
       color: '#3cbf4a',
       category: 'element',
-      upgradeCost: [55, 85, 120, 160, 210],
+      upgradeCost: [55, 85, 120, 160, 210, 290, 390, 520, 700],
       levels: [
         { damage: 12, range: 2.35, cooldown: 1.05, splash: 0, effect: 'poison', poison: 22, poisonTime: 3.2, poisonEvery: 0.4 },
         { damage: 14, range: 2.4, cooldown: 0.95, splash: 0, effect: 'poison', poison: 28, poisonTime: 3.2, poisonEvery: 0.4 },
@@ -74,7 +74,7 @@
       cost: 90,
       color: '#ff7a45',
       category: 'element',
-      upgradeCost: [60, 95, 135, 180, 230],
+      upgradeCost: [60, 95, 135, 180, 230, 310, 420, 560, 750],
       levels: [
         { damage: 48, range: 2.25, cooldown: 1.1, splash: 0.95, effect: 'burn', burn: 4, burnTime: 2.4, burnEvery: 0.5 },
         { damage: 58, range: 2.3, cooldown: 1.0, splash: 1.02, effect: 'burn', burn: 5, burnTime: 2.4, burnEvery: 0.5 },
@@ -90,7 +90,7 @@
       cost: 85,
       color: '#8fd4ff',
       category: 'element',
-      upgradeCost: [55, 90, 130, 175, 220],
+      upgradeCost: [55, 90, 130, 175, 220, 300, 400, 540, 720],
       levels: [
         { damage: 28, range: 2.3, cooldown: 1.1, splash: 1.1, effect: 'slow', slow: 0.35, slowTime: 1.8 },
         { damage: 34, range: 2.35, cooldown: 1.0, splash: 1.2, effect: 'slow', slow: 0.38, slowTime: 1.8 },
@@ -106,7 +106,7 @@
       cost: 85,
       color: '#e0b000',
       category: 'element',
-      upgradeCost: [55, 90, 130, 175, 220],
+      upgradeCost: [55, 90, 130, 175, 220, 300, 400, 540, 720],
       levels: [
         { damage: 24, range: 2.45, cooldown: 0.72, splash: 0, targets: 1, chain: 2, chainRange: 1.75, stunTime: 1.0 },
         { damage: 32, range: 2.5, cooldown: 0.64, splash: 0, targets: 1, chain: 2, chainRange: 1.85, stunTime: 1.05 },
@@ -122,7 +122,7 @@
       cost: 70,
       color: '#f2c14e',
       category: 'economy',
-      upgradeCost: [50, 80, 115, 155, 200],
+      upgradeCost: [50, 80, 115, 155, 200, 270, 360, 480, 640],
       levels: [
         { damage: 0, range: 0, cooldown: 5.0, goldGen: 6 },
         { damage: 0, range: 0, cooldown: 4.6, goldGen: 8 },
@@ -130,6 +130,17 @@
         { damage: 0, range: 0, cooldown: 3.8, goldGen: 14 },
         { damage: 0, range: 0, cooldown: 3.4, goldGen: 18 },
         { damage: 0, range: 0, cooldown: 3.0, goldGen: 22 },
+      ],
+    },
+    smith: {
+      name: '鐵匠',
+      blurb: '不攻擊。在場時，其他塔可以用金幣升到 10 等。',
+      cost: 480,
+      color: '#8d6e63',
+      category: 'support',
+      upgradeCost: [],
+      levels: [
+        { damage: 0, range: 0, cooldown: 99 },
       ],
     },
   };
@@ -208,6 +219,8 @@
     lives: START_LIVES,
     shownLives: START_LIVES,
     wave: 0,
+    waveTime: 0,
+    berserk: false,
     phase: 'prep',
     paused: false,
     userPaused: false,
@@ -413,7 +426,19 @@
   function loadStars() {
     try {
       var raw = JSON.parse(localStorage.getItem('fantasy_td_stars') || '{}');
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) raw = {};
+      if (localStorage.getItem('fantasy_td_star_bits') !== '1') {
+        var keys = Object.keys(raw);
+        for (var i = 0; i < keys.length; i++) {
+          var n = raw[keys[i]] | 0;
+          if (n >= 3) raw[keys[i]] = 7;
+          else if (n === 2) raw[keys[i]] = 3;
+          else if (n === 1) raw[keys[i]] = 1;
+          else raw[keys[i]] = 0;
+        }
+        localStorage.setItem('fantasy_td_star_bits', '1');
+        localStorage.setItem('fantasy_td_stars', JSON.stringify(raw));
+      }
       return raw;
     } catch (error) { return {}; }
   }
@@ -956,6 +981,71 @@
     return waves;
   }
 
+  var GOAL_TYPES = ['poison', 'fire', 'ice', 'bolt'];
+
+  function stageGoalList(chapter, index) {
+    var main = GOAL_TYPES[(chapter - 1) % GOAL_TYPES.length];
+    var side = GOAL_TYPES[chapter % GOAL_TYPES.length];
+    if (index === 1) {
+      return [
+        { kind: 'clear' },
+        { kind: 'flawless' },
+        chapter % 2 ? { kind: 'ban', type: 'mint' } : { kind: 'least', type: side, count: 2 },
+      ];
+    }
+    if (index === 2) {
+      return [
+        { kind: 'clear' },
+        { kind: 'bruise', max: 5 },
+        { kind: 'ban', type: main },
+      ];
+    }
+    if (index === 3) {
+      return [
+        { kind: 'clear' },
+        { kind: 'rank', type: main, level: 5 },
+        chapter >= 4 ? { kind: 'nohero' } : { kind: 'ban', type: 'mint' },
+      ];
+    }
+    if (index === 4) {
+      return [
+        { kind: 'clear' },
+        { kind: 'flawless' },
+        chapter % 2 ? { kind: 'cap', max: 6 } : { kind: 'nosell' },
+      ];
+    }
+    return [
+      { kind: 'clear' },
+      { kind: 'rank', type: side, level: 5 },
+      chapter >= 5 ? { kind: 'nohero' } : { kind: 'bruise', max: 3 },
+    ];
+  }
+
+  function towerShort(type) {
+    if (type === 'basic') return '無屬';
+    if (type === 'poison') return '毒塔';
+    if (type === 'fire') return '火塔';
+    if (type === 'ice') return '冰塔';
+    if (type === 'bolt') return '雷塔';
+    if (type === 'mint') return '產錢';
+    if (type === 'hero') return '英雄';
+    return '塔';
+  }
+
+  function goalLabel(goal) {
+    if (!goal) return '';
+    if (goal.kind === 'clear') return '通關';
+    if (goal.kind === 'flawless') return '無傷';
+    if (goal.kind === 'bruise') return '受傷≤' + goal.max;
+    if (goal.kind === 'ban') return '不放' + towerShort(goal.type);
+    if (goal.kind === 'rank') return towerShort(goal.type) + goal.level + '等';
+    if (goal.kind === 'cap') return '最多' + goal.max + '塔';
+    if (goal.kind === 'least') return towerShort(goal.type) + '×' + goal.count;
+    if (goal.kind === 'nohero') return '不放英雄';
+    if (goal.kind === 'nosell') return '不賣塔';
+    return '';
+  }
+
   function buildStages() {
     var list = [];
     for (var c = 1; c <= 8; c++) {
@@ -968,6 +1058,7 @@
           name: STAGE_TITLES[s - 1],
           path: path,
           waves: buildWaves(c, s),
+          goals: stageGoalList(c, s),
           initialGold: 50,
           hpScale: Math.round((1 + (c - 1) * 0.07 + (s - 1) * 0.02) * 1.06 * 100) / 100,
         });
@@ -1090,7 +1181,8 @@
   }
 
   function tryHopperJump(enemy) {
-    if (!PATH_JUMPS.length || enemy.jumpCd > 0 || enemy.jumping || enemy.freeze > 0 || enemy.stun > 0) return;
+    if (!PATH_JUMPS.length || enemy.jumpCd > 0 || enemy.jumping) return;
+    if (!state.berserk && (enemy.freeze > 0 || enemy.stun > 0)) return;
     if (hoppingCount() >= HOPPER_JUMP_MAX) return;
     var best = null;
     for (var i = 0; i < PATH_JUMPS.length; i++) {
@@ -1171,8 +1263,33 @@ function selectedTower() {
   }
 
   function bossForWave(wave) {
+    if (state.mode === 'infinite' && wave === 50) {
+      return { id: 'titan', name: '迴廊巨王', blurb: state.titanBlurb || '三種王的能力' };
+    }
     if (!isBossWave(wave)) return null;
     return BOSSES[bossIndexFor(wave) % BOSSES.length];
+  }
+
+  function rollTitanTraits() {
+    var ids = [];
+    for (var i = 0; i < BOSSES.length; i++) ids.push(BOSSES[i].id);
+    for (var n = ids.length - 1; n > 0; n--) {
+      var swap = Math.floor(Math.random() * (n + 1));
+      var held = ids[n];
+      ids[n] = ids[swap];
+      ids[swap] = held;
+    }
+    return ids.slice(0, 3);
+  }
+
+  function titanBlurb(traits) {
+    var names = [];
+    for (var i = 0; i < traits.length; i++) {
+      for (var b = 0; b < BOSSES.length; b++) {
+        if (BOSSES[b].id === traits[i]) names.push(BOSSES[b].name);
+      }
+    }
+    return names.join('、');
   }
 
   function planFromSpec(spec, wave) {
@@ -1820,12 +1937,20 @@ function selectedTower() {
       jobs.splice(Math.min(jobs.length, Math.max(2, Math.floor(jobs.length * 0.35))), 0, { type: 'ram', gap: Math.max(1.35, gap * 1.7) });
     }
     var brutes = 0;
-    var boss = bossForWave(wave);
-    if (boss) {
-      jobs.push({ type: 'boss', gap: 1.7, bossIndex: bossIndexFor(wave) });
-    } else if (wave % 5 === 0) {
-      jobs.push({ type: 'brute', gap: 1.15 });
-      brutes = 1;
+    var boss = null;
+    if (state.mode === 'infinite' && wave === 50) {
+      var traits = rollTitanTraits();
+      state.titanBlurb = titanBlurb(traits);
+      jobs.push({ type: 'titan', gap: 1.7, traits: traits });
+      boss = { id: 'titan', name: '迴廊巨王', blurb: state.titanBlurb };
+    } else {
+      boss = bossForWave(wave);
+      if (boss) {
+        jobs.push({ type: 'boss', gap: 1.7, bossIndex: bossIndexFor(wave) });
+      } else if (wave % 5 === 0) {
+        jobs.push({ type: 'brute', gap: 1.15 });
+        brutes = 1;
+      }
     }
     return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, rams: rams, boss: boss };
   }
@@ -1996,6 +2121,28 @@ function selectedTower() {
     };
   }
 
+  function makeTitan(wave, traits) {
+    var boss = makeBoss(0, wave);
+    var picked = traits && traits.length ? traits.slice(0, 3) : rollTitanTraits();
+    boss.bossId = 'titan';
+    boss.name = '迴廊巨王';
+    boss.ability = titanBlurb(picked);
+    boss.traits = picked;
+    boss.hp = Math.round(boss.hp * 2.6);
+    boss.maxHp = boss.hp;
+    boss.radius = 0.9;
+    boss.leak = 8;
+    boss.speed = boss.baseSpeed * 0.78;
+    boss.baseSpeed = boss.speed;
+    boss.color = '#1a1a1a';
+    boss.shield = 0;
+    boss.abilityTimer = 3.2;
+    for (var i = 0; i < picked.length; i++) {
+      if (picked[i] === 'ward') boss.shield = Math.round(boss.maxHp * 0.18);
+    }
+    return boss;
+  }
+
   function queueEnemy(enemy) {
     applyHellSpawnStats(enemy);
     state.pendingSpawns.push(enemy);
@@ -2164,6 +2311,52 @@ function selectedTower() {
     return Math.max(11, qualified + 1) + unqualifiedBefore;
   }
 
+  function scoreRow(account, wave) {
+    return {
+      uid: account.uid,
+      name: account.name,
+      picture: profilePicture(account),
+      frame: frameUnlocked(account.frame) ? account.frame : '',
+      title: titleUnlocked(account.title) ? account.title : '',
+      wave: wave,
+    };
+  }
+
+  function paintLocalBoardCard() {
+    var account = loadAccount();
+    if (!account) return;
+    var card = scoreRow(account, 0);
+    for (var id in onlineBoards) {
+      var rows = onlineBoards[id];
+      if (!rows) continue;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].uid !== account.uid) continue;
+        rows[i].name = card.name;
+        rows[i].picture = card.picture;
+        rows[i].frame = card.frame;
+        rows[i].title = card.title;
+      }
+    }
+  }
+
+  function updateBoardCard() {
+    if (!cloudReady() || !cloudDb) return;
+    var account = loadAccount();
+    if (!account || String(account.uid).indexOf('guest-') === 0) return;
+    var week = ensureWeek();
+    var card = scoreRow(account, 0);
+    delete card.wave;
+    delete card.uid;
+    BOARD_TABS.forEach(function (tab) {
+      if (String(tab.id).indexOf('-hell') < 0) return;
+      var ref = cloudDb.collection('boards').doc(tab.id).collection('weeks').doc(String(week)).collection('entries').doc(account.uid);
+      ref.get().then(function (snap) {
+        if (!snap.exists) return null;
+        return ref.set(card, { merge: true });
+      }).catch(function () {});
+    });
+  }
+
   function bumpCachedScore(boardId, account, wave) {
     if (!onlineBoards[boardId]) return;
     var rows = onlineBoards[boardId].slice();
@@ -2171,9 +2364,9 @@ function selectedTower() {
     for (var i = 0; i < rows.length; i++) {
       if (rows[i].uid !== account.uid) continue;
       found = true;
-      if (wave > rows[i].wave) rows[i] = { uid: account.uid, name: account.name, wave: wave };
+      if (wave > rows[i].wave) rows[i] = scoreRow(account, wave);
     }
-    if (!found) rows.push({ uid: account.uid, name: account.name, wave: wave });
+    if (!found) rows.push(scoreRow(account, wave));
     onlineBoards[boardId] = sortScores(rows).slice(0, 20);
     for (var n = 0; n < onlineBoards[boardId].length; n++) {
       if (onlineBoards[boardId][n].uid !== account.uid) continue;
@@ -2190,7 +2383,14 @@ function selectedTower() {
       var rows = [];
       snap.forEach(function (doc) {
         var data = doc.data() || {};
-        rows.push({ uid: doc.id, name: data.name || '玩家', wave: Number(data.wave) || 0 });
+        rows.push({
+          uid: doc.id,
+          name: data.name || '玩家',
+          wave: Number(data.wave) || 0,
+          picture: data.picture || '',
+          frame: data.frame || '',
+          title: data.title || '',
+        });
       });
       onlineBoards[boardId] = rows;
       if (!account) {
@@ -2261,13 +2461,9 @@ function selectedTower() {
       var prev = snap.exists && snap.data() ? Number(snap.data().wave) || 0 : 0;
       weekBests[boardId] = { week: week, wave: Math.max(wave, prev) };
       if (wave <= prev) return null;
-      return ref.set({
-        uid: account.uid,
-        name: account.name,
-        picture: account.picture || '',
-        wave: wave,
-        updated: firebase.firestore.FieldValue.serverTimestamp(),
-      });
+      var row = scoreRow(account, wave);
+      row.updated = firebase.firestore.FieldValue.serverTimestamp();
+      return ref.set(row);
     }).then(function () {
       return refreshBoard(boardId);
     }).catch(function () {
@@ -2311,10 +2507,12 @@ function selectedTower() {
     if (rank === 1) return '絕對王者';
     if (rank === 2) return '不滅霸主';
     if (rank === 3) return '災厄之主';
+    if (rank >= 4 && rank <= 5) return '白銀';
+    if (rank >= 6 && rank <= 10) return '青銅';
     return '';
   }
 
-  function paintNamed(el, name, rank) {
+  function paintNamed(el, name, rank, chosenId, trusted) {
     if (!el) return;
     el.classList.add('name-line');
     el.replaceChildren();
@@ -2323,11 +2521,19 @@ function selectedTower() {
     text.textContent = name || '玩家';
     el.appendChild(text);
     var epithet = rankEpithet(rank);
-    if (!epithet) return;
-    var tag = document.createElement('span');
-    tag.className = 'name-epithet is-' + rank;
-    tag.textContent = epithet;
-    el.appendChild(tag);
+    if (epithet) {
+      var tag = document.createElement('span');
+      tag.className = 'name-epithet is-' + rank;
+      tag.textContent = epithet;
+      el.appendChild(tag);
+    }
+    var chosen = titleById(chosenId);
+    if (!chosen || chosen.name === epithet) return;
+    if (!trusted && !titleUnlocked(chosenId)) return;
+    var extra = document.createElement('span');
+    extra.className = 'name-epithet is-chosen';
+    extra.textContent = chosen.name;
+    el.appendChild(extra);
   }
 
   function rankHeroUnlocked(id) {
@@ -2416,11 +2622,22 @@ function selectedTower() {
   }
 
   function profilePicture(account) {
-    var avatar = shownAvatar(account);
-    if (avatar) return 'doodle:' + avatar;
-    var photo = account && account.picture || '';
-    if (String(photo).indexOf('doodle:') === 0) return '';
-    return photo;
+    return 'doodle:' + (shownAvatar(account) || 'slime');
+  }
+
+  function avatarById(id) {
+    for (var i = 0; i < AVATARS.length; i++) if (AVATARS[i].id === id) return AVATARS[i];
+    return null;
+  }
+
+  function boardAvatarId(picture, name) {
+    var doodle = avatarIdFromPicture(picture);
+    if (doodle && avatarById(doodle)) return doodle;
+    var free = ['slime', 'ghost', 'frog', 'skull', 'shroom', 'gear', 'gem', 'eye'];
+    var text = String(name || '玩家');
+    var hash = 0;
+    for (var i = 0; i < text.length; i++) hash = (hash + text.charCodeAt(i) * (i + 1)) % free.length;
+    return free[hash];
   }
 
   function avatarDot(x, y, r) {
@@ -2658,6 +2875,34 @@ function selectedTower() {
     avatarSmile(s, s * 0.2);
   }
 
+  function centerAvatarPixels(g, canvas) {
+    var w = canvas.width;
+    var h = canvas.height;
+    var data = g.getImageData(0, 0, w, h);
+    var px = data.data;
+    var minX = w;
+    var minY = h;
+    var maxX = -1;
+    var maxY = -1;
+    for (var y = 0; y < h; y++) {
+      var row = y * w * 4;
+      for (var x = 0; x < w; x++) {
+        if (px[row + x * 4 + 3] < 20) continue;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    if (maxX < 0) return;
+    var dx = Math.round(w / 2 - (minX + maxX + 1) / 2);
+    var dy = Math.round(h / 2 - (minY + maxY + 1) / 2);
+    if (!dx && !dy) return;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, h);
+    g.putImageData(data, dx, dy);
+  }
+
   function paintAvatarCanvas(canvas, id) {
     if (!canvas) return;
     var g = canvas.getContext('2d');
@@ -2667,15 +2912,25 @@ function selectedTower() {
     try {
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, canvas.width, canvas.height);
-      g.translate(canvas.width / 2, canvas.height / 2 + 1);
+      g.translate(canvas.width / 2, canvas.height / 2);
       drawAvatarMark(id || 'slime', canvas.width * 0.34);
+      centerAvatarPixels(g, canvas);
     } finally {
       ctx = prev;
     }
   }
 
+  function avatarCanvas(id) {
+    var face = document.createElement('canvas');
+    face.width = 64;
+    face.height = 64;
+    paintAvatarCanvas(face, id);
+    return face;
+  }
+
+
   function paintAvatarSlot(img, canvas, letter, account) {
-    var avatar = shownAvatar(account);
+    var avatar = account ? (shownAvatar(account) || 'slime') : '';
     if (avatar && canvas) {
       paintAvatarCanvas(canvas, avatar);
       canvas.hidden = false;
@@ -2684,12 +2939,6 @@ function selectedTower() {
       return;
     }
     if (canvas) canvas.hidden = true;
-    if (account && account.picture && String(account.picture).indexOf('doodle:') !== 0 && img) {
-      img.hidden = false;
-      img.src = account.picture;
-      if (letter) letter.hidden = true;
-      return;
-    }
     if (img) img.hidden = true;
     if (letter) {
       letter.hidden = false;
@@ -2697,10 +2946,174 @@ function selectedTower() {
     }
   }
 
+  var profileEditTab = 'face';
+  var profilePick = null;
+
+  function ensureProfilePick(account) {
+    if (profilePick) return profilePick;
+    profilePick = {
+      avatar: account && account.avatar && avatarUnlocked(account.avatar) ? account.avatar : 'slime',
+      frame: account && frameUnlocked(account.frame) ? account.frame : '',
+      title: account && titleUnlocked(account.title) ? account.title : '',
+    };
+    return profilePick;
+  }
+
+  var CARD_FRAMES = [
+    { id: 'vine', chapter: 1, name: '藤蔓' },
+    { id: 'lava', chapter: 2, name: '熔岩' },
+    { id: 'bone', chapter: 3, name: '碎骨' },
+    { id: 'crystal', chapter: 4, name: '晶礦' },
+    { id: 'poison', chapter: 5, name: '劇毒' },
+    { id: 'cult', chapter: 6, name: '邪教' },
+    { id: 'frost', chapter: 7, name: '冰霜' },
+    { id: 'scrap', chapter: 8, name: '廢鐵' },
+    { id: 'all', chapter: 0, name: '全通關' },
+  ];
+
+  function chapterFullStars(id) {
+    for (var s = 1; s <= 5; s++) {
+      if (starCount(state.stars[id + '-' + s] || 0) < 3) return false;
+    }
+    return true;
+  }
+
+  function frameById(id) {
+    for (var i = 0; i < CARD_FRAMES.length; i++) if (CARD_FRAMES[i].id === id) return CARD_FRAMES[i];
+    return null;
+  }
+
+  function frameUnlocked(id) {
+    var frame = frameById(id);
+    if (!frame) return false;
+    if (frame.id === 'all') return allChaptersCleared();
+    return chapterFullStars(frame.chapter);
+  }
+
+  function frameClass(id) {
+    return frameUnlocked(id) ? (' card-frame is-' + id) : '';
+  }
+
+  function loadDeeds() {
+    try {
+      var raw = JSON.parse(localStorage.getItem('symbols-td-deeds') || '{}');
+      return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    } catch (error) { return {}; }
+  }
+
+  function saveDeeds(deeds) {
+    try { localStorage.setItem('symbols-td-deeds', JSON.stringify(deeds)); } catch (error) { /* ignore */ }
+  }
+
+  var TITLES = [
+    { id: 'corridor', name: '無限迴廊之主', hint: '無限模式打過第 50 波巨王', ok: function (d) { return !!d.corridor; } },
+    { id: 'overload', name: '運算超載', hint: '無限或自訂打到第 40 波', ok: function (d) { return (d.infiniteWave || 0) >= 40 || (d.customWave || 0) >= 40; } },
+    { id: 'wheel', name: '地獄轉輪手', hint: '地獄模式打到第 10 波', ok: function (d) { return (d.hellWave || 0) >= 10; } },
+    { id: 'demolish', name: '防線拆遷辦主任', hint: '累積賣掉 15 座塔', ok: function (d) { return (d.sells || 0) >= 15; } },
+    { id: 'micro', name: '微操天花板', hint: '首領關無傷通關', ok: function (d) { return !!d.flawlessBoss; } },
+    { id: 'godpush', name: '全知全能的推塔者', hint: '本週地獄榜進過前 3', ok: function (d) { return !!d.godpush; } },
+    { id: 'affix', name: '詞綴虐待狂', hint: '地獄模式打到第 20 波', ok: function (d) { return (d.hellWave || 0) >= 20; } },
+    { id: 'wraith', name: '第 26 波的亡靈', hint: '地獄模式打到第 26 波', ok: function (d) { return (d.hellWave || 0) >= 26; } },
+    { id: 'symbol', name: '符號魔法師', hint: '一關同時放上毒火冰雷', ok: function (d) { return !!d.allElements; } },
+    { id: 'geo', name: '幾何陣列大師', hint: '一關放滿 8 座塔並通關', ok: function (d) { return !!d.geo; } },
+    { id: 'overflow', name: '火力溢出專家', hint: '把一座塔升到 10 等', ok: function (d) { return !!d.overflow; } },
+    { id: 'nexus', name: '完美交匯點', hint: '四種屬性塔都至少 3 等並通關', ok: function (d) { return !!d.nexus; } },
+    { id: 'pure', name: '純粹符號學家', hint: '只用一種屬性塔通關', ok: function (d) { return !!d.pure; } },
+    { id: 'pierce', name: '全圖貫通', hint: '無限或自訂打到第 30 波', ok: function (d) { return (d.infiniteWave || 0) >= 30 || (d.customWave || 0) >= 30; } },
+    { id: 'builder', name: '終極防線構築者', hint: '八章首領都打過', ok: function () { return allChaptersCleared(); } },
+    { id: 'steward', name: '精打細算大掌櫃', hint: '有產錢塔、不賣塔、受傷不超過 5 並通關', ok: function (d) { return !!d.steward; } },
+    { id: 'interest', name: '利息滾動永動機', hint: '用過 3 次利息卡', ok: function (d) { return (d.interest || 0) >= 3; } },
+    { id: 'rich', name: '暴富防禦者', hint: '手上同時有 1000 金', ok: function (d) { return !!d.rich; } },
+    { id: 'blood', name: '極限扣血流', hint: '剩 3 點生命以內通關', ok: function (d) { return !!d.lowLife; } },
+    { id: 'wreck', name: '路過的拆塔專家', hint: '同一局賣掉 6 座塔', ok: function (d) { return !!d.wreck; } },
+    { id: 'panic', name: '手忙腳亂指揮官', hint: '自訂模式改過一次路', ok: function (d) { return !!d.edit; } },
+    { id: 'drop', name: '差一滴血大師', hint: '剩 1 點生命通關', ok: function (d) { return !!d.oneLife; } },
+    { id: 'victim', name: '隨機命運受害者', hint: '地獄模式打到第 15 波', ok: function (d) { return (d.hellWave || 0) >= 15; } },
+    { id: 'idle', name: '摸魚防禦理事長', hint: '只用無屬塔和產錢塔通關', ok: function (d) { return !!d.idle; } },
+    { id: 'luck', name: '通關靠賽，快樂常在', hint: '作戰模式通關 3 次', ok: function (d) { return (d.clears || 0) >= 3; } },
+  ];
+
+  function titleById(id) {
+    for (var i = 0; i < TITLES.length; i++) if (TITLES[i].id === id) return TITLES[i];
+    return null;
+  }
+
+  function titleUnlocked(id) {
+    var title = titleById(id);
+    return !!(title && title.ok(loadDeeds()));
+  }
+
+  function unlockedTitleIds() {
+    var deeds = loadDeeds();
+    var ids = [];
+    for (var i = 0; i < TITLES.length; i++) if (TITLES[i].ok(deeds)) ids.push(TITLES[i].id);
+    return ids;
+  }
+
+  function noteNewTitles(before) {
+    var after = unlockedTitleIds();
+    for (var i = 0; i < after.length; i++) {
+      if (before.indexOf(after[i]) >= 0) continue;
+      var title = titleById(after[i]);
+      if (title) toast('獲得稱號　' + title.name);
+    }
+  }
+
+  function recordRunDeeds() {
+    var before = unlockedTitleIds();
+    var deeds = loadDeeds();
+    if (state.mode === 'infinite') deeds.infiniteWave = Math.max(deeds.infiniteWave || 0, state.wave || 0);
+    if (state.mode === 'custom') deeds.customWave = Math.max(deeds.customWave || 0, state.wave || 0);
+    if (hellModeActive()) deeds.hellWave = Math.max(deeds.hellWave || 0, state.wave || 0);
+    if (state.mode === 'infinite' && state.wave >= 50 && state.phase !== 'gameover') deeds.corridor = true;
+    if (state.gold >= 1000) deeds.rich = true;
+    var rank = hellRank();
+    if (rank >= 1 && rank <= 3) deeds.godpush = true;
+    for (var towerIndex = 0; towerIndex < state.towers.length; towerIndex++) {
+      if (state.towers[towerIndex].level + 1 >= 10) deeds.overflow = true;
+    }
+    if ((state.soldRun || 0) >= 6) deeds.wreck = true;
+    if (state.mode === 'campaign' && state.wave >= state.levelWaves) {
+      deeds.clears = (deeds.clears || 0) + 1;
+      if (state.lives === 1) deeds.oneLife = true;
+      if (state.lives > 0 && state.lives <= 3) deeds.lowLife = true;
+      if (state.stagePlan && state.stagePlan.index === 5 && state.lifeLost <= 0 && !state.reviveUsed) deeds.flawlessBoss = true;
+      var types = {};
+      var field = 0;
+      var elementLevels = { poison: 0, fire: 0, ice: 0, bolt: 0 };
+      for (var i = 0; i < state.towers.length; i++) {
+        var tower = state.towers[i];
+        types[tower.type] = (types[tower.type] || 0) + 1;
+        if (tower.type !== 'hero' && tower.type !== 'smith') field += 1;
+        if (elementLevels[tower.type] != null) elementLevels[tower.type] = Math.max(elementLevels[tower.type], tower.level + 1);
+        if (tower.level + 1 >= 10) deeds.overflow = true;
+      }
+      var elements = ['poison', 'fire', 'ice', 'bolt'];
+      var used = 0;
+      var nexus = true;
+      for (var e = 0; e < elements.length; e++) {
+        if (types[elements[e]]) used += 1;
+        if (elementLevels[elements[e]] < 3) nexus = false;
+      }
+      if (used === 4) deeds.allElements = true;
+      if (used === 4 && nexus) deeds.nexus = true;
+      if (used === 1 && !types.hero) deeds.pure = true;
+      if (!used && !types.hero && types.basic) deeds.idle = true;
+      if (field >= 8) deeds.geo = true;
+      if (types.mint && !state.soldAny && state.lifeLost <= 5 && !state.reviveUsed) deeds.steward = true;
+      if ((state.soldRun || 0) >= 6) deeds.wreck = true;
+    }
+    saveDeeds(deeds);
+    noteNewTitles(before);
+  }
+
   function renderProfileEditor() {
     var list = document.getElementById('modal-notes');
     if (!list) return;
+    var draftName = list.querySelector('#profile-name');
     var account = loadAccount();
+    var pick = ensureProfilePick(account);
+    var keptName = draftName ? draftName.value : (account ? account.name : '');
     list.replaceChildren();
     list.hidden = false;
     var label = document.createElement('label');
@@ -2709,12 +3122,32 @@ function selectedTower() {
     var input = document.createElement('input');
     input.id = 'profile-name';
     input.maxLength = 12;
-    input.value = account ? account.name : '';
+    input.value = keptName;
     label.appendChild(input);
     list.appendChild(label);
+    var tabs = document.createElement('div');
+    tabs.className = 'profile-tabs';
+    [['face', '頭像'], ['frame', '框'], ['title', '稱號']].forEach(function (pair) {
+      var tab = document.createElement('button');
+      tab.type = 'button';
+      tab.className = 'profile-tab' + (profileEditTab === pair[0] ? ' is-on' : '');
+      tab.textContent = pair[1];
+      tab.addEventListener('click', function () {
+        profileEditTab = pair[0];
+        renderProfileEditor();
+      });
+      tabs.appendChild(tab);
+    });
+    list.appendChild(tabs);
+    if (profileEditTab === 'frame') list.appendChild(renderFramePicks(pick));
+    else if (profileEditTab === 'title') list.appendChild(renderTitlePicks(pick));
+    else list.appendChild(renderAvatarPicks(pick));
+  }
+
+  function renderAvatarPicks(pick) {
     var grid = document.createElement('div');
     grid.className = 'avatar-grid';
-    var current = account && account.avatar && avatarUnlocked(account.avatar) ? account.avatar : 'slime';
+    var current = pick.avatar && avatarUnlocked(pick.avatar) ? pick.avatar : 'slime';
     AVATARS.forEach(function (item) {
       var btn = document.createElement('button');
       btn.type = 'button';
@@ -2722,10 +3155,7 @@ function selectedTower() {
       btn.setAttribute('data-avatar', item.id);
       var open = avatarUnlocked(item.id);
       if (!open) btn.classList.add('is-locked');
-      var face = document.createElement('canvas');
-      face.width = 64;
-      face.height = 64;
-      paintAvatarCanvas(face, item.id);
+      var face = avatarCanvas(item.id);
       var caption = document.createElement('small');
       caption.textContent = open ? item.name : avatarLockText(item.id);
       btn.appendChild(face);
@@ -2737,11 +3167,84 @@ function selectedTower() {
         }
         var picks = grid.querySelectorAll('.avatar-pick');
         for (var i = 0; i < picks.length; i++) picks[i].classList.remove('is-on');
-        btn.classList.add('is-on');
+        selectPick(grid, '.avatar-pick', btn);
+        pick.avatar = item.id;
       });
       grid.appendChild(btn);
     });
-    list.appendChild(grid);
+    return grid;
+  }
+
+  function renderFramePicks(pick) {
+    var grid = document.createElement('div');
+    grid.className = 'frame-grid';
+    var current = pick.frame && frameUnlocked(pick.frame) ? pick.frame : '';
+    var none = document.createElement('button');
+    none.type = 'button';
+    none.className = 'frame-pick' + (current ? '' : ' is-on');
+    none.setAttribute('data-frame', '');
+    none.textContent = '無框';
+    none.addEventListener('click', function () { selectPick(grid, '.frame-pick', none); pick.frame = ''; });
+    grid.appendChild(none);
+    CARD_FRAMES.forEach(function (frame) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      var open = frameUnlocked(frame.id);
+      btn.className = 'frame-pick card-frame is-' + frame.id + (frame.id === current ? ' is-on' : '') + (open ? '' : ' is-locked');
+      btn.setAttribute('data-frame', frame.id);
+      var caption = document.createElement('small');
+      caption.textContent = frame.name;
+      btn.appendChild(caption);
+      btn.addEventListener('click', function () {
+        if (!open) {
+          toast(frame.id === 'all' ? '八章首領都過關才有這個框' : '這一章五關都三星才有這個框');
+          return;
+        }
+        selectPick(grid, '.frame-pick', btn);
+        pick.frame = frame.id;
+      });
+      grid.appendChild(btn);
+    });
+    return grid;
+  }
+
+  function renderTitlePicks(pick) {
+    var wrap = document.createElement('div');
+    wrap.className = 'title-list';
+    var current = pick.title && titleUnlocked(pick.title) ? pick.title : '';
+    var none = document.createElement('button');
+    none.type = 'button';
+    none.className = 'title-pick' + (current ? '' : ' is-on');
+    none.setAttribute('data-title', '');
+    none.textContent = '不顯示自選稱號';
+    none.addEventListener('click', function () { selectPick(wrap, '.title-pick', none); pick.title = ''; });
+    wrap.appendChild(none);
+    TITLES.forEach(function (title) {
+      var open = title.ok(loadDeeds());
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'title-pick' + (title.id === current ? ' is-on' : '') + (open ? '' : ' is-locked');
+      btn.setAttribute('data-title', title.id);
+      var name = document.createElement('b');
+      name.textContent = title.name;
+      var hint = document.createElement('small');
+      hint.textContent = title.hint;
+      btn.appendChild(name);
+      btn.appendChild(hint);
+      btn.addEventListener('click', function () {
+        if (!open) { toast(title.hint); return; }
+        selectPick(wrap, '.title-pick', btn);
+        pick.title = title.id;
+      });
+      wrap.appendChild(btn);
+    });
+    return wrap;
+  }
+
+  function selectPick(root, selector, btn) {
+    var picks = root.querySelectorAll(selector);
+    for (var i = 0; i < picks.length; i++) picks[i].classList.remove('is-on');
+    btn.classList.add('is-on');
   }
 
   function saveProfileCard() {
@@ -2750,17 +3253,45 @@ function selectedTower() {
     var input = document.getElementById('profile-name');
     var name = String(input && input.value || '').trim().slice(0, 12);
     if (!name) { toast('名字不能是空的'); return; }
-    var picked = document.querySelector('.avatar-pick.is-on');
-    var avatar = picked ? picked.getAttribute('data-avatar') : 'slime';
-    if (!avatarUnlocked(avatar)) { toast('這個頭像還不能用'); return; }
+    var pick = profilePick || {};
+    var avatar = pick.avatar || 'slime';
+    var frame = pick.frame || '';
+    var title = pick.title || '';
+    if (avatar && !avatarUnlocked(avatar)) { toast('這個頭像還不能用'); return; }
+    if (frame && !frameUnlocked(frame)) { toast('這個框還不能用'); return; }
+    if (title && !titleUnlocked(title)) { toast('這個稱號還不能用'); return; }
     account.name = name;
     account.nameCustom = true;
-    account.avatar = avatar;
+    account.avatar = avatar || 'slime';
+    account.frame = frame;
+    account.title = title;
     saveAccount(account);
+    paintLocalBoardCard();
     paintAccount();
     publishProfile();
+    updateBoardCard();
     closeModal();
     toast('名片已更新');
+  }
+
+  function applyCardFrame(el, id, trusted) {
+    if (!el) return;
+    el.classList.remove('card-frame');
+    for (var i = 0; i < CARD_FRAMES.length; i++) el.classList.remove('is-' + CARD_FRAMES[i].id);
+    if (!id || !frameById(id)) return;
+    if (!trusted && !frameUnlocked(id)) return;
+    el.classList.add('card-frame', 'is-' + id);
+  }
+
+  function noteRankDeed() {
+    var rank = hellRank();
+    if (rank < 1 || rank > 3) return;
+    var deeds = loadDeeds();
+    if (deeds.godpush) return;
+    var before = unlockedTitleIds();
+    deeds.godpush = true;
+    saveDeeds(deeds);
+    noteNewTitles(before);
   }
 
   function paintPlayerCard() {
@@ -2778,6 +3309,7 @@ function selectedTower() {
     card.classList.toggle('is-diamond', aura === 'diamond');
     card.classList.toggle('is-special', aura === 'special');
     card.classList.toggle('is-ordinary', aura === 'ordinary');
+    applyCardFrame(card, account ? account.frame : '', false);
     fillMedal(document.getElementById('player-medal'), account ? rank : 0);
     var idEl = document.getElementById('player-card-id');
     if (!account) {
@@ -2791,7 +3323,8 @@ function selectedTower() {
       if (letter) { letter.hidden = false; letter.textContent = '?'; }
       return;
     }
-    paintNamed(nameEl, account.name, rank);
+    paintNamed(nameEl, account.name, rank, account.title);
+    noteRankDeed();
     if (idEl) {
       idEl.hidden = false;
       idEl.textContent = 'ID　' + account.friendId;
@@ -2833,6 +3366,7 @@ function selectedTower() {
     var item = document.createElement('li');
     var shown = profileRank(person);
     item.className = 'friend-card' + friendAuraClass(shown);
+    if (person.frame && frameById(person.frame)) item.classList.add('card-frame', 'is-' + person.frame);
     var fx = document.createElement('span');
     fx.className = 'card-fx';
     fx.setAttribute('aria-hidden', 'true');
@@ -2841,11 +3375,7 @@ function selectedTower() {
     avatar.className = 'player-avatar';
     var doodleId = avatarIdFromPicture(person.picture);
     if (doodleId) {
-      var face = document.createElement('canvas');
-      face.width = 64;
-      face.height = 64;
-      paintAvatarCanvas(face, doodleId);
-      avatar.appendChild(face);
+      avatar.appendChild(avatarCanvas(doodleId));
     } else if (person.picture) {
       var photo = document.createElement('img');
       photo.alt = '';
@@ -2856,7 +3386,7 @@ function selectedTower() {
     }
     var copy = document.createElement('div');
     var name = document.createElement('strong');
-    paintNamed(name, person.name || '玩家', shown);
+    paintNamed(name, person.name || '玩家', shown, person.title, true);
     var best = document.createElement('p');
     best.textContent = person.bestWave > 0 ? ('最高 ' + (person.bestLabel || '紀錄') + ' 第 ' + person.bestWave + ' 波') : '還沒有紀錄';
     var title = rankTitle(shown);
@@ -2992,6 +3522,8 @@ function selectedTower() {
       return cloudDb.collection('users').doc(latest.uid).set({
         name: latest.name,
         picture: profilePicture(latest),
+        frame: frameUnlocked(latest.frame) ? latest.frame : '',
+        title: titleUnlocked(latest.title) ? latest.title : '',
         bestLabel: best.label || '',
         bestWave: best.wave || 0,
         hellRank: hellRank(),
@@ -3064,15 +3596,29 @@ function selectedTower() {
       var item = document.createElement('li');
       item.className = 'board-row' + (account && row.uid === account.uid ? ' is-me' : '');
       var place = rankInRows(rows, index);
+      var picture = row.picture || '';
+      var frameId = row.frame || '';
+      var chosen = row.title || '';
+      if (account && row.uid === account.uid) {
+        var mine = scoreRow(account, row.wave);
+        picture = mine.picture || picture;
+        if (!frameId) frameId = mine.frame;
+        if (!chosen) chosen = mine.title;
+      }
+      if (frameId && frameById(frameId)) item.classList.add('card-frame', 'is-' + frameId);
       var rank = document.createElement('span');
       rank.className = 'board-rank';
       rank.textContent = String(place);
+      var face = document.createElement('span');
+      face.className = 'board-face';
+      face.appendChild(avatarCanvas(boardAvatarId(picture, row.name)));
       var who = document.createElement('span');
-      paintNamed(who, row.name, place);
+      paintNamed(who, row.name, place, chosen, true);
       var wave = document.createElement('span');
       wave.className = 'board-wave';
       wave.textContent = '第 ' + row.wave + ' 波';
       item.appendChild(rank);
+      item.appendChild(face);
       item.appendChild(who);
       item.appendChild(wave);
       listEl.appendChild(item);
@@ -3168,6 +3714,8 @@ function selectedTower() {
     syncHellDeffs(n);
     var plan = applyHellBossDeff(planWave(n));
     state.wave = n;
+    state.waveTime = 0;
+    state.berserk = false;
     state.phase = 'combat';
     state.paused = false;
     state.waveGoldEarned = 0;
@@ -3210,7 +3758,9 @@ function selectedTower() {
     state.spawnTimer -= dt;
     if (state.spawnTimer > 0) return;
     var job = state.spawnQueue.shift();
-    var spawned = job.type === 'boss' ? makeBoss(job.bossIndex, state.wave) : makeEnemy(job.type, state.wave);
+    var spawned = job.type === 'titan'
+      ? makeTitan(state.wave, job.traits)
+      : (job.type === 'boss' ? makeBoss(job.bossIndex, state.wave) : makeEnemy(job.type, state.wave));
     applyHellSpawnStats(spawned);
     state.enemies.push(spawned);
     state.spawnTimer = state.spawnQueue.length ? state.spawnQueue[0].gap : 0;
@@ -3359,8 +3909,17 @@ function selectedTower() {
     if (isPoisonCounterTarget(other) || from.poisonRuin) triggerPoisonCounter(other);
   }
 
+  function bossHas(enemy, id) {
+    if (!enemy || !id) return false;
+    if (enemy.bossId === id) return true;
+    var traits = enemy.traits;
+    if (!traits) return false;
+    for (var i = 0; i < traits.length; i++) if (traits[i] === id) return true;
+    return false;
+  }
+
   function isHealRegenEnemy(enemy) {
-    return !!(enemy && (enemy.bossId === 'regen' || enemy.bossId === 'mend'));
+    return !!(enemy && (bossHas(enemy, 'regen') || bossHas(enemy, 'mend')));
   }
 
   function isPoisonCounterTarget(enemy) {
@@ -3368,7 +3927,7 @@ function selectedTower() {
   }
 
   function isFireCounterTarget(enemy) {
-    return !!(enemy && (enemy.shield > 0 || enemy.bossId === 'armor' || hasHellDeff('thick')));
+    return !!(enemy && (enemy.shield > 0 || bossHas(enemy, 'armor') || hasHellDeff('thick')));
   }
 
   function triggerPoisonCounter(enemy) {
@@ -3394,7 +3953,7 @@ function selectedTower() {
       spawnFloater(pos.x, pos.y - 0.55, '破盾', '#e02323');
       shatterShieldFx(pos.x, pos.y);
     }
-    if (enemy.bossId === 'armor' && !enemy.firePierce) {
+    if (bossHas(enemy, 'armor') && !enemy.firePierce) {
       enemy.firePierce = true;
       fresh = true;
       spawnFloater(pos.x, pos.y - 0.75, '破甲', '#e02323');
@@ -3417,7 +3976,7 @@ function selectedTower() {
   function tickBoss(enemy, dt) {
     enemy.pulse += dt;
     var pos = pointAt(enemy.dist);
-    if (enemy.bossId === 'regen') {
+    if (bossHas(enemy, 'regen')) {
       if (healBlocked(enemy)) {
         if (enemy.poisonTime > 0 || enemy.poisonRuin) triggerPoisonCounter(enemy);
         enemy.regenShow = (enemy.regenShow || 0) - dt;
@@ -3430,34 +3989,40 @@ function selectedTower() {
           spawnFloater(pos.x, pos.y - 0.6, '回復', '#3ecf8e');
         }
       }
-    } else if (enemy.bossId === 'rush') {
+    }
+    if (bossHas(enemy, 'rush')) {
       if (!enemy.enraged && enemy.hp <= enemy.maxHp * 0.5) {
         enemy.enraged = true;
         enemy.speed = enemy.baseSpeed * 2.2;
         spawnFloater(pos.x, pos.y - 0.6, '狂暴', '#ff5a36');
       }
-    } else if (enemy.bossId === 'summon') {
-      enemy.abilityTimer -= dt;
-      if (enemy.abilityTimer <= 0 && state.enemies.length + state.pendingSpawns.length < 28) {
-        enemy.abilityTimer = 4.4;
+    }
+    if (bossHas(enemy, 'summon')) {
+      enemy.summonTimer = (enemy.summonTimer == null ? 2.4 : enemy.summonTimer) - dt;
+      if (enemy.summonTimer <= 0 && state.enemies.length + state.pendingSpawns.length < 28) {
+        enemy.summonTimer = 4.4;
         var minion = makeEnemy('grunt', state.wave);
         minion.dist = Math.max(0, enemy.dist - 0.45);
         queueEnemy(minion);
         spawnFloater(pos.x, pos.y - 0.6, '召喚', '#f2c14e');
       }
-    } else if (enemy.bossId === 'ward') {
-      enemy.abilityTimer -= dt;
-      if (enemy.abilityTimer <= 0 && enemy.shield <= 0) {
-        enemy.abilityTimer = 7;
-        enemy.shield = Math.round(enemy.maxHp * 0.2);
-        enemy.shieldCut = 1;
-        tightenShield(enemy);
-        spawnFloater(pos.x, pos.y - 0.6, '護盾', '#67e8f9');
+    }
+    if (bossHas(enemy, 'ward')) {
+      if (enemy.shield <= 0) {
+        enemy.wardTimer = (enemy.wardTimer == null ? 3 : enemy.wardTimer) - dt;
+        if (enemy.wardTimer <= 0) {
+          enemy.wardTimer = 7;
+          enemy.shield = Math.round(enemy.maxHp * 0.2);
+          enemy.shieldCut = 1;
+          tightenShield(enemy);
+          spawnFloater(pos.x, pos.y - 0.6, '護盾', '#67e8f9');
+        }
       }
-    } else if (enemy.bossId === 'frost') {
-      enemy.abilityTimer -= dt;
-      if (enemy.abilityTimer <= 0) {
-        enemy.abilityTimer = 5.4;
+    }
+    if (bossHas(enemy, 'frost')) {
+      enemy.frostTimer = (enemy.frostTimer || enemy.abilityTimer || 3.2) - dt;
+      if (enemy.frostTimer <= 0) {
+        enemy.frostTimer = 5.4;
         for (var t = 0; t < state.towers.length; t++) {
           state.towers[t].cooldown += 1.05;
           state.towers[t].chill = 0.85;
@@ -3465,32 +4030,34 @@ function selectedTower() {
         spawnFloater(pos.x, pos.y - 0.6, '冰封', '#9bd4ff');
         burst(pos.x, pos.y, '#9bd4ff', 12);
       }
-    } else if (enemy.bossId === 'mend') {
+    }
+    if (bossHas(enemy, 'mend')) {
       enemy.mendAcc += dt;
-      if (enemy.mendAcc < 0.5) return;
-      enemy.mendAcc = 0;
-      if (healBlocked(enemy)) {
-        if (enemy.poisonTime > 0 || enemy.poisonRuin) triggerPoisonCounter(enemy);
-        return;
-      }
-      for (var i = 0; i < state.enemies.length; i++) {
-        var other = state.enemies[i];
-        if (other === enemy || other.dead || other.hp >= other.maxHp) continue;
-        var otherPos = pointAt(other.dist);
-        if (Math.hypot(otherPos.x - pos.x, otherPos.y - pos.y) > 1.8) continue;
-        if (healBlocked(other)) {
-          triggerPoisonCounter(other);
-          if (state.time - (other.lastMend || 0) > 0.9) {
-            other.lastMend = state.time;
-            spawnFloater(otherPos.x, otherPos.y - 0.35, '治療失敗', '#3cbf4a');
+      if (enemy.mendAcc >= 0.5) {
+        enemy.mendAcc = 0;
+        if (healBlocked(enemy)) {
+          if (enemy.poisonTime > 0 || enemy.poisonRuin) triggerPoisonCounter(enemy);
+        } else {
+          for (var i = 0; i < state.enemies.length; i++) {
+            var other = state.enemies[i];
+            if (other === enemy || other.dead || other.hp >= other.maxHp) continue;
+            var otherPos = pointAt(other.dist);
+            if (Math.hypot(otherPos.x - pos.x, otherPos.y - pos.y) > 1.8) continue;
+            if (healBlocked(other)) {
+              triggerPoisonCounter(other);
+              if (state.time - (other.lastMend || 0) > 0.9) {
+                other.lastMend = state.time;
+                spawnFloater(otherPos.x, otherPos.y - 0.35, '治療失敗', '#3cbf4a');
+              }
+              continue;
+            }
+            var heal = Math.min(other.maxHp - other.hp, enemy.mendPower * healScale(other));
+            other.hp += heal;
+            if (state.time - (other.lastMend || 0) > 0.9) {
+              other.lastMend = state.time;
+              spawnFloater(otherPos.x, otherPos.y - 0.35, '+' + heal, '#ff8fab');
+            }
           }
-          continue;
-        }
-        var heal = Math.min(other.maxHp - other.hp, enemy.mendPower * healScale(other));
-        other.hp += heal;
-        if (state.time - (other.lastMend || 0) > 0.9) {
-          other.lastMend = state.time;
-          spawnFloater(otherPos.x, otherPos.y - 0.35, '+' + heal, '#ff8fab');
         }
       }
     }
@@ -3524,12 +4091,12 @@ function selectedTower() {
 
   function tickRam(enemy, dt) {
     if (enemy.ramCd > 0) enemy.ramCd -= dt;
-    if (enemy.stun > 0 || enemy.freeze > 0 || enemy.ramCd > 0) return;
+    if ((!state.berserk && (enemy.stun > 0 || enemy.freeze > 0)) || enemy.ramCd > 0) return;
     crushNearestTower(enemy);
   }
 
   function tickDevilHex(enemy, dt) {
-    if (enemy.stun > 0 || enemy.freeze > 0) return;
+    if (!state.berserk && (enemy.stun > 0 || enemy.freeze > 0)) return;
     enemy.hexCd = (enemy.hexCd || 0) - dt;
     if (enemy.hexCd > 0 || !state.towers.length) return;
     enemy.hexCd = 3.0;
@@ -3555,6 +4122,13 @@ function selectedTower() {
     enemy.dead = true;
     state.lifeLost += enemy.leak;
     state.lives -= enemy.leak;
+    if (state.mode === 'campaign' && state.stagePlan && state.stagePlan.goals) {
+      var leakGoals = state.stagePlan.goals;
+      for (var g = 0; g < leakGoals.length; g++) {
+        if (leakGoals[g].kind === 'flawless' && state.lifeLost > 0) noteGoalFail('flawless', '基地受傷了，無傷這顆星沒了');
+        if (leakGoals[g].kind === 'bruise' && state.lifeLost > leakGoals[g].max) noteGoalFail('bruise', '受傷超過 ' + leakGoals[g].max + '，這顆星沒了');
+      }
+    }
     state.hurt = 0.5;
     addShake(8);
     var end = WAYPOINTS[WAYPOINTS.length - 1];
@@ -3602,16 +4176,31 @@ function selectedTower() {
     return copy;
   }
 
+  function lookupLevels(table, index) {
+    var used = Math.max(0, Math.min(table.length - 1, index));
+    return { stats: table[used], extra: Math.max(0, index - used) };
+  }
+
+  function growPastCap(stats, steps) {
+    var copy = cloneStats(stats);
+    var power = Math.pow(1.15, steps);
+    var haste = Math.pow(1.05, steps);
+    if (copy.damage) copy.damage = Math.max(1, Math.round(copy.damage * power));
+    if (copy.poison) copy.poison = Math.max(1, Math.round(copy.poison * power));
+    if (copy.burn) copy.burn = Math.max(1, Math.round(copy.burn * power));
+    if (copy.goldGen) copy.goldGen = Math.max(1, Math.round(copy.goldGen * power));
+    if (copy.range) copy.range = Math.round(copy.range * (1 + steps * 0.02) * 100) / 100;
+    if (copy.cooldown) copy.cooldown = Math.max(0.08, copy.cooldown / haste);
+    return copy;
+  }
+
   function towerStats(tower) {
     var def = TOWERS[tower.type];
-    var stats;
-    if (def.specs) {
-      stats = tower.level < 2 || !tower.spec
-        ? def.levels[Math.min(def.levels.length - 1, tower.level)]
-        : def.specs[tower.spec].levels[Math.min(def.specs[tower.spec].levels.length - 1, tower.level - 2)];
-    } else {
-      stats = def.levels[Math.min(def.levels.length - 1, tower.level)];
-    }
+    if (!def || !def.levels) return { damage: 0, range: 0, cooldown: 1 };
+    var found = def.specs && tower.level >= 2 && tower.spec
+      ? lookupLevels(def.specs[tower.spec].levels, tower.level - 2)
+      : lookupLevels(def.levels, tower.level);
+    var stats = found.extra ? growPastCap(found.stats, found.extra) : found.stats;
     if (tower.level >= 5) stats = rankBoost(stats);
     return applyDivine(applySupport(stats, tower), tower);
   }
@@ -3636,13 +4225,38 @@ function selectedTower() {
     return spec && spec.color ? spec.color : TOWERS[tower.type].color;
   }
 
+  function hasBlacksmith() {
+    for (var i = 0; i < state.towers.length; i++) {
+      if (state.towers[i].type === 'smith') return true;
+    }
+    return false;
+  }
+
+  function smithReady() {
+    if (hasBlacksmith()) return false;
+    if (state.wave >= 20) return true;
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (tower.type !== 'hero' && tower.type !== 'smith' && tower.level >= 4) return true;
+    }
+    return false;
+  }
+
+  function goldLevelCap() {
+    return hasBlacksmith() ? 9 : 4;
+  }
+
   function towerMaxed(tower) {
-    return tower.level >= 4;
+    return !tower || tower.type === 'hero' || tower.type === 'smith' || tower.level >= goldLevelCap();
   }
 
   function nextUpgradeCost(tower) {
-    if (tower.type === 'hero' || towerMaxed(tower)) return 0;
-    return TOWERS[tower.type].upgradeCost[tower.level];
+    if (!tower || tower.type === 'hero' || tower.type === 'smith' || tower.level >= goldLevelCap()) return 0;
+    var costs = TOWERS[tower.type] && TOWERS[tower.type].upgradeCost;
+    if (!costs || !costs.length) return 0;
+    if (tower.level < costs.length) return costs[tower.level];
+    var last = costs[costs.length - 1];
+    return Math.round(last * Math.pow(1.32, tower.level - (costs.length - 1)));
   }
 
   function heroName(id) {
@@ -3911,7 +4525,8 @@ function selectedTower() {
       var trap = state.traps[i];
       if (trap.c !== c || trap.r !== r) continue;
       state.traps.splice(i, 1);
-      if (resists(enemy, 'freeze')) resistFloater(enemy, '抗凍');
+      if (state.berserk) spawnFloater(pos.x, pos.y - 0.4, '狂暴', '#ff5a36');
+      else if (resists(enemy, 'freeze')) resistFloater(enemy, '抗凍');
       else {
         enemy.freeze = Math.max(enemy.freeze || 0, 3);
         spawnFloater(pos.x, pos.y - 0.4, '陷阱', '#161616');
@@ -4197,8 +4812,9 @@ function selectedTower() {
       var slow = Math.min(0.55, 0.28 + rank * 0.22);
       for (var n = 0; n < chilled.length; n++) {
         hurtEnemy(chilled[n], 12 + tower.level * 3, tower.id);
-        if (resists(chilled[n], 'slow')) resistFloater(chilled[n], '抗緩');
-        else {
+        if (state.berserk || resists(chilled[n], 'slow')) {
+          if (!state.berserk && resists(chilled[n], 'slow')) resistFloater(chilled[n], '抗緩');
+        } else {
           chilled[n].slow = Math.max(chilled[n].slow || 0, slow);
           chilled[n].slowTime = Math.max(chilled[n].slowTime || 0, 1.8);
         }
@@ -4216,7 +4832,7 @@ function selectedTower() {
   }
 
   function hunterGuarded(enemy) {
-    return !!(enemy && (enemy.shield > 0 || enemy.bossId === 'armor' || enemy.bossId === 'ward' || enemy.resist || hasHellDeff('thick')));
+    return !!(enemy && (enemy.shield > 0 || bossHas(enemy, 'armor') || bossHas(enemy, 'ward') || enemy.resist || hasHellDeff('thick')));
   }
 
   function hunterStrike(enemy, tower, damage) {
@@ -4325,7 +4941,7 @@ function selectedTower() {
     return [
       { id: 'gold', name: '金幣 +200', desc: '立刻獲得 200 金幣' },
       { id: 'interest', name: '利息', desc: '立刻 +50，接下來 5 波每波 +30' },
-      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等。金幣最高 5 等，只有這張卡可升到 6 等（數值×1.4）' },
+      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等。沒有鐵匠時金幣最高 5 等，這張卡可到 6 等。有鐵匠後，金幣可升到 10 等。' },
       { id: 'wall', name: '阻擋物', desc: '放在路上，擋住怪物 10 秒' },
       { id: 'push', name: '擊退', desc: '使用後全場怪物沿路退回總長的 10%' },
       { id: 'hero', name: '英雄塔', desc: '自選一位尚未登場的英雄，免費放置，之後可拖曳換位' },
@@ -4352,7 +4968,12 @@ function selectedTower() {
 
   function applyLevelCard(tower) {
     if (tower.type === 'hero') { toast('英雄靠擊殺升級'); return false; }
-    if (tower.level >= 5) { toast('這座塔已是 6 等'); return false; }
+    if (tower.type === 'smith') { toast('鐵匠不用升級'); return false; }
+    var cardCap = hasBlacksmith() ? 9 : 5;
+    if (tower.level >= cardCap) {
+      toast(hasBlacksmith() ? '這座塔已是 10 等' : '這座塔已是 6 等');
+      return false;
+    }
     if (needsSpec(tower)) {
       state.freeSpec = true;
       selectTower(tower);
@@ -4390,6 +5011,7 @@ function selectedTower() {
       element: 0,
     });
     state.pendingHero = '';
+    noteBuilt('hero');
     Sfx.build();
     toast(heroName(heroId) + (invested ? ' 已從祭壇登場' : ' 已就位') + '，可拖曳換位');
   }
@@ -4611,6 +5233,11 @@ function selectedTower() {
     } else if (id === 'interest') {
       state.gold += 50;
       state.interestLeft += 5;
+      var beforeInterest = unlockedTitleIds();
+      var interestDeeds = loadDeeds();
+      interestDeeds.interest = (interestDeeds.interest || 0) + 1;
+      saveDeeds(interestDeeds);
+      noteNewTitles(beforeInterest);
       toast('獲得 50 金幣，接下來 5 波每波 +30');
       finishCard();
     } else if (id === 'wall') {
@@ -4636,6 +5263,9 @@ function selectedTower() {
       state.phase = 'prep';
       state.paused = false;
       state.pickMode = 'level';
+      state.selectedId = null;
+      state.sellArmed = false;
+      renderInspector();
       state.banner = { text: '點一座塔', sub: '永久 +1 等，最高 6 等', life: 6 };
       toast('點選要升級的塔');
       syncHud();
@@ -4711,9 +5341,11 @@ function selectedTower() {
   }
 
   function moveSpeed(enemy) {
-    if (enemy.freeze > 0 || enemy.stun > 0) return 0;
     var speed = enemy.speed;
-    if (enemy.slowTime > 0) speed *= 1 - (enemy.slow || 0);
+    if (!state.berserk) {
+      if (enemy.freeze > 0 || enemy.stun > 0) return 0;
+      if (enemy.slowTime > 0) speed *= 1 - (enemy.slow || 0);
+    }
     if (hasHeroId('god')) speed *= 0.9;
     else {
       var pos = enemyPos(enemy);
@@ -4731,6 +5363,7 @@ function selectedTower() {
         updateHero(tower, dt);
         continue;
       }
+      if (tower.type === 'smith') continue;
       var stats = towerStats(tower);
       tower.cooldown -= dt;
       if (tower.type === 'mint') {
@@ -4826,7 +5459,7 @@ function selectedTower() {
   }
 
   function stunEnemy(enemy, time) {
-    if (!enemy || enemy.dead || resists(enemy, 'shock')) return;
+    if (!enemy || enemy.dead || state.berserk || resists(enemy, 'shock')) return;
     var fresh = !(enemy.stun > 0);
     enemy.stun = Math.max(enemy.stun || 0, time || 1);
     if (!fresh) return;
@@ -5148,6 +5781,7 @@ function selectedTower() {
   }
 
   function chillEnemy(enemy, slow, slowTime) {
+    if (state.berserk) return;
     var pos = pointAt(enemy.dist);
     if (resists(enemy, 'slow')) resistFloater(enemy, '抗緩');
     else {
@@ -5220,8 +5854,8 @@ function selectedTower() {
         opts.ignoreShield = true;
       }
     }
-    var pierceArmor = opts.pierce || enemy.firePierce || (enemy.burnTime > 0 && enemy.bossId === 'armor');
-    if (enemy.bossId === 'armor' && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.5));
+    var pierceArmor = opts.pierce || enemy.firePierce || (enemy.burnTime > 0 && bossHas(enemy, 'armor'));
+    if (bossHas(enemy, 'armor') && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.5));
     if (enemy.shield > 0 && !opts.ignoreShield) {
       var blocked = Math.min(enemy.shield, damage);
       enemy.shield -= blocked;
@@ -5280,7 +5914,7 @@ function selectedTower() {
   function killEnemy(enemy) {
     if (enemy.dead) return;
     enemy.dead = true;
-    if (enemy.bossId === 'split') {
+    if (bossHas(enemy, 'split')) {
       for (var s = 0; s < 3; s++) {
         var shard = makeEnemy('swift', state.wave);
         shard.type = 'shard';
@@ -5342,9 +5976,9 @@ function selectedTower() {
     state.paused = false;
     state.projectiles = [];
     state.arcs = [];
-    var title = kind === 'victory' ? '關卡通過' : ('第 ' + state.wave + ' 波守住了');
+    var title = kind === 'victory' ? (starGlyph(starCount(state.runStarMask || 0)) + ' 通過') : ('第 ' + state.wave + ' 波守住了');
     var sub = kind === 'victory'
-      ? (nextStage(state.stagePlan) && stageUnlocked(nextStage(state.stagePlan)) ? '5 秒後下一關' : '5 秒後返回關卡')
+      ? (victoryStarLine() + ' · ' + (nextStage(state.stagePlan) && stageUnlocked(nextStage(state.stagePlan)) ? '即將下一關' : '即將返回關卡'))
       : (state.mode === 'custom' && state.wave % 10 === 0
         ? '5 秒後獎勵，領完再改道（可點提前）'
         : (cardWaveDue(state.wave)
@@ -5361,7 +5995,8 @@ function selectedTower() {
       state.banner.life = Math.max(state.banner.life, state.clearCountdown + 0.05);
       if (state.clearKind === 'victory') {
         var upcoming = nextStage(state.stagePlan);
-        state.banner.sub = (upcoming && stageUnlocked(upcoming) ? '下一關 ' : '返回關卡 ') + left + '（可點提前）';
+        state.banner.text = starGlyph(starCount(state.runStarMask || 0)) + ' 通過';
+        state.banner.sub = victoryStarLine() + ' · ' + (upcoming && stageUnlocked(upcoming) ? '下一關 ' : '返回關卡 ') + left;
       } else if (state.mode === 'custom' && state.wave % 10 === 0) state.banner.sub = '獎勵後改道 ' + left + '（可點提前）';
       else if (cardWaveDue(state.wave)) state.banner.sub = '隨機獎勵 ' + left + '（可點提前）';
       else if (giftWaveDue(state.wave)) state.banner.sub = '廣告贈塔 ' + left + '（可點提前）';
@@ -5399,6 +6034,7 @@ function selectedTower() {
 
   function onWaveClear() {
     if (state.phase !== 'combat') return;
+    recordRunDeeds();
     state.paused = true;
     state.projectiles = [];
     state.arcs = [];
@@ -5410,14 +6046,9 @@ function selectedTower() {
     if (state.mode === 'campaign' && state.wave >= state.levelWaves) {
       state.phase = 'victory';
       state.outcome = 'victory';
-      var stars = earnedStars();
-      var prev = state.stars[state.level] || 0;
-      if (stars > prev) {
-        state.stars[state.level] = stars;
-        saveStars();
-      }
+      var mask = recordStarMask();
       beginClearCountdown('victory');
-      if (state.banner) state.banner.text = starGlyph(stars) + ' 通過';
+      if (state.banner) state.banner.text = starGlyph(starCount(mask)) + ' 通過';
       return;
     }
     state.phase = 'reward';
@@ -5435,18 +6066,131 @@ function selectedTower() {
     return names.join('、');
   }
 
-  function earnedStars() {
-    var stars = 1;
-    if (state.lifeLost <= 0) stars = 3;
-    else if (state.lifeLost <= 10) stars = 2;
-    if (state.reviveUsed) stars = 1;
-    return stars;
+  function starCount(mask) {
+    var n = mask | 0;
+    var count = 0;
+    if (n & 1) count += 1;
+    if (n & 2) count += 1;
+    if (n & 4) count += 1;
+    return count;
+  }
+
+  function towerCountOf(type) {
+    var total = 0;
+    for (var i = 0; i < state.towers.length; i++) {
+      if (state.towers[i].type === type) total += 1;
+    }
+    return total;
+  }
+
+  function builtTowerCount() {
+    var total = 0;
+    var built = state.built || {};
+    var keys = Object.keys(built);
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i] === 'hero') continue;
+      total += built[keys[i]] || 0;
+    }
+    return total;
+  }
+
+  function towerRankMet(type, displayLevel) {
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (tower.type === type && tower.level + 1 >= displayLevel) return true;
+    }
+    return false;
+  }
+
+  function goalMet(goal) {
+    if (!goal) return false;
+    if (goal.kind !== 'clear' && state.reviveUsed) return false;
+    if (goal.kind === 'clear') return true;
+    if (goal.kind === 'flawless') return state.lifeLost <= 0;
+    if (goal.kind === 'bruise') return state.lifeLost <= goal.max;
+    if (goal.kind === 'ban') return !(state.built && state.built[goal.type]);
+    if (goal.kind === 'rank') return towerRankMet(goal.type, goal.level);
+    if (goal.kind === 'cap') return builtTowerCount() <= goal.max;
+    if (goal.kind === 'least') return towerCountOf(goal.type) >= goal.count;
+    if (goal.kind === 'nohero') return !(state.built && state.built.hero);
+    if (goal.kind === 'nosell') return !state.soldAny;
+    return false;
+  }
+
+  function runStarMask() {
+    var goals = state.stagePlan && state.stagePlan.goals;
+    if (!goals || !goals.length) return 1;
+    var mask = 0;
+    for (var i = 0; i < goals.length && i < 3; i++) {
+      if (goalMet(goals[i])) mask |= 1 << i;
+    }
+    return mask;
+  }
+
+  function recordStarMask() {
+    var mask = runStarMask();
+    state.runStarMask = mask;
+    var prev = state.stars[state.level] || 0;
+    var next = prev | mask;
+    if (next !== prev) {
+      state.stars[state.level] = next;
+      saveStars();
+    }
+    return mask;
+  }
+
+  function victoryStarLine() {
+    var goals = state.stagePlan && state.stagePlan.goals;
+    var mask = state.runStarMask || 0;
+    if (!goals) return starGlyph(starCount(mask));
+    var parts = [];
+    for (var i = 0; i < goals.length && i < 3; i++) {
+      parts.push((mask & (1 << i) ? '★' : '☆') + goalLabel(goals[i]));
+    }
+    return parts.join(' ');
+  }
+
+  function noteGoalFail(key, message) {
+    if (state.mode !== 'campaign') return;
+    if (!state.goalWarned) state.goalWarned = {};
+    if (state.goalWarned[key]) return;
+    state.goalWarned[key] = true;
+    toast(message);
+  }
+
+  function noteBuilt(type) {
+    if (!state.built) state.built = {};
+    state.built[type] = (state.built[type] || 0) + 1;
+    if (state.mode !== 'campaign' || !state.stagePlan || !state.stagePlan.goals) return;
+    var goals = state.stagePlan.goals;
+    for (var i = 0; i < goals.length; i++) {
+      var goal = goals[i];
+      if (goal.kind === 'ban' && goal.type === type) noteGoalFail('ban-' + type, '放了' + towerShort(type) + '，這顆星沒了');
+      if (goal.kind === 'nohero' && type === 'hero') noteGoalFail('nohero', '放了英雄，這顆星沒了');
+      if (goal.kind === 'cap' && type !== 'hero' && builtTowerCount() > goal.max) noteGoalFail('cap', '塔超過 ' + goal.max + ' 座，這顆星沒了');
+    }
   }
 
   function starGlyph(n) {
     var text = '';
     for (var i = 0; i < 3; i++) text += i < n ? '★' : '☆';
     return text;
+  }
+
+  function clearControl(enemy) {
+    if (!enemy) return;
+    enemy.freeze = 0;
+    enemy.stun = 0;
+    enemy.slow = 0;
+    enemy.slowTime = 0;
+  }
+
+  function beginBerserk() {
+    if (state.phase !== 'combat' || state.berserk) return;
+    state.berserk = true;
+    for (var i = 0; i < state.enemies.length; i++) clearControl(state.enemies[i]);
+    toast('怪物狂暴，緩速、麻痺、冰凍無效');
+    state.banner = { text: '怪物狂暴', sub: '緩速、麻痺、冰凍無效', life: 2.8 };
   }
 
   function onGameOver() {
@@ -5582,6 +6326,7 @@ function selectedTower() {
       invested: invested,
     };
     state.towers.push(tower);
+    noteBuilt(tower.type);
     flashCell(cell.c, cell.r, true);
     var stats = towerStats(tower);
     state.rangePing = { c: cell.c, r: cell.r, range: stats.range, color: towerColor(tower), t: 0.9 };
@@ -5706,12 +6451,7 @@ function selectedTower() {
   }
 
   function openVictoryModal() {
-    var stars = earnedStars();
-    var prev = state.stars[state.level] || 0;
-    if (stars > prev) {
-      state.stars[state.level] = stars;
-      saveStars();
-    }
+    var stars = recordStarMask();
     var actions = [];
     var upcoming = nextStage(state.stagePlan);
     if (upcoming && stageUnlocked(upcoming)) {
@@ -5723,18 +6463,38 @@ function selectedTower() {
     }
     actions.push({ label: '返回關卡選擇', className: 'btn-ghost', onClick: function () { closeModal(); openStages(state.chapter); } });
     var starNote = state.reviveUsed
-      ? '本局使用了復活廣告，最高 1 星。'
-      : '未使用復活：0 傷三星，受傷 10 點以內兩星。';
+      ? '用了復活，只算通關這一顆。'
+      : victoryStarLine();
     openModal({
       tone: 'reward',
       kicker: '關卡通過',
-      title: starGlyph(stars) + '  ' + state.level,
-      desc: state.chapterName + ' ' + state.levelName + ' 守住了。基地受傷 ' + state.lifeLost + ' 點。' + starNote,
+      title: starGlyph(starCount(stars)) + '  ' + state.level,
+      desc: state.chapterName + ' ' + state.levelName + ' 守住了。' + starNote,
       actions: actions,
     });
   }
 
   var PATCH_NOTES = [
+    {
+      date: '10/27',
+      title: '名片框、稱號、第 50 波巨王',
+      detail: '每一章五關都三星會得到一種名片框，八章都過關再多一個。稱號可以自己選一個，地獄榜前 10 名會再顯示一個榜上稱號。無限模式第 50 波改成迴廊巨王，身上隨機帶三種王的能力。打過這一波會得到「無限迴廊之主」。',
+    },
+    {
+      date: '10/27',
+      title: '關卡星星各關不同',
+      detail: '作戰選關時，點左上的星星可以看這一關的三個條件。第一個是通關。另外兩個會換成無傷、少受傷、至少放幾座塔、不放產錢或某種屬性塔、某座塔升到 5 等、塔數上限、不賣塔或不放英雄。看過廣告復活只保留通關那一顆。',
+    },
+    {
+      date: '10/27',
+      title: '鐵匠讓塔升到 10 等',
+      detail: '第 20 波起，或已經有塔升滿時，建造選單會多出鐵匠，480 金，不攻擊。有他在場，其他塔可以用原本的升級一路升到 10 等。賣走之後不能再往上升，已經升過的等級會留著。',
+    },
+    {
+      date: '10/27',
+      title: '打太久怪物會狂暴',
+      detail: '每一波戰鬥超過 2 分鐘不會直接失敗。場上的怪會狂暴，緩速、麻痺、冰凍都對牠們無效。點英雄技能後，底下的資訊框會收起來。點資訊框外面也會把框關掉。',
+    },
     {
       date: '10/27',
       title: '第 40 波出現破塔怪',
@@ -5957,6 +6717,8 @@ function selectedTower() {
       }
       state.reviveUsed = true;
       state.lives = START_LIVES;
+      state.waveTime = 0;
+      state.berserk = false;
       state.phase = 'combat';
       state.paused = false;
       closeModal();
@@ -6005,6 +6767,11 @@ function selectedTower() {
     if (state.phase !== 'edit') return;
     state.editTool = null;
     state.editCountdown = 0;
+    var beforeEdit = unlockedTitleIds();
+    var editDeeds = loadDeeds();
+    editDeeds.edit = true;
+    saveDeeds(editDeeds);
+    noteNewTitles(beforeEdit);
     state.banner = null;
     syncRouteBar();
     requestStartWave(state.wave + 1);
@@ -6440,6 +7207,8 @@ function selectedTower() {
         email: user.email || '',
         picture: user.photoURL || (same ? prev.picture : '') || '',
         avatar: same && prev.avatar ? prev.avatar : '',
+        frame: same && prev.frame ? prev.frame : '',
+        title: same && prev.title ? prev.title : '',
         guest: !!user.isAnonymous,
         friendId: prevId,
       });
@@ -6525,6 +7294,8 @@ function selectedTower() {
       email: '',
       picture: '',
       avatar: sameGuest && prevGuest.avatar ? prevGuest.avatar : '',
+      frame: sameGuest && prevGuest.frame ? prevGuest.frame : '',
+      title: sameGuest && prevGuest.title ? prevGuest.title : '',
       guest: true,
       friendId: keptFriendId(id),
     });
@@ -6551,11 +7322,13 @@ function selectedTower() {
     var account = loadAccount();
     if (!account) return;
     var epithet = rankEpithet(hellRank());
+    profilePick = null;
+    profileEditTab = 'face';
     openModal({
       tone: 'reward',
       kicker: '名片',
       title: '編輯名片',
-      desc: 'ID　' + account.friendId + '。名字最多 12 字。獎盃頭像只留到本週結算，八章首領都過關才有專屬頭像。',
+      desc: 'ID　' + account.friendId + '。名字最多 12 字。頭像、框和稱號可以自己選。前 10 名的榜上稱號會另外顯示。',
       profile: true,
       actions: [
         { label: '儲存', className: 'btn-mint', onClick: saveProfileCard },
@@ -6589,6 +7362,7 @@ function selectedTower() {
   }
 
   var homePick = null;
+  var homeGoalsOpen = false;
 
   function firstOpenStage() {
     var last = STAGES[0];
@@ -6612,14 +7386,39 @@ function selectedTower() {
 
   function starSum() {
     var total = 0;
-    for (var i = 0; i < STAGES.length; i++) total += state.stars[STAGES[i].stageId] || 0;
+    for (var i = 0; i < STAGES.length; i++) total += starCount(state.stars[STAGES[i].stageId] || 0);
     return total;
   }
 
-  function clearedStageCount() {
-    var total = 0;
-    for (var i = 0; i < STAGES.length; i++) if ((state.stars[STAGES[i].stageId] || 0) >= 1) total += 1;
-    return total;
+  function paintHomeGoals(stage) {
+    var row = document.getElementById('home-goals');
+    var button = document.getElementById('home-stars');
+    if (!row) return;
+    row.replaceChildren();
+    row.hidden = !homeGoalsOpen;
+    if (button) {
+      button.setAttribute('aria-expanded', homeGoalsOpen ? 'true' : 'false');
+      button.setAttribute('aria-label', '星星 ' + starSum() + '，點開看這關條件');
+    }
+    if (!stage) return;
+    var title = document.createElement('p');
+    title.textContent = stage.stageId + ' 條件';
+    row.appendChild(title);
+    var goals = stage.goals || [];
+    var mask = state.stars[stage.stageId] || 0;
+    for (var i = 0; i < goals.length && i < 3; i++) {
+      var item = document.createElement('div');
+      var on = !!(mask & (1 << i));
+      item.className = 'home-goal' + (on ? ' is-on' : '');
+      var mark = document.createElement('span');
+      mark.className = 'goal-mark';
+      mark.textContent = on ? '★' : '☆';
+      var label = document.createElement('span');
+      label.textContent = goalLabel(goals[i]);
+      item.appendChild(mark);
+      item.appendChild(label);
+      row.appendChild(item);
+    }
   }
 
   function drawHomeArt(chapter) {
@@ -6635,8 +7434,7 @@ function selectedTower() {
     var kicker = document.getElementById('home-chapter-kicker');
     var title = document.getElementById('home-chapter-name');
     var progress = document.getElementById('home-progress');
-    var stars = document.getElementById('home-stars');
-    var clear = document.getElementById('home-clear');
+    var starButton = document.getElementById('home-stars');
     var waves = document.getElementById('home-waves');
     var gold = document.getElementById('home-gold');
     var boss = document.getElementById('home-boss');
@@ -6649,8 +7447,8 @@ function selectedTower() {
     if (kicker) kicker.textContent = '章節 ' + chapter.id;
     if (title) title.textContent = chapter.name;
     if (progress) progress.textContent = stage.stageId + ' ' + stage.name + ' · 進度 ' + done + '/5';
-    if (stars) stars.textContent = '★ ' + starSum();
-    if (clear) clear.textContent = '通關 ' + clearedStageCount() + '/40';
+    paintHomeGoals(stage);
+    if (starButton) starButton.classList.toggle('is-won', starSum() > 0);
     if (waves) waves.textContent = String(stage.waves.length);
     if (gold) gold.textContent = String(stage.initialGold);
     if (boss) boss.textContent = chapter.boss.replace(/王$/, '');
@@ -6964,6 +7762,15 @@ function selectedTower() {
       ],
     });
     appendInfoCard(list, {
+      tag: '經濟', title: '鐵匠', paint: { kind: 'tower', type: 'smith' },
+      desc: '不攻擊。第 20 波起，或已經有塔升滿時可造，全場一隻。在場時其他塔可以用金幣升到 10 等。',
+      stats: [
+        '<strong>造價</strong>：480',
+        '<strong>效果</strong>：其他塔金幣上限 5 等 → 10 等',
+        '<strong>賣掉</strong>：已升過的等級留著，但不能再往上升',
+      ],
+    });
+    appendInfoCard(list, {
       tag: '英雄', title: '緋紅劍客', paint: { kind: 'hero', hero: 'sword' },
       desc: '走到放置點的射程內追砍。刀揮過的怪都會受傷，每三下射出旋轉半月劍氣。主動：修羅附體。',
       stats: ['<strong>主動</strong>：攻速約 11 倍，每下總血 0.14%→0.18%，最多 5 秒', '<strong>操作</strong>：可拖曳換位，技能點放置處'],
@@ -7147,6 +7954,11 @@ function selectedTower() {
     if (diff) state.best = loadBest(diff.id, mode);
     else if (mode === 'custom') state.best = loadBest('normal', 'custom');
     state.lifeLost = 0;
+    state.built = {};
+    state.soldAny = false;
+    state.soldRun = 0;
+    state.goalWarned = {};
+    state.runStarMask = 0;
     state.wave = 0;
     state.phase = 'prep';
     state.paused = false;
@@ -7181,6 +7993,11 @@ function selectedTower() {
     state.pendingChoices = null;
     state.cardRerolled = false;
     state.banner = null;
+    if (mode === 'campaign' && level && level.goals) {
+      var goalBits = [];
+      for (var gi = 0; gi < level.goals.length; gi++) goalBits.push(goalLabel(level.goals[gi]));
+      state.banner = { text: level.stageId + ' ' + level.name, sub: goalBits.join(' · '), life: 3.6 };
+    }
     state.rangePing = null;
     state.shake = 0;
     state.hurt = 0;
@@ -7271,6 +8088,11 @@ function selectedTower() {
     }
     var def = TOWERS[type];
     if (!def) return;
+    if (type === 'smith' && hasBlacksmith()) {
+      toast('已經有鐵匠了');
+      Sfx.bad();
+      return;
+    }
     if (state.gold < def.cost) {
       flashCell(site.c, site.r, false);
       toast('金幣不足');
@@ -7292,6 +8114,7 @@ function selectedTower() {
       spec: null,
       invested: def.cost,
     });
+    noteBuilt(type);
     flashCell(site.c, site.r, true);
     state.rangePing = { c: site.c, r: site.r, range: def.levels[0].range, color: def.color, t: 0.9 };
     burst(site.c + 0.5, site.r + 0.5, def.color, 8);
@@ -7391,11 +8214,24 @@ function selectedTower() {
       return;
     }
     state.gold += refund;
+    state.soldAny = true;
+    state.soldRun = (state.soldRun || 0) + 1;
+    var beforeSell = unlockedTitleIds();
+    var sellDeeds = loadDeeds();
+    sellDeeds.sells = (sellDeeds.sells || 0) + 1;
+    if (state.soldRun >= 6) sellDeeds.wreck = true;
+    saveDeeds(sellDeeds);
+    noteNewTitles(beforeSell);
     state.towers = state.towers.filter(function (item) { return item.id !== tower.id; });
     state.selectedId = null;
     state.sellArmed = false;
     Sfx.sell();
     toast('出售獲得 ' + refund + ' 金幣');
+    if (state.mode === 'campaign' && state.stagePlan && state.stagePlan.goals) {
+      for (var soldGoal = 0; soldGoal < state.stagePlan.goals.length; soldGoal++) {
+        if (state.stagePlan.goals[soldGoal].kind === 'nosell') noteGoalFail('nosell', '賣了塔，這顆星沒了');
+      }
+    }
     renderInspector();
     syncHud();
   }
@@ -7423,6 +8259,12 @@ function selectedTower() {
     }
     inspector.classList.add('is-open');
     inspectActions.replaceChildren();
+    if (tower.type === 'smith') {
+      inspectTitle.textContent = '鐵匠';
+      inspectMeta.textContent = '不攻擊。在場時，其他塔可以用金幣升到 10 等。賣走之後就不能再往上升。';
+      appendSellRow(Math.floor(tower.invested * sellRatio()));
+      return;
+    }
     if (tower.type === 'hero') {
       inspectTitle.textContent = heroName(tower.hero) + '  Lv.' + (tower.level + 1);
       inspectMeta.textContent = heroBlurb(tower);
@@ -7444,6 +8286,7 @@ function selectedTower() {
     var maxed = towerMaxed(tower);
     inspectTitle.textContent = towerLabel(tower) + '  Lv.' + (tower.level + 1);
     inspectMeta.textContent = needsSpec(tower) ? specChoiceText(tower) : statLine(stats, tower);
+    if (maxed && !hasBlacksmith() && tower.level < 9) inspectMeta.textContent += ' 金幣升滿了。造一隻鐵匠後可升到 10 等。';
     if (needsSpec(tower)) {
       var row = document.createElement('div');
       row.className = 'spec-row';
@@ -7457,11 +8300,9 @@ function selectedTower() {
       }
       inspectActions.appendChild(row);
     } else {
-      var upgradeLabel = tower.level >= 5
-        ? '已滿級'
-        : (maxed ? '金幣滿等' : '升級 ' + nextUpgradeCost(tower));
-      var upgrade = makeActButton(upgradeLabel, 'btn-mint btn-primary-act', 'upgrade');
-      upgrade.disabled = maxed || tower.level >= 5 || state.gold < nextUpgradeCost(tower);
+      var capped = tower.level >= goldLevelCap();
+      var upgrade = makeActButton(capped ? '已滿級' : ('升級 ' + nextUpgradeCost(tower)), 'btn-mint btn-primary-act', 'upgrade');
+      upgrade.disabled = capped || state.gold < nextUpgradeCost(tower);
       inspectActions.appendChild(upgrade);
     }
     appendSellRow(refund);
@@ -7478,6 +8319,7 @@ function selectedTower() {
     if (stats.shots) bits.push('彈數 ' + Math.min(3, stats.shots));
     if (stats.targets > 1) bits.push('目標 ' + stats.targets);
     if (tower && tower.level >= 5) bits.push('滿等×1.4');
+    if (tower && tower.level > 5) bits.push('鐵匠再強化');
     if (stats.effect === 'slow') bits.push('緩速 ' + Math.round(stats.slow * 100) + '%', '3次凍結');
     if (stats.effect === 'burn') bits.push('灼燒 ' + Math.round(stats.burn / stats.burnEvery) + '/秒', '破盾／破甲／厚皮+10%血', '傳染3秒');
     if (stats.effect === 'poison') bits.push('中毒 ' + Math.round(stats.poison / stats.poisonEvery) + '/秒', '克制再生／治療／回血', '傳染3秒');
@@ -7562,7 +8404,7 @@ function selectedTower() {
       waveBtnLabel.textContent = '防守中';
       var left = state.spawnQueue.length;
       for (var n = 0; n < state.enemies.length; n++) if (!state.enemies[n].dead) left += 1;
-      waveBtnSub.textContent = '剩餘 ' + left;
+      waveBtnSub.textContent = '剩餘 ' + left + ' · ' + waveClockLabel();
     } else if (state.phase === 'prep') {
       waveBtn.disabled = false;
       waveBtnLabel.textContent = state.mode === 'campaign'
@@ -7972,6 +8814,27 @@ function selectedTower() {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('$', inkJitter(9, 0.4), 1 + inkJitter(10, 0.3));
+    } else if (type === 'smith') {
+      drawGlyphPlate('square', s);
+      ctx.fillStyle = '#5d4037';
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.42, s * 0.28);
+      ctx.lineTo(s * 0.42, s * 0.28);
+      ctx.lineTo(s * 0.34, s * 0.08);
+      ctx.lineTo(-s * 0.34, s * 0.08);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      ctx.fillStyle = '#161616';
+      ctx.fillRect(-s * 0.1, -s * 0.42, s * 0.2, s * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.34, -s * 0.18);
+      ctx.lineTo(s * 0.34, -s * 0.18);
+      ctx.lineTo(s * 0.22, -s * 0.42);
+      ctx.lineTo(-s * 0.22, -s * 0.42);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
     } else {
       drawGlyphPlate('square', s);
       if (type === 'poison') {
@@ -8280,7 +9143,9 @@ function selectedTower() {
   }
 
   function buildMenuTypes() {
-    return ['basic', 'poison', 'fire', 'ice', 'bolt', 'mint'];
+    var types = ['basic', 'poison', 'fire', 'ice', 'bolt', 'mint'];
+    if (smithReady()) types.push('smith');
+    return types;
   }
 
   function buildMenuLabel(type) {
@@ -8290,6 +9155,7 @@ function selectedTower() {
     if (type === 'ice') return '冰';
     if (type === 'bolt') return '雷';
     if (type === 'mint') return '錢';
+    if (type === 'smith') return '鐵匠';
     return TOWERS[type] ? TOWERS[type].name : type;
   }
 
@@ -8323,8 +9189,8 @@ function selectedTower() {
     for (var i = 0; i < types.length; i++) {
       var col = i % cols;
       var row = Math.floor(i / cols);
-      var rowCount = row === 0 ? Math.min(cols, types.length) : types.length - cols;
-      var rowOffset = row === 0 ? 0 : (panelW - (rowCount * btnW + (rowCount + 1) * gap)) / 2;
+      var rowCount = Math.min(cols, types.length - row * cols);
+      var rowOffset = (panelW - (rowCount * btnW + (rowCount + 1) * gap)) / 2;
       buttons.push({
         type: types[i],
         x: x + gap + rowOffset + col * (btnW + gap),
@@ -8611,6 +9477,7 @@ function selectedTower() {
       drawTowerGlyph(glyphType, s, tower.aim || 0);
     }
     ctx.restore();
+    if (tower.type !== 'smith') {
     var shown = tower.level + 1;
     ctx.fillStyle = '#161616';
     if (shown > 6) {
@@ -8625,6 +9492,7 @@ function selectedTower() {
       for (var n = 0; n < shown; n++) {
         ctx.fillRect(pipX + n * (pip + gap), y + tile * 0.34, pip, pip);
       }
+    }
     }
     if (state.selectedId === tower.id) {
       ctx.strokeStyle = '#161616';
@@ -9203,7 +10071,7 @@ function selectedTower() {
         drawInkAuraRing(x, y, rad + 4, healColor, t * 3 + 1.2, 0.03);
       }
     }
-    var raging = (enemy.bossId === 'rush' && enemy.enraged) || enemy.hellEnraged;
+    var raging = (bossHas(enemy, 'rush') && enemy.enraged) || enemy.hellEnraged || state.berserk;
     var swiftDebuff = hasHellDeff('speed') && !enemy.boss;
     if (raging || swiftDebuff) {
       ctx.save();
@@ -9245,7 +10113,7 @@ function selectedTower() {
       ctx.stroke();
       ctx.restore();
     }
-    if (enemy.bossId === 'armor' && !enemy.firePierce) {
+    if (bossHas(enemy, 'armor') && !enemy.firePierce) {
       ctx.save();
       ctx.translate(x, y);
       ctx.strokeStyle = '#8aa0b8';
@@ -9269,7 +10137,7 @@ function selectedTower() {
       }
       ctx.restore();
     }
-    if (enemy.bossId === 'split') {
+    if (bossHas(enemy, 'split')) {
       drawInkAuraRing(x, y, rad, '#c084fc', t * 2.5, 0.06);
       ctx.save();
       ctx.strokeStyle = '#c084fc';
@@ -9298,7 +10166,7 @@ function selectedTower() {
       drawInkAuraRing(x, y, rad, '#9bd4ff', t * 2, 0.03);
       ctx.restore();
     }
-    if (enemy.bossId === 'rush' && !enemy.enraged) {
+    if (bossHas(enemy, 'rush') && !enemy.enraged) {
       drawInkAuraRing(x, y, rad, '#ff5a36', t * 2, 0.04);
     }
   }
@@ -9311,7 +10179,7 @@ function selectedTower() {
     var resist = enemy.resist && RESISTS[enemy.resist] ? RESISTS[enemy.resist] : null;
     var colors = enemyBodyColors(enemy, resist);
     var bob = Math.sin(state.time * (enemy.type === 'swift' ? 11 : 7) + enemy.id * 1.7) * rad * 0.08;
-    if (enemy.freeze > 0) bob = 0;
+    if (enemy.freeze > 0 && !state.berserk) bob = 0;
     ctx.save();
     ctx.translate(x, y);
     ctx.lineJoin = 'round';
@@ -9336,11 +10204,11 @@ function selectedTower() {
     ctx.restore();
     ctx.restore();
     drawEnemyStatusFx(enemy, x, y, rad);
-    if (enemy.freeze > 0) {
+    if (!state.berserk && enemy.freeze > 0) {
       ctx.strokeStyle = '#2f7bff';
       ctx.lineWidth = 3;
       ctx.strokeRect(x - rad - 3, y - rad - 3, (rad + 3) * 2, (rad + 3) * 2);
-    } else if (enemy.stun > 0) {
+    } else if (!state.berserk && enemy.stun > 0) {
       ctx.strokeStyle = '#e0b000';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -9349,7 +10217,7 @@ function selectedTower() {
       ctx.lineTo(x - rad * 0.05, y - rad + 3);
       ctx.lineTo(x + rad * 0.22, y - rad + 8);
       ctx.stroke();
-    } else if (enemy.slowTime > 0) {
+    } else if (!state.berserk && enemy.slowTime > 0) {
       ctx.setLineDash([3, 3]);
       ctx.strokeStyle = '#2f7bff';
       ctx.lineWidth = 2;
@@ -9749,6 +10617,19 @@ function selectedTower() {
     return { c: c, r: r };
   }
 
+  function waveClockLabel() {
+    if (state.berserk) return '狂暴';
+    var left = Math.max(0, Math.ceil(120 - (state.waveTime || 0)));
+    var min = Math.floor(left / 60);
+    var sec = left % 60;
+    return min + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  function tapHitsTower(point, cell) {
+    if (cell && towerAt(cell.c, cell.r)) return true;
+    return !!heroAtPoint(point.x, point.y);
+  }
+
   function handleTap(clientX, clientY) {
     if (modal.classList.contains('is-open') || state.adBusy) return;
     if (state.phase === 'gameover' || state.phase === 'menu') return;
@@ -9769,6 +10650,11 @@ function selectedTower() {
     if (!cell) {
       clearSelection();
       return;
+    }
+    if (state.selectedId && !tapHitsTower(point, cell)) {
+      var placing = state.pickMode === 'fog' || state.pickMode === 'wall' || state.pickMode === 'heroPlace';
+      clearSelection();
+      if (!placing) return;
     }
     if (state.pickMode && handlePick(cell)) return;
     var existing = towerAt(cell.c, cell.r);
@@ -9987,6 +10873,19 @@ function selectedTower() {
     if (boardBack) boardBack.addEventListener('click', showMenu);
     if (pauseBtn) pauseBtn.addEventListener('click', togglePause);
     document.getElementById('btn-mode-campaign').addEventListener('click', showMenu);
+    document.getElementById('home-stars').addEventListener('click', function (event) {
+      event.stopPropagation();
+      homeGoalsOpen = !homeGoalsOpen;
+      paintHomeGoals(ensureHomePick());
+    });
+    document.getElementById('home-goals').addEventListener('click', function (event) {
+      event.stopPropagation();
+    });
+    document.addEventListener('click', function () {
+      if (!homeGoalsOpen) return;
+      homeGoalsOpen = false;
+      paintHomeGoals(ensureHomePick());
+    });
     document.getElementById('btn-home-start').addEventListener('click', function () {
       var stage = ensureHomePick();
       if (!stageUnlocked(stage)) {
@@ -10027,7 +10926,13 @@ function selectedTower() {
       var act = btn.dataset.act;
       if (act === 'upgrade') upgradeSelected();
       else if (act === 'spec') specialize(btn.dataset.spec);
-      else if (act === 'skill') castHeroSkill(selectedTower());
+      else if (act === 'skill') {
+        castHeroSkill(selectedTower());
+        state.selectedId = null;
+        state.sellArmed = false;
+        renderInspector();
+        syncHud();
+      }
       else if (act === 'sell') sellSelected();
       else if (act === 'sell-cancel') {
         state.sellArmed = false;
@@ -10075,6 +10980,10 @@ function selectedTower() {
         var rate = playRate();
         if (!state.paused) {
           for (var step = 0; step < rate; step++) update(dt);
+          if (state.phase === 'combat') {
+            state.waveTime = (state.waveTime || 0) + dt;
+            if (state.waveTime >= 120) beginBerserk();
+          }
         }
         updateCosmetic(dt * rate);
         syncHud();
