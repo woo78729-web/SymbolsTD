@@ -968,8 +968,8 @@
           name: STAGE_TITLES[s - 1],
           path: path,
           waves: buildWaves(c, s),
-          initialGold: 60 + (c - 1) * 8 + (s - 1) * 6,
-          hpScale: Math.round((1 + (c - 1) * 0.07 + (s - 1) * 0.02) * 100) / 100,
+          initialGold: 50,
+          hpScale: Math.round((1 + (c - 1) * 0.07 + (s - 1) * 0.02) * 1.06 * 100) / 100,
         });
       }
     }
@@ -1161,8 +1161,13 @@ function selectedTower() {
   }
 
   function threatWave(wave) {
-    if (state.mode !== 'campaign' || !state.stagePlan) return wave;
-    return Math.min(wave, 4) + (state.stagePlan.chapter - 1) * 0.8 + (state.stagePlan.index - 1) * 0.35;
+    if (state.mode === 'campaign' && state.stagePlan) {
+      return Math.min(wave, 4) + (state.stagePlan.chapter - 1) * 0.8 + (state.stagePlan.index - 1) * 0.35;
+    }
+    if ((state.mode === 'infinite' || state.mode === 'custom') && wave > 30) {
+      return wave + (wave - 30) * 0.18;
+    }
+    return wave;
   }
 
   function bossForWave(wave) {
@@ -1201,14 +1206,14 @@ function selectedTower() {
     normal: {
       id: 'normal', name: '普通',
       blurb: '血量與數量適中，擊殺金幣稍少。起始 100 金、20 生命。',
-      hp: 1.18, growth: 1.185, speed: 1.03, speedGrow: 0.034, speedCap: 1.52,
+      hp: 1.25, growth: 1.185, speed: 1.04, speedGrow: 0.035, speedCap: 1.55,
       gold: 0.92, gap: 0.95, gapMin: 0.52, extra: 0, rush: 0.1,
       lives: 20, purse: 100, swiftFrom: 3, swiftEvery: 3, bruteEvery: 5,
     },
     hell: {
       id: 'hell', name: '地獄',
       blurb: '基礎更高。另有地獄詞綴：1–9 波隨機 1 則（半效），之後每 10 波重抽 2 則。起始 100 金、14 生命。',
-      hp: 1.68, growth: 1.295, speed: 1.16, speedGrow: 0.05, speedCap: 2.0,
+      hp: 1.78, growth: 1.295, speed: 1.18, speedGrow: 0.051, speedCap: 2.05,
       gold: 0.62, gap: 0.76, gapMin: 0.38, extra: 2, rush: 0.24,
       lives: 14, purse: 100, swiftFrom: 2, swiftEvery: 2, bruteEvery: 3,
     },
@@ -1729,6 +1734,7 @@ function selectedTower() {
     var diff = infiniteProfile();
     var gap = Math.max(diff.gapMin, (1.05 - (wave - 1) * 0.045) * diff.gap);
     var gruntCount = 5 + wave + diff.extra + Math.floor((wave - 1) * diff.rush);
+    if (wave > 30) gruntCount += 1 + Math.floor((wave - 30) / 3);
     var jobs = [];
     var swifts = 0;
     for (var i = 0; i < gruntCount; i++) {
@@ -1743,6 +1749,7 @@ function selectedTower() {
       hoppers = 1 + Math.floor((wave - 6) / 9);
       if (diff.id === 'hell' && wave >= 12) hoppers += 1;
       hoppers = Math.min(diff.id === 'hell' ? 3 : 2, hoppers);
+      if (wave > 30) hoppers = Math.min(hoppers + 1, diff.id === 'hell' ? 4 : 3);
       for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: Math.max(1.35, gap * 2.2) });
     }
     var devils = 0;
@@ -1750,7 +1757,13 @@ function selectedTower() {
       devils = 1 + Math.floor((wave - 8) / 10);
       if (diff.id === 'hell' && wave >= 14) devils += 1;
       devils = Math.min(diff.id === 'hell' ? 3 : 2, devils);
+      if (wave > 30) devils = Math.min(devils + 1, diff.id === 'hell' ? 4 : 3);
       for (var d = 0; d < devils; d++) jobs.push({ type: 'devil', gap: Math.max(1.2, gap * 1.8) });
+    }
+    var rams = 0;
+    if (wave >= 40) {
+      rams = 1;
+      jobs.splice(Math.min(jobs.length, Math.max(2, Math.floor(jobs.length * 0.35))), 0, { type: 'ram', gap: Math.max(1.3, gap * 1.6) });
     }
     var brutes = 0;
     var boss = bossForWave(wave);
@@ -1768,7 +1781,7 @@ function selectedTower() {
       for (var b = 0; b < pack; b++) jobs.push({ type: 'brute', gap: 1.05 });
       brutes += pack;
     }
-    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, boss: boss };
+    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, rams: rams, boss: boss };
   }
 
   function planWave(wave) {
@@ -1779,6 +1792,7 @@ function selectedTower() {
     if (state.mode === 'infinite' || (state.mode === 'custom' && state.difficulty === 'hell')) return planInfiniteWave(wave);
     var gap = Math.max(0.52, 0.98 - (wave - 1) * 0.042);
     var gruntCount = 6 + wave;
+    if (wave > 30) gruntCount += 1 + Math.floor((wave - 30) / 3);
     var jobs = [];
     var swifts = 0;
     for (var i = 0; i < gruntCount; i++) {
@@ -1791,12 +1805,19 @@ function selectedTower() {
     var hoppers = 0;
     if (wave >= 6) {
       hoppers = Math.min(2, 1 + Math.floor((wave - 6) / 10));
+      if (wave > 30) hoppers = Math.min(3, hoppers + 1);
       for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: Math.max(1.4, gap * 2.1) });
     }
     var devils = 0;
     if (wave >= 8) {
       devils = Math.min(2, 1 + Math.floor((wave - 8) / 11));
+      if (wave > 30) devils = Math.min(3, devils + 1);
       for (var d = 0; d < devils; d++) jobs.push({ type: 'devil', gap: Math.max(1.25, gap * 1.85) });
+    }
+    var rams = 0;
+    if (wave >= 40) {
+      rams = 1;
+      jobs.splice(Math.min(jobs.length, Math.max(2, Math.floor(jobs.length * 0.35))), 0, { type: 'ram', gap: Math.max(1.35, gap * 1.7) });
     }
     var brutes = 0;
     var boss = bossForWave(wave);
@@ -1806,7 +1827,7 @@ function selectedTower() {
       jobs.push({ type: 'brute', gap: 1.15 });
       brutes = 1;
     }
-    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, boss: boss };
+    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, rams: rams, boss: boss };
   }
 
   function compositionText(plan) {
@@ -1815,6 +1836,7 @@ function selectedTower() {
       var text = '隨機小怪 ' + count;
       if (plan.hoppers) text += ' · 跳躍 ' + plan.hoppers;
       if (plan.devils) text += ' · 惡魔 ' + plan.devils;
+      if (plan.rams) text += ' · 破塔 ' + plan.rams;
       if (plan.brutes) text += ' · 精英 ' + plan.brutes;
       if (plan.boss) text += ' · ' + plan.boss.name;
       return text;
@@ -1874,8 +1896,8 @@ function selectedTower() {
       speedCap = diff.speedCap;
     } else if (state.mode === 'custom') {
       growth = 1.2;
-      hpMul *= 1.15;
-      speedMul = 1.06;
+      hpMul *= 1.22;
+      speedMul = 1.08;
       goldMul = 0.9;
       speedGrow = 0.038;
       speedCap = 1.55;
@@ -1888,15 +1910,18 @@ function selectedTower() {
       swift: { hp: Math.round(gruntHp * 0.62), speed: Math.min(diff ? speedCap + 0.45 : 2.1, gruntSpeed * 1.55), gold: Math.max(2, softWaveGold - 1), radius: 0.23, color: '#f0a202', leak: 1 },
       hopper: { hp: Math.round(gruntHp * 0.8), speed: Math.min((diff ? speedCap : 1.7) + 0.15, gruntSpeed * 1.25), gold: Math.max(3, softWaveGold + 1), radius: 0.26, color: '#4ec6e8', leak: 1 },
       devil: { hp: Math.round(gruntHp * 0.95), speed: Math.min((diff ? speedCap : 1.7) + 0.2, gruntSpeed * 1.2), gold: Math.max(4, softWaveGold + 2), radius: 0.28, color: '#c62828', leak: 1 },
+      ram: { hp: Math.round(gruntHp * 2.8), speed: gruntSpeed * 0.82, gold: Math.max(5, softWaveGold + 3), radius: 0.36, color: '#5c4033', leak: 1 },
       brute: { hp: Math.round(gruntHp * 7.5), speed: gruntSpeed * 0.52, gold: 8 + softWaveGold * 2, radius: 0.44, color: '#8d6bff', leak: 3 },
     };
     var spec = table[type] || table.grunt;
     if (goldMul !== 1) spec.gold = Math.max(2, Math.round(spec.gold * goldMul));
-    var kind = type === 'hopper'
+    var kind = type === 'ram'
+      ? { id: 'ram', name: '破塔怪', color: '#5c4033' }
+      : (type === 'hopper'
       ? { id: 'hopper', name: '跳躍怪', color: '#4ec6e8' }
       : (type === 'devil'
         ? { id: 'devil', name: '小惡魔', color: '#c62828' }
-        : pickMinion(type === 'swift' ? 'swift' : 'grunt'));
+        : pickMinion(type === 'swift' ? 'swift' : 'grunt')));
     var resist = (type === 'hopper' || type === 'devil') ? '' : rollResist(wave);
     return {
       id: state.nextId++,
@@ -1919,6 +1944,7 @@ function selectedTower() {
       jumping: null,
       flying: type === 'swift',
       hexCd: type === 'devil' ? 1.6 + Math.random() * 0.8 : 0,
+      ramCd: 0,
     };
   }
 
@@ -1938,8 +1964,8 @@ function selectedTower() {
       gruntSpeed = Math.min(1.62, gruntSpeed * 1.06);
       gold = Math.max(4, Math.round(gold * 0.9));
     }
-    var bossMul = 9.5 + Math.min(wave, 40) * 0.18;
-    if (diff && diff.id === 'hell') bossMul = 5.4 + Math.min(wave, 40) * 0.1;
+    var bossMul = 9.5 + Math.min(wave, 30) * 0.18 + Math.max(0, wave - 30) * 0.28;
+    if (diff && diff.id === 'hell') bossMul = 5.4 + Math.min(wave, 30) * 0.1 + Math.max(0, wave - 30) * 0.16;
     var hp = Math.round(gruntHp * bossMul);
     return {
       id: state.nextId++,
@@ -3211,6 +3237,7 @@ function selectedTower() {
         if (enemy.type === 'hopper') tryHopperJump(enemy);
       }
       if (enemy.type === 'devil') tickDevilHex(enemy, dt);
+      if (enemy.type === 'ram') tickRam(enemy, dt);
       triggerTrap(enemy);
       if (enemy.freeze > 0) enemy.freeze -= dt;
       if (enemy.stun > 0) enemy.stun -= dt;
@@ -3467,6 +3494,38 @@ function selectedTower() {
         }
       }
     }
+  }
+
+  function crushNearestTower(enemy) {
+    var pos = enemyPos(enemy);
+    var best = null;
+    var bestDist = 1.42;
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (tower.type === 'hero') continue;
+      var dist = Math.hypot((tower.c + 0.5) - pos.x, (tower.r + 0.5) - pos.y);
+      if (dist < bestDist) {
+        best = tower;
+        bestDist = dist;
+      }
+    }
+    if (!best) return;
+    state.towers = state.towers.filter(function (item) { return item.id !== best.id; });
+    if (state.selectedId === best.id) {
+      state.selectedId = null;
+      state.sellArmed = false;
+      renderInspector();
+    }
+    enemy.ramCd = 0.5;
+    spawnFloater(best.c + 0.5, best.r + 0.5 - 0.45, '撞破', '#161616');
+    burst(best.c + 0.5, best.r + 0.5, '#161616', 10);
+    Sfx.cannon();
+  }
+
+  function tickRam(enemy, dt) {
+    if (enemy.ramCd > 0) enemy.ramCd -= dt;
+    if (enemy.stun > 0 || enemy.freeze > 0 || enemy.ramCd > 0) return;
+    crushNearestTower(enemy);
   }
 
   function tickDevilHex(enemy, dt) {
@@ -5242,7 +5301,7 @@ function selectedTower() {
     }
     var hellSplit = hellDeffValue('split');
     if (hellSplit > 0 && !enemy.boss && !enemy.noSplit && enemy.type !== 'shard') {
-      var childType = enemy.type === 'hopper' || enemy.type === 'brute' || enemy.type === 'devil' ? 'grunt' : (enemy.type || 'grunt');
+      var childType = enemy.type === 'hopper' || enemy.type === 'brute' || enemy.type === 'devil' || enemy.type === 'ram' ? 'grunt' : (enemy.type || 'grunt');
       var childHp = Math.max(1, Math.round(enemy.maxHp * hellSplit));
       var spdBonus = hellDeffValue('speed');
       for (var h = 0; h < 2; h++) {
@@ -5676,6 +5735,31 @@ function selectedTower() {
   }
 
   var PATCH_NOTES = [
+    {
+      date: '10/27',
+      title: '第 40 波出現破塔怪',
+      detail: '無限和自訂從第 40 波起，每波多一隻破塔怪。它走近一般塔會把塔撞破，塔直接消失，不退金幣。英雄塔不會被撞掉。',
+    },
+    {
+      date: '10/27',
+      title: '30 波以後無限和自訂更難',
+      detail: '第 30 波之後，無限和自訂的怪物血量、速度和數量會再往上加。一般關卡不受這段加難。一般關卡起始金幣改回 50，怪物血量稍微提高一點。',
+    },
+    {
+      date: '10/27',
+      title: '血量百分比技能調低',
+      detail: '致命節奏、修羅附體、隕石術、致命毒霧，還有獵手打護盾的百分比傷害都調低了。火塔在打掉護盾、第一次打穿護甲或厚皮時，只額外打一次約 6% 總血。毒蝕還是每秒約 3% 總血。',
+    },
+    {
+      date: '10/27',
+      title: '名片可以改名、選頭像',
+      detail: '點名片可以改名字，也能選手繪頭像。本週地獄榜第 1 到 10 名會暫時多一個獎盃頭像。八個章節的第 5 關都有星星時，會多一個通關頭像。',
+    },
+    {
+      date: '10/27',
+      title: '快怪改成飛行蝙蝠',
+      detail: '快怪改成會飛的蝙蝠。雷塔麻痺時間拉長，打飛行怪和跳躍怪（含跳起來的時候）傷害更高。小惡魔還是走在地上。',
+    },
     {
       date: '10/27',
       title: '地獄成績記到雲端排行',
@@ -6221,6 +6305,7 @@ function selectedTower() {
         else if (spec.type === 'devil') drawDevilBody(rad, colors, 0);
         else if (spec.type === 'swift') drawSwiftBody(rad, colors, 0);
         else if (spec.type === 'brute') drawBruteBody(rad, colors, 0);
+        else if (spec.type === 'ram') drawRamBody(rad, colors, 0);
         else drawGruntBody(rad, colors, 0);
         if (resist) {
           g.font = '800 11px ' + FONT;
@@ -6679,6 +6764,16 @@ function selectedTower() {
           '<strong>惡咒</strong>：約每 3 秒鎖附近一座塔',
           '<strong>漏關</strong>：扣 1 生命，並偷走部分金幣',
           '<strong>出現</strong>：約第 8 波起',
+        ],
+      },
+      {
+        tag: '小怪', title: '破塔怪', paint: { kind: 'enemy', type: 'ram', color: '#5c4033' },
+        desc: '手繪衝角獸。無限和自訂模式第 40 波起出現，走近一般塔會把塔撞破。英雄塔不會被撞掉。',
+        stats: [
+          '<strong>血量</strong>：普通怪 ×2.8',
+          '<strong>移速</strong>：普通怪 ×0.82',
+          '<strong>撞塔</strong>：撞破後塔消失，不退金幣',
+          '<strong>出現</strong>：無限、自訂，第 40 波起每波 1 隻',
         ],
       },
       {
@@ -8730,6 +8825,34 @@ function selectedTower() {
     inkStroke();
   }
 
+  function drawRamBody(rad, colors, bob) {
+    inkSeed = Math.round(rad * 31 + 5);
+    ctx.translate(0, bob * 0.15);
+    doodleInk(colors, Math.max(2.1, rad * 0.14));
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.62, rad * 0.28);
+    ctx.quadraticCurveTo(-rad * 0.95, -rad * 0.05, -rad * 0.4, -rad * 0.32);
+    ctx.quadraticCurveTo(rad * 0.05, -rad * 0.55, rad * 0.42, -rad * 0.18);
+    ctx.quadraticCurveTo(rad * 0.9, rad * 0.12, rad * 0.38, rad * 0.46);
+    ctx.quadraticCurveTo(-rad * 0.08, rad * 0.72, -rad * 0.62, rad * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.02, -rad * 0.28);
+    ctx.quadraticCurveTo(rad * 0.42, -rad * 0.95, rad * 0.62, -rad * 0.22);
+    ctx.quadraticCurveTo(rad * 0.28, -rad * 0.38, rad * 0.08, -rad * 0.16);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.fillStyle = colors.ink;
+    doodleEye(-rad * 0.16, -rad * 0.02, Math.max(1.4, rad * 0.08));
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.36, -rad * 0.16);
+    ctx.quadraticCurveTo(-rad * 0.12, rad * 0.02, -rad * 0.02, -rad * 0.14);
+    inkStroke();
+  }
+
   function drawHopperBody(rad, colors, bob, jumping) {
     inkSeed = Math.round(rad * 23 + 6);
     ctx.translate(0, bob + (jumping ? -rad * 0.2 : 0));
@@ -9184,6 +9307,7 @@ function selectedTower() {
     else if (enemy.type === 'devil') drawDevilBody(rad, colors, bob);
     else if (enemy.type === 'swift') drawSwiftBody(rad, colors, bob);
     else if (enemy.type === 'brute') drawBruteBody(rad, colors, bob);
+    else if (enemy.type === 'ram') drawRamBody(rad, colors, bob);
     else drawGruntBody(rad, colors, bob);
     ctx.restore();
     ctx.restore();
