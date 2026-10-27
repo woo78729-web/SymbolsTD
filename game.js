@@ -102,18 +102,18 @@
     },
     bolt: {
       name: '雷塔',
-      blurb: '一發串連跳電 · 打多隻',
+      blurb: '對空、跳躍增傷 · 麻痺',
       cost: 85,
       color: '#e0b000',
       category: 'element',
       upgradeCost: [55, 90, 130, 175, 220],
       levels: [
-        { damage: 24, range: 2.45, cooldown: 0.72, splash: 0, targets: 1, chain: 2, chainRange: 1.75 },
-        { damage: 32, range: 2.5, cooldown: 0.64, splash: 0, targets: 1, chain: 2, chainRange: 1.85 },
-        { damage: 42, range: 2.55, cooldown: 0.56, splash: 0, targets: 1, chain: 3, chainRange: 1.9 },
-        { damage: 54, range: 2.6, cooldown: 0.5, splash: 0, targets: 1, chain: 3, chainRange: 2.0 },
-        { damage: 68, range: 2.65, cooldown: 0.44, splash: 0, targets: 1, chain: 4, chainRange: 2.05 },
-        { damage: 84, range: 2.7, cooldown: 0.38, splash: 0, targets: 1, chain: 4, chainRange: 2.15 },
+        { damage: 24, range: 2.45, cooldown: 0.72, splash: 0, targets: 1, chain: 2, chainRange: 1.75, stunTime: 1.0 },
+        { damage: 32, range: 2.5, cooldown: 0.64, splash: 0, targets: 1, chain: 2, chainRange: 1.85, stunTime: 1.05 },
+        { damage: 42, range: 2.55, cooldown: 0.56, splash: 0, targets: 1, chain: 3, chainRange: 1.9, stunTime: 1.1 },
+        { damage: 54, range: 2.6, cooldown: 0.5, splash: 0, targets: 1, chain: 3, chainRange: 2.0, stunTime: 1.15 },
+        { damage: 68, range: 2.65, cooldown: 0.44, splash: 0, targets: 1, chain: 4, chainRange: 2.05, stunTime: 1.2 },
+        { damage: 84, range: 2.7, cooldown: 0.38, splash: 0, targets: 1, chain: 4, chainRange: 2.15, stunTime: 1.3 },
       ],
     },
     mint: {
@@ -1090,7 +1090,7 @@
   }
 
   function tryHopperJump(enemy) {
-    if (!PATH_JUMPS.length || enemy.jumpCd > 0 || enemy.jumping || enemy.freeze > 0) return;
+    if (!PATH_JUMPS.length || enemy.jumpCd > 0 || enemy.jumping || enemy.freeze > 0 || enemy.stun > 0) return;
     if (hoppingCount() >= HOPPER_JUMP_MAX) return;
     var best = null;
     for (var i = 0; i < PATH_JUMPS.length; i++) {
@@ -1917,6 +1917,7 @@ function selectedTower() {
       lastNum: 0,
       jumpCd: type === 'hopper' ? 2.8 : 0,
       jumping: null,
+      flying: type === 'swift',
       hexCd: type === 'devil' ? 1.6 + Math.random() * 0.8 : 0,
     };
   }
@@ -2342,6 +2343,400 @@ function selectedTower() {
     return best;
   }
 
+  var AVATARS = [
+    { id: 'slime', name: '史萊姆' },
+    { id: 'ghost', name: '幽靈' },
+    { id: 'frog', name: '青蛙' },
+    { id: 'skull', name: '骷髏' },
+    { id: 'shroom', name: '蘑菇' },
+    { id: 'gear', name: '齒輪' },
+    { id: 'gem', name: '晶石' },
+    { id: 'eye', name: '眼石' },
+    { id: 'trophy', name: '獎盃', lock: 'rank' },
+    { id: 'clear', name: '全通關', lock: 'clear' },
+  ];
+
+  function allChaptersCleared() {
+    for (var id = 1; id <= 8; id++) {
+      if ((state.stars[id + '-5'] || 0) < 1) return false;
+    }
+    return true;
+  }
+
+  function avatarUnlocked(id) {
+    if (id === 'trophy') {
+      var rank = hellRank();
+      return rank >= 1 && rank <= 10;
+    }
+    if (id === 'clear') return allChaptersCleared();
+    return !!id;
+  }
+
+  function avatarLockText(id) {
+    if (id === 'trophy') return '本週名次';
+    if (id === 'clear') return '八章全過';
+    return '';
+  }
+
+  function shownAvatar(account) {
+    if (!account || !account.avatar || !avatarUnlocked(account.avatar)) return '';
+    return account.avatar;
+  }
+
+  function avatarIdFromPicture(picture) {
+    var text = String(picture || '');
+    if (text.indexOf('doodle:') !== 0) return '';
+    return text.slice(7);
+  }
+
+  function profilePicture(account) {
+    var avatar = shownAvatar(account);
+    if (avatar) return 'doodle:' + avatar;
+    var photo = account && account.picture || '';
+    if (String(photo).indexOf('doodle:') === 0) return '';
+    return photo;
+  }
+
+  function avatarDot(x, y, r) {
+    ctx.beginPath();
+    ctx.fillStyle = '#161616';
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function avatarInk(s) {
+    inkSeed = Math.round(s * 17 + 5);
+    inkSetup(Math.max(2, s * 0.11));
+    ctx.strokeStyle = '#161616';
+    ctx.fillStyle = '#fff';
+  }
+
+  function avatarSmile(s, y) {
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.16, y);
+    ctx.quadraticCurveTo(0, y + s * 0.22, s * 0.18, y - s * 0.02);
+    inkStroke();
+  }
+
+  function drawAvatarMark(id, s) {
+    avatarInk(s);
+    if (id === 'ghost') {
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.55, s * 0.42);
+      ctx.quadraticCurveTo(-s * 0.78, -s * 0.2, 0, -s * 0.62);
+      ctx.quadraticCurveTo(s * 0.78, -s * 0.15, s * 0.55, s * 0.4);
+      ctx.quadraticCurveTo(s * 0.28, s * 0.1, s * 0.02, s * 0.5);
+      ctx.quadraticCurveTo(-s * 0.22, s * 0.12, -s * 0.55, s * 0.42);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      avatarDot(-s * 0.16, -s * 0.08, s * 0.07);
+      avatarDot(s * 0.16, -s * 0.08, s * 0.07);
+      ctx.beginPath();
+      ctx.arc(0, s * 0.08, s * 0.1, 0.2, Math.PI - 0.2);
+      inkStroke();
+      return;
+    }
+    if (id === 'frog') {
+      ctx.beginPath();
+      ctx.moveTo(0, s * 0.55);
+      ctx.quadraticCurveTo(-s * 0.55, s * 0.32, -s * 0.68, 0);
+      ctx.quadraticCurveTo(-s * 0.88, -s * 0.22, -s * 0.38, -s * 0.2);
+      ctx.quadraticCurveTo(-s * 0.52, -s * 0.72, -s * 0.1, -s * 0.28);
+      ctx.quadraticCurveTo(0, -s * 0.08, s * 0.1, -s * 0.28);
+      ctx.quadraticCurveTo(s * 0.52, -s * 0.72, s * 0.38, -s * 0.2);
+      ctx.quadraticCurveTo(s * 0.88, -s * 0.18, s * 0.66, s * 0.04);
+      ctx.quadraticCurveTo(s * 0.48, s * 0.38, 0, s * 0.55);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      avatarDot(-s * 0.22, -s * 0.32, s * 0.06);
+      avatarDot(s * 0.22, -s * 0.32, s * 0.06);
+      avatarSmile(s, s * 0.08);
+      return;
+    }
+    if (id === 'skull') {
+      inkCircle(0, -s * 0.02, s * 0.58, 14);
+      ctx.fill();
+      inkStroke();
+      ctx.fillStyle = '#161616';
+      inkCircle(-s * 0.2, -s * 0.08, s * 0.12, 8);
+      ctx.fill();
+      inkCircle(s * 0.2, -s * 0.08, s * 0.12, 8);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, s * 0.02);
+      ctx.lineTo(-s * 0.06, s * 0.16);
+      ctx.lineTo(s * 0.06, s * 0.16);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.22, s * 0.28);
+      ctx.quadraticCurveTo(0, s * 0.42, s * 0.22, s * 0.28);
+      ctx.lineTo(s * 0.18, s * 0.48);
+      ctx.lineTo(s * 0.06, s * 0.36);
+      ctx.lineTo(0, s * 0.5);
+      ctx.lineTo(-s * 0.06, s * 0.36);
+      ctx.lineTo(-s * 0.18, s * 0.48);
+      ctx.closePath();
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      inkStroke();
+      return;
+    }
+    if (id === 'shroom') {
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.18, s * 0.02);
+      ctx.quadraticCurveTo(-s * 0.28, s * 0.55, 0, s * 0.62);
+      ctx.quadraticCurveTo(s * 0.26, s * 0.55, s * 0.16, 0);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.62, s * 0.02);
+      ctx.quadraticCurveTo(-s * 0.72, -s * 0.68, s * 0.02, -s * 0.58);
+      ctx.quadraticCurveTo(s * 0.78, -s * 0.48, s * 0.58, s * 0.06);
+      ctx.quadraticCurveTo(0, s * 0.2, -s * 0.62, s * 0.02);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      avatarDot(-s * 0.22, -s * 0.18, s * 0.07);
+      avatarDot(s * 0.16, -s * 0.28, s * 0.06);
+      avatarSmile(s * 0.7, s * 0.28);
+      return;
+    }
+    if (id === 'gear') {
+      ctx.beginPath();
+      for (var i = 0; i < 6; i++) {
+        var a0 = -Math.PI / 2 + i * Math.PI / 3;
+        var a1 = a0 + Math.PI / 6;
+        var a2 = a0 + Math.PI / 3;
+        var reach = s * (0.7 + inkJitter(i + 2, 0.06));
+        var x0 = Math.cos(a0) * s * 0.4;
+        var y0 = Math.sin(a0) * s * 0.4;
+        if (i === 0) ctx.moveTo(x0, y0);
+        else ctx.lineTo(x0, y0);
+        ctx.quadraticCurveTo(Math.cos(a1) * reach, Math.sin(a1) * reach, Math.cos(a2) * s * 0.4, Math.sin(a2) * s * 0.4);
+      }
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      avatarDot(-s * 0.12, -s * 0.04, s * 0.06);
+      avatarDot(s * 0.12, -s * 0.04, s * 0.06);
+      avatarSmile(s * 0.8, s * 0.1);
+      return;
+    }
+    if (id === 'gem') {
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.08, -s * 0.62);
+      ctx.quadraticCurveTo(-s * 0.7, -s * 0.2, -s * 0.42, s * 0.28);
+      ctx.quadraticCurveTo(-s * 0.15, s * 0.72, s * 0.08, s * 0.48);
+      ctx.quadraticCurveTo(s * 0.62, s * 0.15, s * 0.4, -s * 0.22);
+      ctx.quadraticCurveTo(s * 0.15, -s * 0.78, -s * 0.08, -s * 0.62);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.02, -s * 0.4);
+      ctx.quadraticCurveTo(s * 0.12, -s * 0.05, -s * 0.04, s * 0.22);
+      inkStroke();
+      avatarDot(-s * 0.12, s * 0.02, s * 0.05);
+      avatarDot(s * 0.12, -s * 0.02, s * 0.05);
+      return;
+    }
+    if (id === 'eye') {
+      inkCircle(0, s * 0.06, s * 0.62, 14);
+      ctx.fill();
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.36, s * 0.02);
+      ctx.quadraticCurveTo(0, -s * 0.36, s * 0.36, s * 0.02);
+      ctx.quadraticCurveTo(0, s * 0.32, -s * 0.36, s * 0.02);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      avatarDot(s * 0.04, s * 0.02, s * 0.1);
+      avatarSmile(s, s * 0.32);
+      return;
+    }
+    if (id === 'trophy') {
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.28, -s * 0.48);
+      ctx.quadraticCurveTo(-s * 0.4, s * 0.02, -s * 0.1, s * 0.12);
+      ctx.lineTo(s * 0.1, s * 0.12);
+      ctx.quadraticCurveTo(s * 0.4, s * 0.02, s * 0.28, -s * 0.48);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.26, -s * 0.32);
+      ctx.quadraticCurveTo(-s * 0.58, -s * 0.12, -s * 0.24, s * 0.02);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(s * 0.26, -s * 0.32);
+      ctx.quadraticCurveTo(s * 0.58, -s * 0.12, s * 0.24, s * 0.02);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.08, s * 0.12);
+      ctx.lineTo(-s * 0.12, s * 0.32);
+      ctx.lineTo(s * 0.12, s * 0.32);
+      ctx.lineTo(s * 0.08, s * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.34, s * 0.3);
+      ctx.quadraticCurveTo(0, s * 0.4, s * 0.34, s * 0.3);
+      ctx.lineTo(s * 0.3, s * 0.48);
+      ctx.quadraticCurveTo(0, s * 0.58, -s * 0.3, s * 0.48);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      return;
+    }
+    if (id === 'clear') {
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.12, -s * 0.08);
+      ctx.lineTo(-s * 0.34, -s * 0.58);
+      ctx.lineTo(-s * 0.02, -s * 0.22);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(s * 0.12, -s * 0.08);
+      ctx.lineTo(s * 0.34, -s * 0.58);
+      ctx.lineTo(s * 0.02, -s * 0.22);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      inkCircle(0, s * 0.16, s * 0.4, 14);
+      ctx.fill();
+      inkStroke();
+      avatarDot(-s * 0.12, s * 0.1, s * 0.05);
+      avatarDot(s * 0.12, s * 0.1, s * 0.05);
+      avatarSmile(s * 0.75, s * 0.24);
+      return;
+    }
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.7, s * 0.12);
+    ctx.quadraticCurveTo(-s * 0.9, -s * 0.32, -s * 0.15, -s * 0.52);
+    ctx.quadraticCurveTo(s * 0.12, -s * 0.78, s * 0.5, -s * 0.28);
+    ctx.quadraticCurveTo(s * 0.92, s * 0.08, s * 0.45, s * 0.42);
+    ctx.quadraticCurveTo(0, s * 0.7, -s * 0.4, s * 0.45);
+    ctx.quadraticCurveTo(-s * 0.75, s * 0.4, -s * 0.7, s * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    avatarDot(-s * 0.16, -s * 0.02, s * 0.07);
+    avatarDot(s * 0.2, s * 0.02, s * 0.07);
+    avatarSmile(s, s * 0.2);
+  }
+
+  function paintAvatarCanvas(canvas, id) {
+    if (!canvas) return;
+    var g = canvas.getContext('2d');
+    if (!g) return;
+    var prev = ctx;
+    ctx = g;
+    try {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, canvas.width, canvas.height);
+      g.translate(canvas.width / 2, canvas.height / 2 + 1);
+      drawAvatarMark(id || 'slime', canvas.width * 0.34);
+    } finally {
+      ctx = prev;
+    }
+  }
+
+  function paintAvatarSlot(img, canvas, letter, account) {
+    var avatar = shownAvatar(account);
+    if (avatar && canvas) {
+      paintAvatarCanvas(canvas, avatar);
+      canvas.hidden = false;
+      if (img) img.hidden = true;
+      if (letter) letter.hidden = true;
+      return;
+    }
+    if (canvas) canvas.hidden = true;
+    if (account && account.picture && String(account.picture).indexOf('doodle:') !== 0 && img) {
+      img.hidden = false;
+      img.src = account.picture;
+      if (letter) letter.hidden = true;
+      return;
+    }
+    if (img) img.hidden = true;
+    if (letter) {
+      letter.hidden = false;
+      letter.textContent = account ? String(account.name || '?').slice(0, 1) : '?';
+    }
+  }
+
+  function renderProfileEditor() {
+    var list = document.getElementById('modal-notes');
+    if (!list) return;
+    var account = loadAccount();
+    list.replaceChildren();
+    list.hidden = false;
+    var label = document.createElement('label');
+    label.className = 'profile-name';
+    label.appendChild(document.createTextNode('名字'));
+    var input = document.createElement('input');
+    input.id = 'profile-name';
+    input.maxLength = 12;
+    input.value = account ? account.name : '';
+    label.appendChild(input);
+    list.appendChild(label);
+    var grid = document.createElement('div');
+    grid.className = 'avatar-grid';
+    var current = account && account.avatar && avatarUnlocked(account.avatar) ? account.avatar : 'slime';
+    AVATARS.forEach(function (item) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'avatar-pick' + (item.id === current ? ' is-on' : '');
+      btn.setAttribute('data-avatar', item.id);
+      var open = avatarUnlocked(item.id);
+      if (!open) btn.classList.add('is-locked');
+      var face = document.createElement('canvas');
+      face.width = 64;
+      face.height = 64;
+      paintAvatarCanvas(face, item.id);
+      var caption = document.createElement('small');
+      caption.textContent = open ? item.name : avatarLockText(item.id);
+      btn.appendChild(face);
+      btn.appendChild(caption);
+      btn.addEventListener('click', function () {
+        if (!avatarUnlocked(item.id)) {
+          toast(item.id === 'trophy' ? '本週進前 10 名才有獎盃頭像' : '八章首領都過關才有這個頭像');
+          return;
+        }
+        var picks = grid.querySelectorAll('.avatar-pick');
+        for (var i = 0; i < picks.length; i++) picks[i].classList.remove('is-on');
+        btn.classList.add('is-on');
+      });
+      grid.appendChild(btn);
+    });
+    list.appendChild(grid);
+  }
+
+  function saveProfileCard() {
+    var account = loadAccount();
+    if (!account) return;
+    var input = document.getElementById('profile-name');
+    var name = String(input && input.value || '').trim().slice(0, 12);
+    if (!name) { toast('名字不能是空的'); return; }
+    var picked = document.querySelector('.avatar-pick.is-on');
+    var avatar = picked ? picked.getAttribute('data-avatar') : 'slime';
+    if (!avatarUnlocked(avatar)) { toast('這個頭像還不能用'); return; }
+    account.name = name;
+    account.nameCustom = true;
+    account.avatar = avatar;
+    saveAccount(account);
+    paintAccount();
+    publishProfile();
+    closeModal();
+    toast('名片已更新');
+  }
+
   function paintPlayerCard() {
     var card = document.getElementById('player-card');
     if (!card) return;
@@ -2365,6 +2760,8 @@ function selectedTower() {
       if (bestEl) bestEl.textContent = '登入後才有名片';
       if (rankEl) rankEl.textContent = '第 11 名起沒有稱號';
       if (img) img.hidden = true;
+      var emptyFace = document.getElementById('player-avatar-doodle');
+      if (emptyFace) emptyFace.hidden = true;
       if (letter) { letter.hidden = false; letter.textContent = '?'; }
       return;
     }
@@ -2382,14 +2779,7 @@ function selectedTower() {
           ? ('本週地獄榜第 ' + rank + ' · ' + title.name)
           : ('本週地獄榜第 ' + rank + ' · 無稱號');
     }
-    if (account.picture && img) {
-      img.hidden = false;
-      img.src = account.picture;
-      if (letter) letter.hidden = true;
-    } else {
-      if (img) img.hidden = true;
-      if (letter) { letter.hidden = false; letter.textContent = String(account.name || '?').slice(0, 1); }
-    }
+    paintAvatarSlot(img, document.getElementById('player-avatar-doodle'), letter, account);
   }
 
   function openAuraPreview() {
@@ -2423,7 +2813,14 @@ function selectedTower() {
     item.appendChild(fx);
     var avatar = document.createElement('span');
     avatar.className = 'player-avatar';
-    if (person.picture) {
+    var doodleId = avatarIdFromPicture(person.picture);
+    if (doodleId) {
+      var face = document.createElement('canvas');
+      face.width = 64;
+      face.height = 64;
+      paintAvatarCanvas(face, doodleId);
+      avatar.appendChild(face);
+    } else if (person.picture) {
       var photo = document.createElement('img');
       photo.alt = '';
       photo.src = person.picture;
@@ -2568,7 +2965,7 @@ function selectedTower() {
       var best = profileBest();
       return cloudDb.collection('users').doc(latest.uid).set({
         name: latest.name,
-        picture: latest.picture || '',
+        picture: profilePicture(latest),
         bestLabel: best.label || '',
         bestWave: best.wave || 0,
         hellRank: hellRank(),
@@ -2816,6 +3213,7 @@ function selectedTower() {
       if (enemy.type === 'devil') tickDevilHex(enemy, dt);
       triggerTrap(enemy);
       if (enemy.freeze > 0) enemy.freeze -= dt;
+      if (enemy.stun > 0) enemy.stun -= dt;
       if (enemy.slowTime > 0) {
         enemy.slowTime -= dt;
         if (enemy.slowTime <= 0) enemy.slow = 0;
@@ -3079,6 +3477,7 @@ function selectedTower() {
   }
 
   function tickDevilHex(enemy, dt) {
+    if (enemy.stun > 0 || enemy.freeze > 0) return;
     enemy.hexCd = (enemy.hexCd || 0) - dt;
     if (enemy.hexCd > 0 || !state.towers.length) return;
     enemy.hexCd = 3.0;
@@ -4260,7 +4659,7 @@ function selectedTower() {
   }
 
   function moveSpeed(enemy) {
-    if (enemy.freeze > 0) return 0;
+    if (enemy.freeze > 0 || enemy.stun > 0) return 0;
     var speed = enemy.speed;
     if (enemy.slowTime > 0) speed *= 1 - (enemy.slow || 0);
     if (hasHeroId('god')) speed *= 0.9;
@@ -4368,6 +4767,21 @@ function selectedTower() {
     });
   }
 
+  function boltPreyBonus(enemy) {
+    if (!enemy) return 1;
+    if (enemy.flying || enemy.type === 'hopper' || enemy.jumping) return 1.4;
+    return 1;
+  }
+
+  function stunEnemy(enemy, time) {
+    if (!enemy || enemy.dead || resists(enemy, 'shock')) return;
+    var fresh = !(enemy.stun > 0);
+    enemy.stun = Math.max(enemy.stun || 0, time || 1);
+    if (!fresh) return;
+    var pos = pointAt(enemy.dist);
+    spawnFloater(pos.x, pos.y - 0.55, '麻痺', '#e0b000');
+  }
+
   function fire(tower, targets, stats) {
     var originX = tower.c + 0.5;
     var originY = tower.r + 0.5;
@@ -4391,7 +4805,8 @@ function selectedTower() {
           life: 0.16,
           maxLife: 0.16,
         });
-        hurtEnemy(chain[c], stats.damage, tower.id);
+        hurtEnemy(chain[c], Math.round(stats.damage * boltPreyBonus(chain[c])), tower.id);
+        if (!chain[c].dead) stunEnemy(chain[c], stats.stunTime || 1);
         fromX = hit.x;
         fromY = hit.y;
       }
@@ -4824,6 +5239,7 @@ function selectedTower() {
         shard.gold = 5 + state.wave;
         shard.leak = 1;
         shard.resist = '';
+        shard.flying = false;
         shard.noSplit = true;
         shard.dist = Math.max(0, Math.min(enemy.dist + (s - 1) * 0.22, WAYPOINTS.length - 1.05));
         queueEnemy(shard);
@@ -5345,14 +5761,16 @@ function selectedTower() {
   }
 
   function openModal(options) {
-    modal.classList.remove('is-over', 'is-reward', 'is-shop', 'is-notice');
+    modal.classList.remove('is-over', 'is-reward', 'is-shop', 'is-notice', 'is-profile');
     modal.classList.add(options.tone === 'over' ? 'is-over' : 'is-reward');
     if (options.shop) modal.classList.add('is-shop');
     if (options.notes) modal.classList.add('is-notice');
+    if (options.profile) modal.classList.add('is-profile');
     modalKicker.textContent = options.kicker;
     modalTitle.textContent = options.title;
     modalDesc.textContent = options.desc;
     renderPatchNotes(options.notes);
+    if (options.profile) renderProfileEditor();
     modalActions.replaceChildren();
     options.actions.forEach(function (action) {
       modalActions.appendChild(actionButton(action));
@@ -5362,7 +5780,7 @@ function selectedTower() {
   }
 
   function closeModal() {
-    modal.classList.remove('is-open', 'is-over', 'is-reward', 'is-shop', 'is-notice');
+    modal.classList.remove('is-open', 'is-over', 'is-reward', 'is-shop', 'is-notice', 'is-profile');
     modal.setAttribute('aria-hidden', 'true');
   }
 
@@ -5911,11 +6329,15 @@ function selectedTower() {
       }
       var named = String(user.displayName || user.email || '').trim();
       var prevId = keptFriendId(user.uid);
+      var prev = loadAccount();
+      var same = prev && prev.uid === user.uid;
       saveAccount({
         uid: user.uid,
-        name: (user.isAnonymous || !named ? guestLabel() : named).slice(0, 24),
+        name: (same && prev.nameCustom && prev.name) ? prev.name : (user.isAnonymous || !named ? guestLabel() : named).slice(0, 24),
+        nameCustom: !!(same && prev.nameCustom),
         email: user.email || '',
-        picture: user.photoURL || '',
+        picture: user.photoURL || (same ? prev.picture : '') || '',
+        avatar: same && prev.avatar ? prev.avatar : '',
         guest: !!user.isAnonymous,
         friendId: prevId,
       });
@@ -5945,12 +6367,12 @@ function selectedTower() {
     if (welcomeName) welcomeName.textContent = account.name + (rankEpithet(hellRank()) ? ('　' + rankEpithet(hellRank())) : '');
     if (chipName) chipName.textContent = account.name;
     if (welcomeAvatar) {
-      welcomeAvatar.hidden = !account.picture;
-      if (account.picture) welcomeAvatar.src = account.picture;
+      paintAvatarSlot(welcomeAvatar, document.getElementById('welcome-avatar-doodle'), null, account);
     }
     if (chipAvatar) {
-      chipAvatar.hidden = !account.picture;
-      if (account.picture) chipAvatar.src = account.picture;
+      var chipPhoto = account.picture && String(account.picture).indexOf('doodle:') !== 0;
+      chipAvatar.hidden = !chipPhoto;
+      if (chipPhoto) chipAvatar.src = account.picture;
     }
   }
 
@@ -5992,7 +6414,18 @@ function selectedTower() {
       id = 'guest-' + Date.now().toString(36);
       try { localStorage.setItem('symbols-td-guest-id', id); } catch (error) { /* ignore */ }
     }
-    saveAccount({ uid: id, name: guestLabel(), email: '', picture: '', guest: true, friendId: keptFriendId(id) });
+    var prevGuest = loadAccount();
+    var sameGuest = prevGuest && prevGuest.uid === id;
+    saveAccount({
+      uid: id,
+      name: (sameGuest && prevGuest.nameCustom && prevGuest.name) ? prevGuest.name : guestLabel(),
+      nameCustom: !!(sameGuest && prevGuest.nameCustom),
+      email: '',
+      picture: '',
+      avatar: sameGuest && prevGuest.avatar ? prevGuest.avatar : '',
+      guest: true,
+      friendId: keptFriendId(id),
+    });
     paintAccount();
     showMenu();
     toast('已用訪客進入');
@@ -6018,12 +6451,12 @@ function selectedTower() {
     var epithet = rankEpithet(hellRank());
     openModal({
       tone: 'reward',
-      kicker: '帳號',
-      title: account.name + (epithet ? ('　' + epithet) : ''),
-      desc: 'ID　' + account.friendId + '。加好友時把這組 ID 給對方。' + (account.guest
-        ? '這是訪客。同一台裝置會留著這個名字。換手機要改用 Google，才看得到同一筆成績。'
-        : (account.email || '已用 Google 登入') + '。成績記在這個帳號，換手機登入同一個帳號看得到。'),
+      kicker: '名片',
+      title: '編輯名片',
+      desc: 'ID　' + account.friendId + '。名字最多 12 字。獎盃頭像只留到本週結算，八章首領都過關才有專屬頭像。',
+      profile: true,
       actions: [
+        { label: '儲存', className: 'btn-mint', onClick: saveProfileCard },
         { label: '登出', className: 'btn-ghost', onClick: function () {
           var done = function () {
             clearAccount();
@@ -6214,10 +6647,11 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '快怪', paint: { kind: 'enemy', type: 'swift', color: '#f0a202' },
-        desc: '手繪幽靈，會飄，擅長衝線。',
+        desc: '手繪蝙蝠，沿著路飛，跑得比普通怪快。',
         stats: [
           '<strong>血量</strong>：普通怪 ×0.62',
           '<strong>移速</strong>：普通怪 ×1.55（較快）',
+          '<strong>飛行</strong>：雷塔對它增傷',
           '<strong>金幣</strong>：略低於普通怪',
           '<strong>漏關</strong>：扣 1 生命',
         ],
@@ -6238,17 +6672,17 @@ function selectedTower() {
         stats: [
           '<strong>血量</strong>：普通怪 ×0.8',
           '<strong>移速</strong>：略快於普通怪',
-          '<strong>跳躍</strong>：同時最多 3 隻、有冷卻',
+          '<strong>跳躍</strong>：同時最多 3 隻、有冷卻。雷塔增傷',
           '<strong>金幣</strong>：略高於普通怪',
           '<strong>漏關</strong>：扣 1 生命',
         ],
       },
       {
         tag: '小怪', title: '小惡魔', paint: { kind: 'enemy', type: 'devil', color: '#c62828' },
-        desc: '手繪飛天小惡魔。惡咒鎖塔時會把紅叉插在塔旁。漏關還會偷金幣。',
+        desc: '手繪小惡魔，走在地上。惡咒鎖塔時會把紅叉插在塔旁。漏關還會偷金幣。',
         stats: [
           '<strong>血量</strong>：普通怪 ×0.95',
-          '<strong>移速</strong>：略快於普通怪',
+          '<strong>移速</strong>：普通怪 ×1.2',
           '<strong>惡咒</strong>：約每 3 秒鎖附近一座塔',
           '<strong>漏關</strong>：扣 1 生命，並偷走部分金幣',
           '<strong>出現</strong>：約第 8 波起',
@@ -6266,7 +6700,7 @@ function selectedTower() {
       },
       {
         tag: '首領', title: '再生王', paint: { kind: 'enemy', type: 'grunt', color: '#3ecf8e', bossId: 'regen' },
-        desc: '葉形王體＋黃冠，外框會泛綠光回血光環。',
+        desc: '手繪笑臉，側邊長葉子，戴黃冠。外框泛綠回血光環。',
         stats: [
           '<strong>特性</strong>：戰鬥中持續回血',
           '<strong>克制</strong>：毒塔毒蝕（持續扣總血 %）',
@@ -6275,37 +6709,37 @@ function selectedTower() {
       },
       {
         tag: '首領', title: '狂暴王', paint: { kind: 'enemy', type: 'grunt', color: '#ff5a36', bossId: 'rush' },
-        desc: '尖刺王體＋黃冠。殘血爆發時出現衝刺殘影。',
+        desc: '手繪怒臉跟亂髮，戴黃冠。殘血爆發時出現衝刺殘影。',
         stats: ['<strong>觸發</strong>：血量低於 50%', '<strong>效果</strong>：大幅加速'],
       },
       {
         tag: '首領', title: '召喚王', paint: { kind: 'enemy', type: 'grunt', color: '#f2c14e', bossId: 'summon' },
-        desc: '多瓣王體＋黃冠，周圍有召喚點環繞。',
+        desc: '手繪張嘴喊叫的臉，戴黃冠，周圍有召喚點環繞。',
         stats: ['<strong>特性</strong>：週期召喚小怪', '<strong>壓力</strong>：增加漏關與干擾火力'],
       },
       {
         tag: '首領', title: '護盾王', paint: { kind: 'enemy', type: 'grunt', color: '#67e8f9', bossId: 'ward' },
-        desc: '盾形王體＋黃冠。護盾時有八角邊框，破盾有粉碎感。',
+        desc: '手繪的臉擋在盾牌後面，戴黃冠。護盾時外框發亮。',
         stats: ['<strong>特性</strong>：護盾期間減傷／擋彈', '<strong>克制</strong>：火塔破盾並打血量 10%'],
       },
       {
         tag: '首領', title: '分裂王', paint: { kind: 'enemy', type: 'grunt', color: '#c084fc', bossId: 'split' },
-        desc: '三瓣重疊王體＋黃冠，外框有紫環特效。',
+        desc: '三張手繪臉擠在一起，戴黃冠，外框有紫環。',
         stats: ['<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：分裂體金幣較低'],
       },
       {
         tag: '首領', title: '治癒王', paint: { kind: 'enemy', type: 'grunt', color: '#ff8fab', bossId: 'mend' },
-        desc: '柔圓王體＋黃冠，粉紅治癒光環包覆外框。',
+        desc: '手繪溫和笑臉，戴黃冠，外框有粉紅治癒光環。',
         stats: ['<strong>特性</strong>：範圍治療友軍', '<strong>克制</strong>：毒塔毒蝕'],
       },
       {
         tag: '首領', title: '冰封王', paint: { kind: 'enemy', type: 'grunt', color: '#9bd4ff', bossId: 'frost' },
-        desc: '冰晶王體＋黃冠，外框有冰刺光環。',
+        desc: '手繪掛著冰柱瀏海的臉，戴黃冠，外框有冰刺光環。',
         stats: ['<strong>技能</strong>：定期凍結所有塔', '<strong>應對</strong>：預留輸出與節奏'],
       },
       {
         tag: '首領', title: '鐵甲王', paint: { kind: 'enemy', type: 'grunt', color: '#8aa0b8', bossId: 'armor' },
-        desc: '鐵板王體＋黃冠，外框有鐵甲邊。',
+        desc: '手繪戴頭盔的臉，戴黃冠，外框有鐵甲邊。',
         stats: ['<strong>減傷</strong>：受到傷害減半', '<strong>克制</strong>：火塔破甲並打血量 10%'],
       },
       {
@@ -6396,10 +6830,11 @@ function selectedTower() {
       {
         tag: '雷', title: '雷塔', cardClass: 'info-card--attr info-card--bolt',
         paint: { kind: 'tower', type: 'bolt' },
-        desc: '串連跳電 · 清多隻',
+        desc: '串連跳電 · 對空與跳躍增傷 · 麻痺',
         stats: [
           '<strong>造價</strong> 85',
-          '<strong>傷</strong> 24→84',
+          '<strong>傷</strong> 24→84，飛行與跳躍 ×1.4',
+          '<strong>麻痺</strong> 1.0→1.3 秒',
           '<strong>串連</strong> 2→4 跳',
         ],
       },
@@ -8154,15 +8589,6 @@ function selectedTower() {
     }
   }
 
-  function enemyFacing(enemy, pos) {
-    var ahead = pointAt(Math.min(WAYPOINTS.length - 1, (enemy.dist || 0) + 0.4));
-    if (enemy.jumping) {
-      var to = WAYPOINTS[enemy.jumping.to];
-      ahead = { x: to.x, y: to.y };
-    }
-    return Math.atan2(ahead.y - pos.y, ahead.x - pos.x);
-  }
-
   function enemyBodyColors(enemy, resist) {
     var hit = enemy.hitFlash > 0;
     return {
@@ -8199,262 +8625,382 @@ function selectedTower() {
     ctx.fill();
   }
 
+  function doodleInk(colors, width) {
+    inkSetup(width);
+    ctx.strokeStyle = colors.ink;
+    ctx.fillStyle = colors.fill;
+  }
+
+  function doodleEye(x, y, r) {
+    inkCircle(x, y, r, 6);
+    ctx.fill();
+  }
+
   function drawGruntBody(rad, colors, bob) {
     inkSeed = Math.round(rad * 17 + 3);
     ctx.translate(0, bob * 0.35);
-    inkSetup(Math.max(2, rad * 0.13));
-    ctx.fillStyle = colors.fill;
+    doodleInk(colors, Math.max(2, rad * 0.16));
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.72, rad * 0.4);
-    ctx.quadraticCurveTo(-rad * 0.98, -rad * 0.05, -rad * 0.42, -rad * 0.48);
-    ctx.quadraticCurveTo(0, -rad * 0.78, rad * 0.48, -rad * 0.42);
-    ctx.quadraticCurveTo(rad * 0.98, rad * 0.02, rad * 0.68, rad * 0.42);
-    ctx.quadraticCurveTo(0.05 * rad, rad * 0.7, -rad * 0.72, rad * 0.4);
+    ctx.moveTo(-rad * 0.78, rad * 0.18);
+    ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.28, -rad * 0.32, -rad * 0.58);
+    ctx.quadraticCurveTo(rad * 0.05, -rad * 0.92, rad * 0.52, -rad * 0.46);
+    ctx.quadraticCurveTo(rad * 1.02, rad * 0.02, rad * 0.62, rad * 0.4);
+    ctx.quadraticCurveTo(rad * 0.18, rad * 0.78, -rad * 0.28, rad * 0.58);
+    ctx.quadraticCurveTo(-rad * 0.72, rad * 0.7, -rad * 0.78, rad * 0.18);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    ctx.fillStyle = '#161616';
-    inkCircle(-rad * 0.2, -rad * 0.02, Math.max(1.5, rad * 0.09), 6);
-    ctx.fill();
-    inkCircle(rad * 0.24, rad * 0.02, Math.max(1.5, rad * 0.09), 6);
-    ctx.fill();
-    inkLine(-rad * 0.1, rad * 0.26, rad * 0.16, rad * 0.28, 2);
+    ctx.fillStyle = colors.ink;
+    doodleEye(-rad * 0.22, -rad * 0.08, Math.max(1.4, rad * 0.09));
+    doodleEye(rad * 0.26, -rad * 0.02, Math.max(1.4, rad * 0.09));
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.16, rad * 0.2);
+    ctx.quadraticCurveTo(rad * 0.06, rad * 0.42, rad * 0.3, rad * 0.16);
     inkStroke();
   }
 
   function drawSwiftBody(rad, colors, bob) {
     inkSeed = Math.round(rad * 19 + 8);
-    ctx.translate(0, bob * 0.25);
-    inkSetup(Math.max(2, rad * 0.12));
-    ctx.fillStyle = '#fffdf8';
+    var flap = Math.sin((state.time || 0) * 14 + inkSeed) * rad * 0.12;
+    ctx.translate(0, -rad * 0.36 + bob);
+    doodleInk(colors, Math.max(1.8, rad * 0.12));
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.58, rad * 0.08);
-    ctx.quadraticCurveTo(-rad * 0.78, -rad * 0.55, inkJitter(1, rad * 0.04), -rad * 0.72);
-    ctx.quadraticCurveTo(rad * 0.8, -rad * 0.5, rad * 0.58, rad * 0.1);
-    ctx.lineTo(rad * 0.4, rad * 0.48);
-    ctx.quadraticCurveTo(rad * 0.16, rad * 0.22, 0, rad * 0.55);
-    ctx.quadraticCurveTo(-rad * 0.2, rad * 0.2, -rad * 0.42, rad * 0.48);
+    ctx.moveTo(-rad * 0.22, rad * 0.08);
+    ctx.quadraticCurveTo(-rad * 0.95, -rad * 0.35 - flap, -rad * 1.05, rad * 0.05);
+    ctx.quadraticCurveTo(-rad * 0.7, rad * 0.42 + flap, -rad * 0.2, rad * 0.22);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    ctx.fillStyle = '#161616';
-    inkCircle(-rad * 0.18, -rad * 0.16, Math.max(1.6, rad * 0.11), 6);
-    ctx.fill();
-    inkCircle(rad * 0.18, -rad * 0.16, Math.max(1.6, rad * 0.11), 6);
-    ctx.fill();
     ctx.beginPath();
-    ctx.arc(0, rad * 0.02, rad * 0.16, 0.25, Math.PI - 0.25);
+    ctx.moveTo(rad * 0.22, rad * 0.08);
+    ctx.quadraticCurveTo(rad * 0.95, -rad * 0.35 - flap, rad * 1.05, rad * 0.05);
+    ctx.quadraticCurveTo(rad * 0.7, rad * 0.42 + flap, rad * 0.2, rad * 0.22);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    inkCircle(0, rad * 0.04, rad * 0.4, 12);
+    ctx.fill();
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.2, -rad * 0.22);
+    ctx.quadraticCurveTo(-rad * 0.28, -rad * 0.68, -rad * 0.02, -rad * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.2, -rad * 0.22);
+    ctx.quadraticCurveTo(rad * 0.28, -rad * 0.68, rad * 0.02, -rad * 0.28);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.fillStyle = colors.ink;
+    doodleEye(-rad * 0.13, rad * 0.02, Math.max(1.2, rad * 0.07));
+    doodleEye(rad * 0.13, rad * 0.02, Math.max(1.2, rad * 0.07));
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.06, rad * 0.16);
+    ctx.lineTo(-rad * 0.02, rad * 0.28);
+    ctx.lineTo(rad * 0.03, rad * 0.16);
+    ctx.lineTo(rad * 0.08, rad * 0.28);
+    ctx.lineTo(rad * 0.12, rad * 0.16);
     inkStroke();
   }
 
   function drawBruteBody(rad, colors, bob) {
     inkSeed = Math.round(rad * 13 + 4);
     ctx.translate(0, bob * 0.2);
-    inkSetup(Math.max(2.2, rad * 0.14));
-    ctx.fillStyle = colors.fill;
+    doodleInk(colors, Math.max(2.2, rad * 0.15));
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.82, rad * 0.08);
-    ctx.quadraticCurveTo(-rad * 0.95, -rad * 0.35, -rad * 0.25, -rad * 0.38);
-    ctx.lineTo(-rad * 0.05, -rad * 0.68);
-    ctx.lineTo(rad * 0.12, -rad * 0.34);
-    ctx.lineTo(rad * 0.38, -rad * 0.62);
-    ctx.lineTo(rad * 0.48, -rad * 0.28);
-    ctx.quadraticCurveTo(rad * 1.02, rad * 0.02, rad * 0.72, rad * 0.32);
-    ctx.lineTo(rad * 0.4, rad * 0.48);
-    ctx.lineTo(-rad * 0.55, rad * 0.46);
+    ctx.moveTo(-rad * 0.72, rad * 0.08);
+    ctx.quadraticCurveTo(-rad * 1.02, -rad * 0.22, -rad * 0.42, -rad * 0.32);
+    ctx.quadraticCurveTo(-rad * 0.22, -rad * 0.88, rad * 0.02, -rad * 0.38);
+    ctx.quadraticCurveTo(rad * 0.28, -rad * 0.72, rad * 0.38, -rad * 0.22);
+    ctx.quadraticCurveTo(rad * 0.98, rad * 0.02, rad * 0.58, rad * 0.32);
+    ctx.quadraticCurveTo(rad * 0.42, rad * 0.78, rad * 0.12, rad * 0.36);
+    ctx.quadraticCurveTo(-rad * 0.02, rad * 0.86, -rad * 0.28, rad * 0.34);
+    ctx.quadraticCurveTo(-rad * 0.52, rad * 0.8, -rad * 0.72, rad * 0.08);
     ctx.closePath();
     ctx.fill();
     inkStroke();
-    inkLine(-rad * 0.42, rad * 0.44, -rad * 0.48, rad * 0.82, 2);
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.55, rad * 0.02);
+    ctx.quadraticCurveTo(0, rad * 0.18, rad * 0.48, -rad * 0.02);
     inkStroke();
-    inkLine(-rad * 0.08, rad * 0.46, -rad * 0.02, rad * 0.86, 2);
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.22, rad * 0.02);
+    ctx.quadraticCurveTo(rad * 0.42, rad * 0.18, rad * 0.34, rad * 0.32);
     inkStroke();
-    inkLine(rad * 0.28, rad * 0.4, rad * 0.36, rad * 0.78, 2);
+    ctx.fillStyle = colors.ink;
+    doodleEye(-rad * 0.16, -rad * 0.08, Math.max(1.5, rad * 0.08));
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.34, -rad * 0.16);
+    ctx.quadraticCurveTo(-rad * 0.12, -rad * 0.02, rad * 0.08, -rad * 0.18);
     inkStroke();
-    ctx.fillStyle = '#161616';
-    inkCircle(rad * 0.42, -rad * 0.02, Math.max(1.6, rad * 0.09), 6);
-    ctx.fill();
-    inkCircle(-rad * 0.28, -rad * 0.08, Math.max(1.4, rad * 0.07), 6);
-    ctx.fill();
   }
 
   function drawHopperBody(rad, colors, bob, jumping) {
     inkSeed = Math.round(rad * 23 + 6);
-    ctx.translate(0, bob + (jumping ? -rad * 0.12 : 0));
-    inkSetup(Math.max(2, rad * 0.13));
-    ctx.strokeStyle = '#161616';
-    ctx.lineWidth = Math.max(1.8, rad * 0.12);
+    ctx.translate(0, bob + (jumping ? -rad * 0.2 : 0));
+    doodleInk(colors, Math.max(2, rad * 0.14));
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.28, rad * 0.28);
-    ctx.lineTo(-rad * 0.55, rad * 0.55);
-    ctx.lineTo(-rad * 0.22, rad * 0.62);
-    ctx.lineTo(-rad * 0.62, rad * 0.95);
+    ctx.moveTo(0, rad * 0.62);
+    ctx.quadraticCurveTo(-rad * 0.55, rad * 0.4, -rad * 0.78, rad * 0.02);
+    ctx.quadraticCurveTo(-rad * 0.98, -rad * 0.28, -rad * 0.48, -rad * 0.32);
+    ctx.quadraticCurveTo(-rad * 0.62, -rad * 0.92, -rad * 0.18, -rad * 0.4);
+    ctx.quadraticCurveTo(0, -rad * 0.22, rad * 0.18, -rad * 0.4);
+    ctx.quadraticCurveTo(rad * 0.62, -rad * 0.92, rad * 0.48, -rad * 0.32);
+    ctx.quadraticCurveTo(rad * 0.98, -rad * 0.22, rad * 0.72, rad * 0.08);
+    ctx.quadraticCurveTo(rad * 0.48, rad * 0.48, 0, rad * 0.62);
+    ctx.closePath();
+    ctx.fill();
     inkStroke();
     ctx.beginPath();
-    ctx.moveTo(rad * 0.28, rad * 0.28);
-    ctx.lineTo(rad * 0.55, rad * 0.55);
-    ctx.lineTo(rad * 0.22, rad * 0.62);
-    ctx.lineTo(rad * 0.62, rad * 0.95);
+    ctx.moveTo(-rad * 0.42, rad * 0.48);
+    ctx.quadraticCurveTo(-rad * 0.7, rad * 0.72, -rad * 0.28, rad * 0.78);
     inkStroke();
-    ctx.fillStyle = colors.fill;
-    inkCircle(0, rad * 0.02, rad * 0.5, 14);
-    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(rad * 0.38, rad * 0.48);
+    ctx.quadraticCurveTo(rad * 0.68, rad * 0.74, rad * 0.22, rad * 0.8);
     inkStroke();
-    ctx.fillStyle = colors.fill;
-    inkCircle(-rad * 0.28, -rad * 0.48, rad * 0.22, 8);
-    ctx.fill();
+    ctx.fillStyle = colors.ink;
+    doodleEye(-rad * 0.28, -rad * 0.5, Math.max(1.3, rad * 0.08));
+    doodleEye(rad * 0.28, -rad * 0.5, Math.max(1.3, rad * 0.08));
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.28, rad * 0.12);
+    ctx.quadraticCurveTo(0, rad * 0.38, rad * 0.32, rad * 0.08);
     inkStroke();
-    inkCircle(rad * 0.28, -rad * 0.48, rad * 0.22, 8);
+  }
+
+  function drawDevilHorn(rad, side) {
+    ctx.beginPath();
+    ctx.moveTo(side * rad * 0.12, -rad * 0.4);
+    ctx.quadraticCurveTo(side * rad * 0.58, -rad * 0.48, side * rad * 0.4, -rad * 0.78);
+    ctx.quadraticCurveTo(side * rad * 0.2, -rad * 0.55, side * rad * 0.28, -rad * 0.38);
+    ctx.closePath();
     ctx.fill();
-    inkStroke();
-    ctx.fillStyle = '#161616';
-    inkCircle(-rad * 0.28, -rad * 0.48, rad * 0.08, 6);
-    ctx.fill();
-    inkCircle(rad * 0.28, -rad * 0.48, rad * 0.08, 6);
-    ctx.fill();
+    ctx.stroke();
   }
 
   function drawDevilBody(rad, colors, bob) {
-    inkSeed = Math.round(rad * 29 + 2);
-    ctx.translate(0, bob * 0.3);
-    inkSetup(Math.max(2, rad * 0.12));
+    ctx.translate(0, bob * 0.12);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = colors.ink;
     ctx.fillStyle = colors.fill;
+    ctx.lineWidth = Math.max(2.2, rad * 0.15);
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.35, -rad * 0.05);
-    ctx.quadraticCurveTo(-rad * 0.95, -rad * 0.45, -rad * 1.05, rad * 0.05);
-    ctx.quadraticCurveTo(-rad * 0.7, rad * 0.02, -rad * 0.4, rad * 0.22);
-    ctx.closePath();
+    ctx.arc(0, rad * 0.1, rad * 0.62, 0, Math.PI * 2);
     ctx.fill();
-    inkStroke();
+    ctx.stroke();
+    drawDevilHorn(rad, -1);
+    drawDevilHorn(rad, 1);
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = Math.max(2.4, rad * 0.18);
     ctx.beginPath();
-    ctx.moveTo(rad * 0.35, -rad * 0.05);
-    ctx.quadraticCurveTo(rad * 0.95, -rad * 0.45, rad * 1.05, rad * 0.05);
-    ctx.quadraticCurveTo(rad * 0.7, rad * 0.02, rad * 0.4, rad * 0.22);
-    ctx.closePath();
-    ctx.fill();
-    inkStroke();
-    inkCircle(0, rad * 0.08, rad * 0.42, 12);
-    ctx.fill();
-    inkStroke();
+    ctx.moveTo(-rad * 0.32, -rad * 0.02);
+    ctx.lineTo(-rad * 0.06, rad * 0.14);
+    ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.16, -rad * 0.22);
-    ctx.lineTo(-rad * 0.28, -rad * 0.62);
-    ctx.lineTo(-rad * 0.02, -rad * 0.28);
-    ctx.closePath();
-    ctx.fill();
-    inkStroke();
+    ctx.moveTo(rad * 0.32, -rad * 0.02);
+    ctx.lineTo(rad * 0.06, rad * 0.14);
+    ctx.stroke();
+    ctx.lineWidth = Math.max(2.2, rad * 0.15);
     ctx.beginPath();
-    ctx.moveTo(rad * 0.16, -rad * 0.22);
-    ctx.lineTo(rad * 0.3, -rad * 0.6);
-    ctx.lineTo(rad * 0.02, -rad * 0.28);
-    ctx.closePath();
-    ctx.fill();
-    inkStroke();
-    ctx.fillStyle = '#161616';
-    inkCircle(-rad * 0.14, rad * 0.02, Math.max(1.3, rad * 0.07), 5);
-    ctx.fill();
-    inkCircle(rad * 0.14, rad * 0.02, Math.max(1.3, rad * 0.07), 5);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(0, rad * 0.14, rad * 0.14, 0.2, Math.PI - 0.2);
-    inkStroke();
+    ctx.arc(0, rad * 0.08, rad * 0.3, 0.4, Math.PI - 0.4);
+    ctx.stroke();
   }
 
   function drawShardBody(rad, colors) {
     inkSeed = Math.round(rad * 11 + 9);
-    inkSetup(Math.max(2, rad * 0.16));
-    ctx.fillStyle = colors.fill;
+    doodleInk(colors, Math.max(2, rad * 0.16));
     ctx.beginPath();
-    ctx.moveTo(0, -rad * 0.85);
-    ctx.lineTo(rad * 0.55, rad * 0.15);
-    ctx.lineTo(0, rad * 0.85);
-    ctx.lineTo(-rad * 0.55, rad * 0.1);
+    ctx.moveTo(-rad * 0.15, -rad * 0.68);
+    ctx.quadraticCurveTo(-rad * 0.9, -rad * 0.35, -rad * 0.68, rad * 0.18);
+    ctx.quadraticCurveTo(-rad * 0.82, rad * 0.72, -rad * 0.05, rad * 0.58);
+    ctx.quadraticCurveTo(rad * 0.62, rad * 0.88, rad * 0.7, rad * 0.12);
+    ctx.quadraticCurveTo(rad * 0.95, -rad * 0.38, rad * 0.18, -rad * 0.52);
+    ctx.quadraticCurveTo(-rad * 0.02, -rad * 0.95, -rad * 0.15, -rad * 0.68);
     ctx.closePath();
+    ctx.fill();
+    inkStroke();
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.02, -rad * 0.48);
+    ctx.lineTo(rad * 0.1, -rad * 0.12);
+    ctx.lineTo(-rad * 0.06, rad * 0.08);
+    ctx.lineTo(rad * 0.12, rad * 0.38);
+    inkStroke();
+    ctx.fillStyle = colors.ink;
+    doodleEye(-rad * 0.22, rad * 0.02, Math.max(1.2, rad * 0.08));
+    doodleEye(rad * 0.22, -rad * 0.02, Math.max(1.2, rad * 0.08));
+    ctx.beginPath();
+    ctx.arc(rad * 0.02, rad * 0.16, rad * 0.16, Math.PI * 0.15, Math.PI * 0.85, true);
+    inkStroke();
+  }
+
+  function drawBossHead(rad, colors, y) {
+    inkCircle(0, y, rad * 0.7, 16);
+    ctx.fillStyle = colors.fill;
+    ctx.strokeStyle = colors.ink;
     ctx.fill();
     inkStroke();
   }
 
-  function drawBossSilhouette(id, rad, colors) {
+  function drawBossFace(rad, colors, y, mood) {
+    var eye = Math.max(1.5, rad * 0.07);
+    ctx.fillStyle = colors.ink;
+    ctx.strokeStyle = colors.ink;
+    if (mood === 'shut') {
+      ctx.beginPath();
+      ctx.moveTo(-rad * 0.28, y);
+      ctx.quadraticCurveTo(-rad * 0.16, y - rad * 0.12, -rad * 0.04, y);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(rad * 0.04, y);
+      ctx.quadraticCurveTo(rad * 0.16, y - rad * 0.12, rad * 0.28, y);
+      inkStroke();
+    } else {
+      doodleEye(-rad * 0.2, y, eye);
+      doodleEye(rad * 0.2, y, eye);
+    }
+    ctx.beginPath();
+    if (mood === 'angry' || mood === 'yell') {
+      ctx.moveTo(-rad * 0.34, y - rad * 0.16);
+      ctx.quadraticCurveTo(-rad * 0.16, y - rad * 0.02, -rad * 0.02, y - rad * 0.14);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(rad * 0.34, y - rad * 0.16);
+      ctx.quadraticCurveTo(rad * 0.16, y - rad * 0.02, rad * 0.02, y - rad * 0.14);
+      inkStroke();
+    }
+    ctx.beginPath();
+    if (mood === 'yell') {
+      inkCircle(0, y + rad * 0.24, rad * 0.12, 8);
+      ctx.fillStyle = colors.ink;
+      ctx.fill();
+    } else if (mood === 'angry') {
+      ctx.moveTo(-rad * 0.16, y + rad * 0.22);
+      ctx.quadraticCurveTo(0, y + rad * 0.1, rad * 0.18, y + rad * 0.24);
+      inkStroke();
+    } else {
+      ctx.moveTo(-rad * 0.16, y + rad * 0.18);
+      ctx.quadraticCurveTo(0, y + rad * 0.36, rad * 0.2, y + rad * 0.16);
+      inkStroke();
+    }
+  }
+
+  function drawBossDoodle(id, rad, colors) {
+    var y = rad * 0.08;
     if (id === 'split') {
-      for (var s = 0; s < 3; s++) {
-        var sa = -Math.PI / 2 + s * (Math.PI * 2 / 3);
-        var sx = Math.cos(sa) * rad * 0.42;
-        var sy = Math.sin(sa) * rad * 0.42;
-        inkCircle(sx, sy, rad * 0.62, 14);
+      var bits = [[-rad * 0.4, rad * 0.2, rad * 0.4], [rad * 0.42, rad * 0.16, rad * 0.38], [0, rad * 0.02, rad * 0.5]];
+      for (var s = 0; s < bits.length; s++) {
+        inkSeed += 5;
+        inkCircle(bits[s][0], bits[s][1], bits[s][2], 12);
         ctx.fillStyle = colors.fill;
-        ctx.strokeStyle = colors.rim;
+        ctx.strokeStyle = colors.ink;
         ctx.fill();
         inkStroke();
+        ctx.fillStyle = colors.ink;
+        doodleEye(bits[s][0] - bits[s][2] * 0.28, bits[s][1] - bits[s][2] * 0.05, Math.max(1.2, bits[s][2] * 0.14));
+        doodleEye(bits[s][0] + bits[s][2] * 0.28, bits[s][1] - bits[s][2] * 0.05, Math.max(1.2, bits[s][2] * 0.14));
       }
       return;
     }
-    ctx.beginPath();
-    if (id === 'rush') {
-      for (var i = 0; i < 8; i++) {
-        var a = -Math.PI / 2 + i * Math.PI / 4;
-        var rr = (i % 2 === 0 ? 1.08 : 0.72) * rad;
-        var px = Math.cos(a) * rr * (1 + inkJitter(i + 1, 0.03));
-        var py = Math.sin(a) * rr * (1 + inkJitter(i + 2, 0.03));
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
+    if (id === 'ward') {
+      inkCircle(0, -rad * 0.22, rad * 0.42, 12);
+      ctx.fillStyle = colors.fill;
+      ctx.strokeStyle = colors.ink;
+      ctx.fill();
+      inkStroke();
+      ctx.fillStyle = colors.ink;
+      doodleEye(-rad * 0.14, -rad * 0.28, Math.max(1.4, rad * 0.07));
+      doodleEye(rad * 0.14, -rad * 0.28, Math.max(1.4, rad * 0.07));
+      ctx.beginPath();
+      ctx.moveTo(0, -rad * 0.02);
+      ctx.quadraticCurveTo(rad * 0.78, rad * 0.08, rad * 0.55, rad * 0.58);
+      ctx.quadraticCurveTo(0, rad * 1.02, -rad * 0.55, rad * 0.58);
+      ctx.quadraticCurveTo(-rad * 0.78, rad * 0.08, 0, -rad * 0.02);
       ctx.closePath();
-    } else if (id === 'ward') {
-      ctx.moveTo(inkJitter(1, 0.3), -rad * 1.05);
-      ctx.lineTo(rad * 0.92, -rad * 0.45);
-      ctx.lineTo(rad * 0.82, rad * 0.25);
-      ctx.quadraticCurveTo(0, rad * 1.2, -rad * 0.82, rad * 0.25);
-      ctx.lineTo(-rad * 0.92, -rad * 0.45);
-      ctx.closePath();
-    } else if (id === 'frost') {
-      for (var f = 0; f < 6; f++) {
-        var fa = -Math.PI / 2 + f * Math.PI / 3;
-        var fx = Math.cos(fa) * rad * 1.12;
-        var fy = Math.sin(fa) * rad * 1.12;
-        var ix = Math.cos(fa + Math.PI / 6) * rad * 0.52;
-        var iy = Math.sin(fa + Math.PI / 6) * rad * 0.52;
-        if (f === 0) ctx.moveTo(fx, fy);
-        else ctx.lineTo(fx, fy);
-        ctx.lineTo(ix, iy);
-      }
-      ctx.closePath();
-    } else if (id === 'armor') {
-      inkRect(-rad * 0.95, -rad * 0.85, rad * 1.9, rad * 1.7);
-    } else if (id === 'summon') {
-      for (var m = 0; m < 12; m++) {
-        var ma = -Math.PI / 2 + m * Math.PI / 6;
-        var mr = (m % 4 === 0 ? 1.12 : 0.88) * rad;
-        var mx = Math.cos(ma) * mr * (1 + inkJitter(m + 1, 0.03));
-        var my = Math.sin(ma) * mr * (1 + inkJitter(m + 2, 0.03));
-        if (m === 0) ctx.moveTo(mx, my);
-        else ctx.lineTo(mx, my);
-      }
-      ctx.closePath();
-    } else if (id === 'mend') {
-      for (var h = 0; h <= 16; h++) {
-        var ha = (h / 16) * Math.PI * 2;
-        var hr = rad * (0.92 + 0.1 * Math.sin(ha * 2));
-        var hx = Math.cos(ha) * hr * (1 + inkJitter(h + 1, 0.03));
-        var hy = Math.sin(ha) * hr * 1.05 * (1 + inkJitter(h + 2, 0.03));
-        if (h === 0) ctx.moveTo(hx, hy);
-        else ctx.lineTo(hx, hy);
-      }
-      ctx.closePath();
-    } else {
-      for (var r = 0; r <= 16; r++) {
-        var ra = -Math.PI / 2 + (r / 16) * Math.PI * 2;
-        var rr2 = rad * (1 + 0.08 * Math.sin(ra * 3));
-        var rx2 = Math.cos(ra) * rr2 * (1 + inkJitter(r + 1, 0.03));
-        var ry2 = Math.sin(ra) * rr2 * (1 + inkJitter(r + 2, 0.03));
-        if (r === 0) ctx.moveTo(rx2, ry2);
-        else ctx.lineTo(rx2, ry2);
-      }
-      ctx.closePath();
+      ctx.fillStyle = colors.fill;
+      ctx.fill();
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(0, rad * 0.08);
+      ctx.quadraticCurveTo(rad * 0.06, rad * 0.4, 0, rad * 0.72);
+      inkStroke();
+      return;
     }
-    ctx.fillStyle = colors.fill;
-    ctx.strokeStyle = colors.rim;
-    ctx.fill();
-    inkStroke();
+    drawBossHead(rad, colors, y);
+    if (id === 'regen') {
+      ctx.beginPath();
+      ctx.moveTo(-rad * 0.62, y);
+      ctx.quadraticCurveTo(-rad * 1.05, -rad * 0.15, -rad * 0.72, -rad * 0.42);
+      ctx.quadraticCurveTo(-rad * 0.48, -rad * 0.05, -rad * 0.62, y);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(-rad * 0.58, -rad * 0.02);
+      ctx.quadraticCurveTo(-rad * 0.95, rad * 0.28, -rad * 0.55, rad * 0.22);
+      ctx.quadraticCurveTo(-rad * 0.4, rad * 0.05, -rad * 0.58, -rad * 0.02);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      drawBossFace(rad, colors, y, 'shut');
+    } else if (id === 'rush') {
+      var tufts = [[-rad * 0.55, -rad * 0.35, -rad * 0.35, -rad * 0.45], [rad * 0.5, -rad * 0.32, rad * 0.4, -rad * 0.42], [-rad * 0.15, -rad * 0.5, -rad * 0.05, -rad * 0.38]];
+      for (var t = 0; t < tufts.length; t++) {
+        ctx.beginPath();
+        ctx.moveTo(tufts[t][0], tufts[t][1]);
+        ctx.quadraticCurveTo(tufts[t][0] + tufts[t][2] * 0.2, tufts[t][1] + tufts[t][3], tufts[t][0] + tufts[t][2], tufts[t][1] + tufts[t][3] * 0.15);
+        ctx.quadraticCurveTo(tufts[t][0] + tufts[t][2] * 0.35, tufts[t][1] + rad * 0.02, tufts[t][0] + tufts[t][2] * 0.05, tufts[t][1] + rad * 0.08);
+        ctx.closePath();
+        ctx.fill();
+        inkStroke();
+      }
+      drawBossFace(rad, colors, y, 'yell');
+    } else if (id === 'summon') {
+      ctx.beginPath();
+      ctx.moveTo(rad * 0.48, y + rad * 0.12);
+      ctx.quadraticCurveTo(rad * 0.9, -rad * 0.05, rad * 0.7, -rad * 0.55);
+      inkStroke();
+      inkCircle(rad * 0.7, -rad * 0.62, rad * 0.1, 6);
+      ctx.fill();
+      inkStroke();
+      drawBossFace(rad, colors, y, 'yell');
+    } else if (id === 'frost') {
+      var drips = [-rad * 0.42, -rad * 0.16, rad * 0.22, rad * 0.46];
+      for (var d = 0; d < drips.length; d++) {
+        ctx.beginPath();
+        ctx.moveTo(drips[d] - rad * 0.08, -rad * 0.28);
+        ctx.quadraticCurveTo(drips[d], rad * 0.05 + (d % 2) * rad * 0.12, drips[d] + rad * 0.08, -rad * 0.28);
+        ctx.closePath();
+        ctx.fill();
+        inkStroke();
+      }
+      drawBossFace(rad, colors, y, 'angry');
+    } else if (id === 'armor') {
+      ctx.beginPath();
+      ctx.moveTo(-rad * 0.58, y + rad * 0.08);
+      ctx.quadraticCurveTo(-rad * 0.72, -rad * 0.72, 0, -rad * 0.62);
+      ctx.quadraticCurveTo(rad * 0.72, -rad * 0.72, rad * 0.58, y + rad * 0.08);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(0, y - rad * 0.2);
+      ctx.quadraticCurveTo(rad * 0.04, y + rad * 0.08, 0, y + rad * 0.16);
+      inkStroke();
+      drawBossFace(rad, colors, y + rad * 0.02, 'angry');
+    } else if (id === 'mend') {
+      drawBossFace(rad, colors, y, 'shut');
+      ctx.beginPath();
+      ctx.moveTo(rad * 0.34, y + rad * 0.02);
+      ctx.lineTo(rad * 0.34, y + rad * 0.28);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(rad * 0.2, y + rad * 0.14);
+      ctx.lineTo(rad * 0.48, y + rad * 0.14);
+      inkStroke();
+    } else {
+      drawBossFace(rad, colors, y, 'shut');
+    }
   }
 
   function drawBossCrown(rad) {
@@ -8462,15 +9008,15 @@ function selectedTower() {
     ctx.strokeStyle = '#161616';
     ctx.lineWidth = Math.max(1.6, rad * 0.1);
     ctx.beginPath();
-    ctx.moveTo(-rad * 0.52, -rad * 0.92);
-    ctx.lineTo(-rad * 0.3, -rad * 1.35);
-    ctx.lineTo(-rad * 0.06, -rad * 0.98);
-    ctx.lineTo(0, -rad * 1.42);
-    ctx.lineTo(rad * 0.06, -rad * 0.98);
-    ctx.lineTo(rad * 0.3, -rad * 1.35);
-    ctx.lineTo(rad * 0.52, -rad * 0.92);
-    ctx.lineTo(rad * 0.58, -rad * 0.72);
-    ctx.lineTo(-rad * 0.58, -rad * 0.72);
+    ctx.moveTo(-rad * 0.46, -rad * 0.62);
+    ctx.lineTo(-rad * 0.26, -rad * 1.02);
+    ctx.lineTo(-rad * 0.05, -rad * 0.68);
+    ctx.lineTo(0, -rad * 1.08);
+    ctx.lineTo(rad * 0.05, -rad * 0.68);
+    ctx.lineTo(rad * 0.26, -rad * 1.02);
+    ctx.lineTo(rad * 0.46, -rad * 0.62);
+    ctx.lineTo(rad * 0.5, -rad * 0.46);
+    ctx.lineTo(-rad * 0.5, -rad * 0.46);
     ctx.closePath();
     ctx.fill();
     inkStroke();
@@ -8479,28 +9025,8 @@ function selectedTower() {
   function drawBossBody(enemy, rad, colors, bob) {
     inkSeed = (enemy.bossId || 'x').charCodeAt(0) * 17 + Math.round(rad * 12);
     ctx.translate(0, bob * 0.3);
-    inkSetup(Math.max(2.6, rad * 0.18));
-    drawBossSilhouette(enemy.bossId, rad, colors);
-    if (enemy.bossId === 'armor') {
-      ctx.strokeStyle = colors.accent;
-      ctx.lineWidth = Math.max(1.8, rad * 0.1);
-      inkRect(-rad * 0.55, -rad * 0.4, rad * 1.1, rad * 0.85);
-      inkStroke();
-      inkCircle(-rad * 0.55, -rad * 0.4, rad * 0.08, 6);
-      ctx.fillStyle = colors.ink;
-      ctx.fill();
-      inkCircle(rad * 0.55, -rad * 0.4, rad * 0.08, 6);
-      ctx.fill();
-    } else {
-      ctx.fillStyle = colors.accent;
-      ctx.globalAlpha = 0.16;
-      inkCircle(0, rad * 0.05, rad * 0.48, 12);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    ctx.strokeStyle = colors.ink;
-    ctx.fillStyle = colors.ink;
-    drawBossSymbol(enemy.bossId, rad * 0.92);
+    doodleInk(colors, Math.max(2.4, rad * 0.14));
+    drawBossDoodle(enemy.bossId, rad, colors);
     drawBossCrown(rad);
   }
 
@@ -8646,14 +9172,19 @@ function selectedTower() {
     var colors = enemyBodyColors(enemy, resist);
     var bob = Math.sin(state.time * (enemy.type === 'swift' ? 11 : 7) + enemy.id * 1.7) * rad * 0.08;
     if (enemy.freeze > 0) bob = 0;
-    var ang = enemyFacing(enemy, pos);
     ctx.save();
     ctx.translate(x, y);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    drawEnemyShadow(rad);
+    if (enemy.flying) {
+      ctx.save();
+      ctx.translate(0, rad * 0.42);
+      drawEnemyShadow(rad * 0.62);
+      ctx.restore();
+    } else {
+      drawEnemyShadow(rad);
+    }
     ctx.save();
-    if (enemy.type === 'swift') ctx.rotate(ang);
     if (enemy.boss) drawBossBody(enemy, rad, colors, bob);
     else if (enemy.type === 'shard') drawShardBody(rad, colors);
     else if (enemy.type === 'hopper') drawHopperBody(rad, colors, bob, !!enemy.jumping);
@@ -8668,6 +9199,15 @@ function selectedTower() {
       ctx.strokeStyle = '#2f7bff';
       ctx.lineWidth = 3;
       ctx.strokeRect(x - rad - 3, y - rad - 3, (rad + 3) * 2, (rad + 3) * 2);
+    } else if (enemy.stun > 0) {
+      ctx.strokeStyle = '#e0b000';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - rad * 0.2, y - rad - 6);
+      ctx.lineTo(x + rad * 0.05, y - rad - 1);
+      ctx.lineTo(x - rad * 0.05, y - rad + 3);
+      ctx.lineTo(x + rad * 0.22, y - rad + 8);
+      ctx.stroke();
     } else if (enemy.slowTime > 0) {
       ctx.setLineDash([3, 3]);
       ctx.strokeStyle = '#2f7bff';

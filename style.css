@@ -181,6 +181,7 @@ canvas {
   display: block;
   touch-action: none;
 }
+canvas[hidden] { display: none !important; }
 
 .inspector {
   position: absolute;
@@ -531,6 +532,52 @@ canvas {
 
 .modal-card h2 { margin: 6px 0 8px; font-size: 26px; line-height: 1.25; }
 .modal-desc { margin: 0 0 16px; color: var(--muted); line-height: 1.55; }
+.modal.is-profile .profile-name {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.modal.is-profile .profile-name input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 2px solid #161616;
+  border-radius: 12px;
+  background: #fff;
+  color: #161616;
+  font: inherit;
+  font-weight: 800;
+}
+.modal.is-profile .avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.modal.is-profile .avatar-pick {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: 86px;
+  padding: 6px 2px 8px;
+}
+.modal.is-profile .avatar-pick canvas {
+  position: static;
+  inset: auto;
+  width: 44px;
+  height: 44px;
+}
+.modal.is-profile .avatar-pick small {
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+.modal.is-profile .avatar-pick.is-on::before { border-width: 4px; }
+.modal.is-profile .avatar-pick.is-locked {
+  opacity: 0.45;
+}
 .notice-list { display: grid; gap: 8px; margin: 0 0 12px; }
 .notice-list[hidden] { display: none !important; }
 .modal.is-notice .notice-item {
@@ -781,7 +828,10 @@ canvas {
   font-weight: 800;
 }
 .welcome-user img,
+.welcome-user canvas,
 .account-chip img {
+  position: static;
+  inset: auto;
   width: 28px;
   height: 28px;
   border: 2px solid #161616;
@@ -1008,7 +1058,10 @@ canvas {
   font-size: 26px;
   font-weight: 800;
 }
-.player-avatar img {
+.player-avatar img,
+.player-avatar canvas {
+  position: static;
+  inset: auto;
   width: 100%;
   height: 100%;
   object-fit: cover;
