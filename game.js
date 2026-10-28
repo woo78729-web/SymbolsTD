@@ -2575,10 +2575,6 @@ function selectedTower() {
     try {
       var raw = JSON.parse(localStorage.getItem('symbols-td-account') || 'null');
       if (!(raw && raw.uid && raw.name)) return null;
-      if (!validFriendId(raw.friendId)) {
-        raw.friendId = makeFriendId();
-        saveAccount(raw);
-      }
       return raw;
     } catch (error) {
       return null;
@@ -2611,7 +2607,8 @@ function selectedTower() {
     var prev = null;
     try { prev = JSON.parse(localStorage.getItem('symbols-td-account') || 'null'); } catch (error) { prev = null; }
     if (prev && prev.uid === uid && validFriendId(prev.friendId)) return prev.friendId;
-    return makeFriendId();
+    // 不要在新裝置亂生 ID；等雲端 users/{uid}.friendId 還原
+    return '';
   }
 
   function clearAccount() {
@@ -3399,15 +3396,36 @@ function selectedTower() {
     }, 450);
   }
 
+  function buildUserCloudPayload(account) {
+    var best = profileBest();
+    return {
+      name: String((account && account.name) || '玩家').trim().slice(0, 24) || '玩家',
+      picture: profilePicture(account),
+      frame: frameUnlocked(account && account.frame) ? account.frame : '',
+      title: titleUnlocked(account && account.title) ? account.title : '',
+      bestLabel: best.label || '',
+      bestWave: best.wave || 0,
+      hellRank: hellRank(),
+      rankWeek: currentWeekKey(),
+      guest: !!(account && account.guest),
+      friendId: (account && account.friendId) || '',
+      stars: state.stars || {},
+      deeds: loadDeeds(),
+      progressAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+  }
+
   function pushCloudProgress() {
     if (!cloudReady() || !cloudDb) return Promise.resolve();
     var account = loadAccount();
     if (!account || !progressAccountUid()) return Promise.resolve();
-    return cloudDb.collection('users').doc(account.uid).set({
-      stars: state.stars || {},
-      deeds: loadDeeds(),
-      progressAt: firebase.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true }).catch(function () {});
+    return claimFriendId(account).then(function () {
+      var latest = loadAccount() || account;
+      if (!validFriendId(latest.friendId)) return null;
+      return cloudDb.collection('users').doc(latest.uid).set(buildUserCloudPayload(latest), { merge: true });
+    }).catch(function (error) {
+      console.warn('cloud progress push failed', error && error.code, error && error.message);
+    });
   }
 
   function pullCloudProgress(opts) {
@@ -3417,20 +3435,32 @@ function selectedTower() {
     if (!account || !progressAccountUid()) return Promise.resolve();
     if (progressPullBusy) return Promise.resolve();
     progressPullBusy = true;
-    return cloudDb.collection('users').doc(account.uid).get().then(function (doc) {
-      var data = doc.exists ? (doc.data() || {}) : {};
-      var beforeSum = starSum();
-      var mergedStars = mergeStarMaps(state.stars, data.stars || {});
-      var mergedDeeds = mergeDeedsMaps(loadDeeds(), data.deeds || {});
-      state.stars = mergedStars;
-      try { localStorage.setItem(starsStorageKey(), JSON.stringify(state.stars || {})); } catch (error) { /* ignore */ }
-      try { localStorage.setItem(deedsStorageKey(), JSON.stringify(mergedDeeds || {})); } catch (error) { /* ignore */ }
-      return pushCloudProgress().then(function () {
-        if (screenMenu && !screenMenu.hidden) paintPlayHome();
-        paintAccount();
-        if (opts.toast && starSum() > beforeSum) toast('已同步關卡進度');
+    var beforeSum = starSum();
+    var beforeId = account.friendId || '';
+    return claimFriendId(account).then(function () {
+      var latest = loadAccount() || account;
+      return cloudDb.collection('users').doc(latest.uid).get().then(function (doc) {
+        var data = doc.exists ? (doc.data() || {}) : {};
+        if (validFriendId(data.friendId) && data.friendId !== latest.friendId) {
+          latest.friendId = data.friendId;
+          saveAccount(latest);
+        }
+        state.stars = mergeStarMaps(state.stars, data.stars || {});
+        var mergedDeeds = mergeDeedsMaps(loadDeeds(), data.deeds || {});
+        try { localStorage.setItem(starsStorageKey(), JSON.stringify(state.stars || {})); } catch (error) { /* ignore */ }
+        try { localStorage.setItem(deedsStorageKey(), JSON.stringify(mergedDeeds || {})); } catch (error) { /* ignore */ }
+        return pushCloudProgress().then(function () {
+          if (screenMenu && !screenMenu.hidden) paintPlayHome();
+          paintAccount();
+          renderFriendCode();
+          if (!opts.toast) return;
+          if (starSum() > beforeSum) toast('已同步關卡進度');
+          else if (validFriendId(latest.friendId) && latest.friendId !== beforeId) toast('已對齊帳號 ID');
+        });
       });
-    }).catch(function () {}).then(function () {
+    }).catch(function (error) {
+      console.warn('cloud progress pull failed', error && error.code, error && error.message);
+    }).then(function () {
       progressPullBusy = false;
     });
   }
@@ -3438,6 +3468,23 @@ function selectedTower() {
   function bindAccountProgress() {
     state.stars = loadStars();
     return pullCloudProgress({ toast: true });
+  }
+
+  function renderFriendCode() {
+    var account = loadAccount();
+    var codeEl = document.getElementById('friend-code');
+    if (codeEl) {
+      codeEl.textContent = account && validFriendId(account.friendId)
+        ? ('你的 ID　' + account.friendId)
+        : (account ? 'ID 同步中…' : '登入後才有 ID。');
+    }
+    var idEl = document.getElementById('player-card-id');
+    if (idEl && account) {
+      idEl.hidden = false;
+      idEl.textContent = validFriendId(account.friendId)
+        ? ('ID　' + account.friendId)
+        : 'ID 同步中…';
+    }
   }
 
   function castleCleared() {
@@ -3768,7 +3815,9 @@ function selectedTower() {
     noteRankDeed();
     if (idEl) {
       idEl.hidden = false;
-      idEl.textContent = 'ID　' + account.friendId;
+      idEl.textContent = validFriendId(account.friendId)
+        ? ('ID　' + account.friendId)
+        : 'ID 同步中…';
     }
     var best = profileBest();
     if (bestEl) bestEl.textContent = best.wave > 0 ? ('最高 ' + best.label + ' 第 ' + best.wave + ' 波') : '還沒有紀錄';
@@ -3857,7 +3906,7 @@ function selectedTower() {
     var listEl = document.getElementById('friend-list');
     if (!listEl) return;
     var account = loadAccount();
-    if (codeEl) codeEl.textContent = account && account.friendId ? ('你的 ID　' + account.friendId) : '登入後才有 ID。';
+    renderFriendCode();
     listEl.replaceChildren();
     if (!account) {
       var need = document.createElement('p');
@@ -3871,6 +3920,14 @@ function selectedTower() {
       offline.className = 'board-empty';
       offline.textContent = '線上帳號接上後才能加好友，並看到對方的名片。';
       listEl.appendChild(offline);
+      return;
+    }
+    if (!validFriendId(account.friendId)) {
+      var waiting = document.createElement('p');
+      waiting.className = 'board-empty';
+      waiting.textContent = '正在對齊帳號 ID…';
+      listEl.appendChild(waiting);
+      pullCloudProgress({ toast: false }).then(function () { renderFriends(); });
       return;
     }
     var loading = document.createElement('p');
@@ -3956,45 +4013,39 @@ function selectedTower() {
   function publishProfile() {
     if (!cloudReady() || !cloudDb) return;
     var account = loadAccount();
-    if (!account || String(account.uid).indexOf('guest-') === 0) return;
-    claimFriendId(account).then(function () {
-      var latest = loadAccount() || account;
-      var best = profileBest();
-      return cloudDb.collection('users').doc(latest.uid).set({
-        name: latest.name,
-        picture: profilePicture(latest),
-        frame: frameUnlocked(latest.frame) ? latest.frame : '',
-        title: titleUnlocked(latest.title) ? latest.title : '',
-        bestLabel: best.label || '',
-        bestWave: best.wave || 0,
-        hellRank: hellRank(),
-        rankWeek: currentWeekKey(),
-        guest: !!latest.guest,
-        friendId: latest.friendId || '',
-        stars: state.stars || {},
-        deeds: loadDeeds(),
-        progressAt: firebase.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
-    }).catch(function () {});
+    if (!account || !progressAccountUid()) return;
+    pushCloudProgress().then(function () { renderFriendCode(); });
   }
 
   function claimFriendId(account, left) {
-    if (!cloudReady() || !cloudDb || !account || String(account.uid).indexOf('guest-') === 0) return Promise.resolve();
-    if (left == null) left = 5;
-    if (!left) return Promise.resolve();
-    if (!validFriendId(account.friendId)) {
-      account.friendId = makeFriendId();
-      saveAccount(account);
-    }
-    var handle = cloudDb.collection('handles').doc(account.friendId);
-    return handle.get().then(function (doc) {
-      if (doc.exists && doc.data() && doc.data().uid === account.uid) return null;
-      if (doc.exists) {
+    if (!cloudReady() || !cloudDb || !account || !progressAccountUid()) return Promise.resolve(account);
+    if (left == null) left = 8;
+    if (!left) return Promise.resolve(account);
+    return cloudDb.collection('users').doc(account.uid).get().then(function (userDoc) {
+      var data = userDoc.exists ? (userDoc.data() || {}) : {};
+      if (validFriendId(data.friendId)) {
+        account.friendId = data.friendId;
+        saveAccount(account);
+      } else if (!validFriendId(account.friendId)) {
         account.friendId = makeFriendId();
         saveAccount(account);
-        return claimFriendId(account, left - 1);
       }
-      return handle.set({ uid: account.uid });
+      var handle = cloudDb.collection('handles').doc(account.friendId);
+      return handle.get().then(function (doc) {
+        if (doc.exists && doc.data() && doc.data().uid === account.uid) return account;
+        if (doc.exists) {
+          // 雲端名片已指定此 ID 但 handle 被佔用：另開新碼
+          if (validFriendId(data.friendId) && data.friendId === account.friendId) {
+            account.friendId = makeFriendId();
+            saveAccount(account);
+            return claimFriendId(account, left - 1);
+          }
+          account.friendId = makeFriendId();
+          saveAccount(account);
+          return claimFriendId(account, left - 1);
+        }
+        return handle.set({ uid: account.uid }).then(function () { return account; });
+      });
     });
   }
 
@@ -7254,12 +7305,12 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/28',
-      title: '章節特色、小王／大王、稱號、設定、難度、進度同步',
+      title: '章節特色、小王／大王、稱號、設定、難度、進度與 ID 同步',
       detail: [
         '玩法：前八章整章首領特色；第九章魔王城',
         '首領：第五關尾波大王；前四關尾波小王',
         '難度：起始金 65；第 1 波一座 1 等可過，第 2 波起要升級或兩座塔',
-        '星星：先通關才算；廣告贈塔不算自己放的；登入後關卡進度雲端同步',
+        '星星：先通關才算；廣告贈塔不算自己放的；同一 Google 換裝置會合併進度與好友 ID',
         '稱號：滿天星斗、魔王城征服者',
         '介面：選關進度、作戰星星位置、建造選單、目錄設定',
         '特效：各章能力施放效果',
@@ -7270,7 +7321,7 @@ function selectedTower() {
         '首領：有手腳大王只在 x-5 尾波；前四關尾波是小王（弱化能力、圓圓王圖）',
         '難度：起始金 65；第 1 波 4 普怪一座 1 等可過；第 2 波起快怪群＋更密，單座 1 等扛不住；精英約第 6 波起',
         '星星：必須真正通關才算其他星；每 5 波廣告贈塔不算自己建造',
-        '同步：Google／Firebase 登入後，關卡星星與成就會寫入帳號，換裝置會合併較高進度',
+        '同步：Google 登入後，關卡星星、成就與好友 ID 跟帳號走；換手機／電腦會對齊同一個 ID，並合併較高進度',
         '稱號：累積 45 星「滿天星斗」；打通 9-5「魔王城征服者」',
         '介面：選關點在外框底邊；作戰星星在上方 HUD 下；建造選單點外面會收',
         '設定：目錄好友右側齒輪可開關音量、預設速度、輸入代碼、看更新細項、意見提供',
@@ -8299,9 +8350,10 @@ function selectedTower() {
         return;
       }
       var named = String(user.displayName || user.email || '').trim();
-      var prevId = keptFriendId(user.uid);
       var prev = loadAccount();
       var same = prev && prev.uid === user.uid;
+      // 本機有合法 ID 就先留著；沒有則空著，等雲端 users/{uid}.friendId
+      var prevId = (same && validFriendId(prev.friendId)) ? prev.friendId : keptFriendId(user.uid);
       saveAccount({
         uid: user.uid,
         name: (same && prev.nameCustom && prev.name) ? prev.name : (user.isAnonymous || !named ? guestLabel() : named).slice(0, 24),
@@ -8312,7 +8364,7 @@ function selectedTower() {
         frame: same && prev.frame ? prev.frame : '',
         title: same && prev.title ? prev.title : '',
         guest: !!user.isAnonymous,
-        friendId: prevId,
+        friendId: prevId || '',
       });
       paintAccount();
       bindAccountProgress();
