@@ -877,6 +877,18 @@
     { id: 9, name: '魔王城', boss: '骷髏王' },
   ];
 
+  var CHAPTER_KITS = [
+    { id: 'regen', name: '再生', blurb: '小怪每秒回復 1.5% 血' },
+    { id: 'rush', name: '狂暴', blurb: '小怪血量低於一半就加速' },
+    { id: 'summon', name: '召喚', blurb: '沿路會不斷叫出小怪' },
+    { id: 'ward', name: '護盾', blurb: '小怪出場就帶一層護盾' },
+    { id: 'split', name: '分裂', blurb: '小怪死後會裂成兩隻' },
+    { id: 'mend', name: '治癒', blurb: '小怪會慢慢把彼此補血' },
+    { id: 'frost', name: '冰封', blurb: '會定期把塔凍住一下' },
+    { id: 'armor', name: '鐵甲', blurb: '小怪受到的傷害減少' },
+    { id: 'wheel', name: '轉盤', blurb: '開局與每 10 波轉動命運轉盤' },
+  ];
+
   var MINION_PAIRS = [
     [
       { id: 'slime', name: '綠史萊姆', color: '#3dcf62' },
@@ -1373,6 +1385,24 @@ function selectedTower() {
     return (state.mode === 'infinite' || state.mode === 'custom') && state.difficulty === 'hell';
   }
 
+  function chapterKitById(id) {
+    return CHAPTER_KITS[(id || 1) - 1] || null;
+  }
+
+  function campaignKit() {
+    if (state.mode !== 'campaign') return null;
+    return chapterKitById(state.chapter);
+  }
+
+  function chapterHasKit(id) {
+    var kit = campaignKit();
+    return !!(kit && kit.id === id);
+  }
+
+  function wheelRulesActive() {
+    return hellModeActive() || chapterHasKit('wheel');
+  }
+
   function hellDeffDef(id) {
     for (var i = 0; i < HELL_DEFFS.length; i++) {
       if (HELL_DEFFS[i].id === id) return HELL_DEFFS[i];
@@ -1414,7 +1444,7 @@ function selectedTower() {
   }
 
   function syncHellDeffs(wave) {
-    if (!hellModeActive()) {
+    if (!wheelRulesActive()) {
       state.hellDeffs = [];
       state.hellDeffHalf = false;
       state.hellDeffWave = 0;
@@ -1439,7 +1469,7 @@ function selectedTower() {
   }
 
   function hellRefreshNeeded(wave) {
-    if (!hellModeActive()) return false;
+    if (!wheelRulesActive()) return false;
     if (wave === 1) return !(state.hellDeffs && state.hellDeffs.length && state.hellDeffWave >= 1);
     return wave >= 10 && wave % 10 === 0 && state.hellDeffWave !== wave;
   }
@@ -1816,6 +1846,56 @@ function selectedTower() {
     return plan;
   }
 
+  function tickChapterKit(dt) {
+    if (state.mode !== 'campaign' || state.phase !== 'combat') return;
+    if (chapterHasKit('summon')) {
+      state.kitSummonCd = (state.kitSummonCd == null ? 7 : state.kitSummonCd) - dt;
+      if (state.kitSummonCd <= 0) {
+        state.kitSummonCd = 8;
+        if (state.enemies.length + state.pendingSpawns.length < 24) {
+          var host = null;
+          for (var i = 0; i < state.enemies.length; i++) {
+            if (!state.enemies[i].dead) { host = state.enemies[i]; break; }
+          }
+          if (host) {
+            var minion = makeEnemy('grunt', state.wave);
+            minion.dist = Math.max(0, host.dist - 0.4);
+            queueEnemy(minion);
+            var hostPos = enemyPos(host);
+            spawnFloater(hostPos.x, hostPos.y - 0.5, '召喚', '#f2c14e');
+          }
+        }
+      }
+    }
+    if (chapterHasKit('frost')) {
+      state.kitFrostCd = (state.kitFrostCd == null ? 6 : state.kitFrostCd) - dt;
+      if (state.kitFrostCd <= 0) {
+        state.kitFrostCd = 8;
+        if (state.towers.length) {
+          for (var t = 0; t < state.towers.length; t++) {
+            state.towers[t].chill = Math.max(state.towers[t].chill || 0, 0.7);
+          }
+          spawnFloater(state.towers[0].c + 0.5, state.towers[0].r + 0.4, '冰封', '#9bd4ff');
+        }
+      }
+    }
+    if (chapterHasKit('mend')) {
+      state.kitMendCd = (state.kitMendCd == null ? 2 : state.kitMendCd) - dt;
+      if (state.kitMendCd <= 0) {
+        state.kitMendCd = 2.2;
+        for (var m = 0; m < state.enemies.length; m++) {
+          var foe = state.enemies[m];
+          if (foe.dead || foe.boss || foe.hp >= foe.maxHp) continue;
+          if (healBlocked(foe)) {
+            triggerPoisonCounter(foe);
+            continue;
+          }
+          foe.hp = Math.min(foe.maxHp, foe.hp + foe.maxHp * 0.02 * healScale(foe));
+        }
+      }
+    }
+  }
+
   function tickHellLock(dt) {
     if (!hasHellDeff('lock') || state.phase !== 'combat') return;
     state.hellLockCd = (state.hellLockCd || 0) - dt;
@@ -1830,7 +1910,7 @@ function selectedTower() {
   }
 
   function applyHellSpawnStats(enemy) {
-    if (!enemy || !hellModeActive() || enemy.skipHellStats || enemy.hellBuffed) return enemy;
+    if (!enemy || !wheelRulesActive() || enemy.skipHellStats || enemy.hellBuffed) return enemy;
     enemy.hellBuffed = true;
     var thick = hellDeffValue('thick');
     if (thick > 0) {
@@ -2207,8 +2287,19 @@ function selectedTower() {
     return boss;
   }
 
+  function applyChapterSpawn(enemy) {
+    if (!enemy || enemy.boss || enemy.kitReady) return enemy;
+    enemy.kitReady = true;
+    if (chapterHasKit('ward')) {
+      enemy.shield = Math.max(enemy.shield || 0, Math.max(1, Math.round(enemy.maxHp * 0.12)));
+      if (enemy.shieldCut == null) enemy.shieldCut = 1;
+    }
+    return enemy;
+  }
+
   function queueEnemy(enemy) {
     applyHellSpawnStats(enemy);
+    applyChapterSpawn(enemy);
     state.pendingSpawns.push(enemy);
   }
 
@@ -3774,7 +3865,7 @@ function selectedTower() {
       state.interestLeft -= 1;
       toast('利息 +30');
     }
-    var refreshed = hellModeActive() && (n === 1 || n % 10 === 0);
+    var refreshed = wheelRulesActive() && (n === 1 || n % 10 === 0);
     syncHellDeffs(n);
     var plan = applyHellBossDeff(planWave(n));
     state.wave = n;
@@ -3788,7 +3879,7 @@ function selectedTower() {
     state.spawnQueue = plan.jobs.slice();
     state.spawnTimer = 0.55;
     var deffText = hellDeffLabel();
-    if (refreshed && deffText) toast('地獄詞綴 · ' + deffText);
+    if (refreshed && deffText) toast((chapterHasKit('wheel') ? '魔王城' : '地獄') + '詞綴 · ' + deffText);
     state.banner = plan.boss
       ? { text: '第 ' + n + ' 波 · ' + plan.boss.name, sub: deffText || plan.boss.blurb, life: 3.2 }
       : { text: '第 ' + n + ' 波', sub: deffText || compositionText(plan), life: 2.2 };
@@ -3804,6 +3895,7 @@ function selectedTower() {
     updateWalls(dt);
     updateEnemies(dt);
     tickHellLock(dt);
+    tickChapterKit(dt);
     updateTowers(dt);
     updateGusts(dt);
     updateFogs(dt);
@@ -3829,6 +3921,7 @@ function selectedTower() {
         ? makeTitan(state.wave, job.traits)
         : (job.type === 'boss' ? makeBoss(job.bossIndex, state.wave) : makeEnemy(job.type, state.wave)));
     applyHellSpawnStats(spawned);
+    applyChapterSpawn(spawned);
     state.enemies.push(spawned);
     state.spawnTimer = state.spawnQueue.length ? state.spawnQueue[0].gap : 0;
   }
@@ -3889,6 +3982,17 @@ function selectedTower() {
         } else {
           enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * regenRate * dt * healScale(enemy));
         }
+      }
+      if (chapterHasKit('regen') && !enemy.boss && enemy.hp < enemy.maxHp) {
+        if (healBlocked(enemy)) triggerPoisonCounter(enemy);
+        else enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.015 * dt * healScale(enemy));
+      }
+      if (chapterHasKit('rush') && !enemy.boss && !enemy.kitRushed && enemy.hp <= enemy.maxHp * 0.5) {
+        enemy.kitRushed = true;
+        enemy.speed *= 1.45;
+        if (enemy.baseSpeed) enemy.baseSpeed *= 1.45;
+        var rushPos = enemyPos(enemy);
+        spawnFloater(rushPos.x, rushPos.y - 0.55, '狂暴', '#ff5a36');
       }
       var enrageMul = hellDeffValue('enrage');
       if (enrageMul > 0 && !enemy.hellEnraged && enemy.hp <= enemy.maxHp * 0.1) {
@@ -3991,11 +4095,11 @@ function selectedTower() {
   }
 
   function isPoisonCounterTarget(enemy) {
-    return !!(enemy && (isHealRegenEnemy(enemy) || hasHellDeff('regen')));
+    return !!(enemy && (isHealRegenEnemy(enemy) || hasHellDeff('regen') || (!enemy.boss && (chapterHasKit('regen') || chapterHasKit('mend')))));
   }
 
   function isFireCounterTarget(enemy) {
-    return !!(enemy && (enemy.shield > 0 || bossHas(enemy, 'armor') || hasHellDeff('thick')));
+    return !!(enemy && (enemy.shield > 0 || bossHas(enemy, 'armor') || hasHellDeff('thick') || (chapterHasKit('armor') && !enemy.boss)));
   }
 
   function triggerPoisonCounter(enemy) {
@@ -4021,7 +4125,7 @@ function selectedTower() {
       spawnFloater(pos.x, pos.y - 0.55, '破盾', '#e02323');
       shatterShieldFx(pos.x, pos.y);
     }
-    if (bossHas(enemy, 'armor') && !enemy.firePierce) {
+    if ((bossHas(enemy, 'armor') || (chapterHasKit('armor') && !enemy.boss)) && !enemy.firePierce) {
       enemy.firePierce = true;
       fresh = true;
       spawnFloater(pos.x, pos.y - 0.75, '破甲', '#e02323');
@@ -5987,8 +6091,10 @@ function selectedTower() {
         opts.ignoreShield = true;
       }
     }
-    var pierceArmor = opts.pierce || enemy.firePierce || (enemy.burnTime > 0 && bossHas(enemy, 'armor'));
+    var kitArmor = chapterHasKit('armor') && !enemy.boss;
+    var pierceArmor = opts.pierce || enemy.firePierce || (enemy.burnTime > 0 && (bossHas(enemy, 'armor') || kitArmor));
     if (bossHas(enemy, 'armor') && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.5));
+    else if (kitArmor && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.75));
     if (enemy.shield > 0 && !opts.ignoreShield) {
       var blocked = Math.min(enemy.shield, damage);
       enemy.shield -= blocked;
@@ -6079,6 +6185,22 @@ function selectedTower() {
       }
       var splitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(splitPos.x, splitPos.y - 0.5, '分裂', '#c084fc');
+    }
+    if (chapterHasKit('split') && !enemy.boss && !enemy.noSplit && enemy.type !== 'shard') {
+      var kitChildHp = Math.max(1, Math.round(enemy.maxHp * 0.3));
+      for (var ks = 0; ks < 2; ks++) {
+        var kitChild = makeEnemy('grunt', state.wave);
+        kitChild.hp = kitChildHp;
+        kitChild.maxHp = kitChildHp;
+        kitChild.gold = Math.max(1, Math.floor((enemy.gold || 1) * 0.2));
+        kitChild.leak = 1;
+        kitChild.noSplit = true;
+        kitChild.radius = Math.max(0.2, (enemy.radius || 0.3) * 0.78);
+        kitChild.dist = Math.max(0, Math.min(enemy.dist + (ks === 0 ? -0.18 : 0.18), WAYPOINTS.length - 1.05));
+        queueEnemy(kitChild);
+      }
+      var kitSplitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+      spawnFloater(kitSplitPos.x, kitSplitPos.y - 0.45, '分裂', '#c084fc');
     }
     var hellSplit = hellDeffValue('split');
     if (hellSplit > 0 && !enemy.boss && !enemy.noSplit && enemy.type !== 'shard') {
@@ -6284,6 +6406,35 @@ function selectedTower() {
       saveStars();
     }
     return mask;
+  }
+
+  function paintGoalBar() {
+    var bar = document.getElementById('goal-bar');
+    if (!bar) return;
+    var goals = state.mode === 'campaign' && state.phase !== 'menu' && state.stagePlan && state.stagePlan.goals;
+    if (!goals || !goals.length) {
+      bar.hidden = true;
+      bar.dataset.sig = '';
+      return;
+    }
+    var parts = [];
+    var flags = [];
+    for (var i = 0; i < goals.length && i < 3; i++) {
+      var on = goals[i].kind === 'clear' ? state.phase === 'victory' : goalMet(goals[i]);
+      flags.push(on ? '1' : '0');
+      parts.push((on ? '★' : '☆') + goalLabel(goals[i]));
+    }
+    var sig = parts.join('|');
+    if (bar.dataset.sig === sig && !bar.hidden) return;
+    bar.dataset.sig = sig;
+    bar.hidden = false;
+    bar.replaceChildren();
+    for (var n = 0; n < parts.length; n++) {
+      var chip = document.createElement('span');
+      if (flags[n] === '1') chip.className = 'is-on';
+      chip.textContent = parts[n];
+      bar.appendChild(chip);
+    }
   }
 
   function victoryStarLine() {
@@ -7547,7 +7698,8 @@ function selectedTower() {
     row.hidden = !homeGoalsOpen;
     if (button) {
       button.setAttribute('aria-expanded', homeGoalsOpen ? 'true' : 'false');
-      button.setAttribute('aria-label', '星星 ' + starSum() + '，點開看這關條件');
+      var got = stage ? starCount(state.stars[stage.stageId] || 0) : 0;
+      button.setAttribute('aria-label', (stage ? stage.stageId + ' ' : '') + '星星 ' + got + '，點開看這關條件');
     }
     if (!stage) return;
     var title = document.createElement('p');
@@ -7609,9 +7761,13 @@ function selectedTower() {
     for (var s = 1; s <= 5; s++) if ((state.stars[stage.chapter + '-' + s] || 0) >= 1) done += 1;
     if (kicker) kicker.textContent = '章節 ' + chapter.id;
     if (title) title.textContent = chapter.name;
-    if (progress) progress.textContent = stage.stageId + ' ' + stage.name + ' · 進度 ' + done + '/5';
+    var homeKit = chapterKitById(chapter.id);
+    if (progress) progress.textContent = stage.stageId + ' ' + stage.name + (homeKit ? ' · ' + homeKit.name : '') + ' · 進度 ' + done + '/5';
     paintHomeGoals(stage);
-    if (starButton) starButton.classList.toggle('is-won', starSum() > 0);
+    if (starButton) {
+      starButton.dataset.stars = String(starCount(state.stars[stage.stageId] || 0));
+      starButton.classList.remove('is-won');
+    }
     if (waves) waves.textContent = String(stage.waves.length);
     if (gold) gold.textContent = String(stage.initialGold);
     if (boss) boss.textContent = chapter.boss.replace(/王$/, '');
@@ -8176,10 +8332,18 @@ function selectedTower() {
     state.pendingChoices = null;
     state.cardRerolled = false;
     state.banner = null;
+    state.hellDeffs = [];
+    state.hellDeffHalf = false;
+    state.hellDeffWave = 0;
+    state.kitSummonCd = 7;
+    state.kitFrostCd = 6;
+    state.kitMendCd = 2;
     if (mode === 'campaign' && level && level.goals) {
       var goalBits = [];
       for (var gi = 0; gi < level.goals.length; gi++) goalBits.push(goalLabel(level.goals[gi]));
-      state.banner = { text: level.stageId + ' ' + level.name, sub: goalBits.join(' · '), life: 3.6 };
+      var runKit = chapterKitById(level.chapter);
+      state.banner = { text: level.stageId + ' ' + level.name, sub: (runKit ? runKit.name + ' · ' : '') + goalBits.join(' · '), life: 3.6 };
+      if (runKit) toast('本章 · ' + runKit.name + '：' + runKit.blurb);
     }
     state.rangePing = null;
     state.shake = 0;
@@ -8566,10 +8730,16 @@ function selectedTower() {
     state.shownLives = state.lives;
     if (state.mode === 'campaign') {
       hudWave.textContent = String(state.level || '');
+      var campKit = campaignKit();
+      var campDeff = campKit && campKit.id === 'wheel' ? hellDeffLabel() : '';
       var bossNow = state.phase === 'combat' ? bossForWave(state.wave) : null;
       hudWaveSub.textContent = bossNow
         ? '王 · ' + bossNow.name
-        : (state.wave === 0 ? state.levelName : '第 ' + state.wave + '/' + state.levelWaves + ' 波');
+        : (campDeff
+          ? campDeff
+          : (state.wave === 0
+            ? ((campKit ? campKit.name + ' · ' : '') + (state.levelName || ''))
+            : ((campKit && campKit.id !== 'wheel' ? campKit.name + ' · ' : '') + '第 ' + state.wave + '/' + state.levelWaves + ' 波')));
     } else if (state.mode === 'custom') {
       var customName = state.difficulty === 'hell' ? '地獄' : '普通';
       hudWave.textContent = state.wave === 0 ? customName : '第 ' + state.wave + ' 波';
@@ -8757,6 +8927,7 @@ function selectedTower() {
     drawHurt();
     drawBanner();
     drawBuildMenu();
+    paintGoalBar();
     if (inspector.classList.contains('is-open')) placeInspector();
     if (state.pickMode === 'level') drawHint('點一座塔，永久提升 1 等');
     else if (state.pickMode === 'heroPlace') drawHint('點空地放置' + heroName(state.pendingHero));
@@ -10452,7 +10623,7 @@ function selectedTower() {
   function drawEnemyStatusFx(enemy, x, y, rad) {
     inkSeed = Math.round((enemy.id || 1) * 17 + rad * 3);
     var t = state.time + (enemy.id || 0) * 0.37;
-    var healing = enemy.bossId === 'regen' || enemy.bossId === 'mend' || (hasHellDeff('regen') && !enemy.boss);
+    var healing = enemy.bossId === 'regen' || enemy.bossId === 'mend' || (hasHellDeff('regen') && !enemy.boss) || (chapterHasKit('regen') && !enemy.boss);
     if (healing) {
       var healColor = enemy.bossId === 'mend' ? '#ff8fab' : '#3ecf8e';
       drawInkAuraRing(x, y, rad, healColor, t * 3, 0.05);
@@ -10460,7 +10631,7 @@ function selectedTower() {
         drawInkAuraRing(x, y, rad + 4, healColor, t * 3 + 1.2, 0.03);
       }
     }
-    var raging = (bossHas(enemy, 'rush') && enemy.enraged) || enemy.hellEnraged || state.berserk;
+    var raging = (bossHas(enemy, 'rush') && enemy.enraged) || enemy.hellEnraged || enemy.kitRushed || state.berserk;
     var swiftDebuff = hasHellDeff('speed') && !enemy.boss;
     if (raging || swiftDebuff) {
       ctx.save();
