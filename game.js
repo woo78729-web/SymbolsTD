@@ -6636,8 +6636,10 @@ function selectedTower() {
     if (!bar) return;
     var goals = state.mode === 'campaign' && state.phase !== 'menu' && state.stagePlan && state.stagePlan.goals;
     if (!goals || !goals.length) {
+      var wasOpen = !bar.hidden;
       bar.hidden = true;
       bar.dataset.sig = '';
+      if (wasOpen) resize();
       return;
     }
     var parts = [];
@@ -6649,6 +6651,7 @@ function selectedTower() {
     }
     var sig = parts.join('|');
     if (bar.dataset.sig === sig && !bar.hidden) return;
+    var wasHidden = bar.hidden;
     bar.dataset.sig = sig;
     bar.hidden = false;
     bar.replaceChildren();
@@ -6658,6 +6661,7 @@ function selectedTower() {
       chip.textContent = parts[n];
       bar.appendChild(chip);
     }
+    if (wasHidden) resize();
   }
 
   function victoryStarLine() {
@@ -6999,8 +7003,8 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/28',
-      title: '八章特色、小王舊圖、能力特效、有手腳的大王、手機選關',
-      detail: '前八章整章都帶該章首領的特色：再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲，小怪也算。第九章魔王城是骷髏王，會放隕石把塔炸暈；骷髏小怪打死會再站起來一次，半血。這一章跟地獄一樣，第 1 波轉 1 個詞綴，之後每 10 波再轉。選關的三顆星只顯示目前這一關拿到的顆數，放在章名下面。1 到 5 的關卡點坐在關卡圖外框底邊，不再另外畫一條線；未通關灰點有白底蓋住框線，數字會顯示，進度字放在點下面。有手腳的首領只會出現在 1-5、2-5、3-5、4-5、5-5、6-5、7-5、8-5、9-5 的最後一波。各章前四關的尾王改成小王，血比首領少、比小怪多，並帶該章能力的弱化版，外型統一用原來那張圓圓的王圖加黃冠，不另外畫再生小王。再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲施放時都會有各自的新特效：回血飄加號、狂暴衝刺殘影、召喚軌道點、六角護盾、分裂裂線、治癒十字、冰刺環、鐵甲鉚釘框，觸發瞬間還會爆一圈光。第五關首領會走路擺動，腳有腳掌、手有拳頭，畫法和骷髏王同一套。作戰時地圖底下會一直顯示這一關的星星條件。手機選關時，開始按鈕會留在畫面上；螢幕不夠高，關卡圖會縮小，不會被底下的模式列蓋住。',
+      title: '八章特色、小王、能力特效、有手腳的大王、星星條件上移',
+      detail: '前八章整章都帶該章首領的特色：再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲，小怪也算。第九章魔王城是骷髏王，會放隕石把塔炸暈；骷髏小怪打死會再站起來一次，半血。這一章跟地獄一樣，第 1 波轉 1 個詞綴，之後每 10 波再轉。選關的三顆星只顯示目前這一關拿到的顆數，放在章名下面。1 到 5 的關卡點坐在關卡圖外框底邊，不再另外畫一條線；未通關灰點有白底蓋住框線，數字會顯示，進度字放在點下面。有手腳的首領只會出現在 1-5、2-5、3-5、4-5、5-5、6-5、7-5、8-5、9-5 的最後一波。各章前四關的尾王改成小王，血比首領少、比小怪多，並帶該章能力的弱化版，外型統一用原來那張圓圓的王圖加黃冠，不另外畫再生小王。再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲施放時都會有各自的新特效：回血飄加號、狂暴衝刺殘影、召喚軌道點、六角護盾、分裂裂線、治癒十字、冰刺環、鐵甲鉚釘框，觸發瞬間還會爆一圈光。第五關首領會走路擺動，腳有腳掌、手有拳頭，畫法和骷髏王同一套。作戰時星星條件改放在上方狀態列下面，棋盤會往下讓一點，不會蓋住路徑。手機選關時，開始按鈕會留在畫面上；螢幕不夠高，關卡圖會縮小，不會被底下的模式列蓋住。',
     },
     {
       date: '10/27',
@@ -9134,6 +9138,11 @@ function selectedTower() {
     placeInspector();
   }
 
+  function goalBarPad() {
+    var bar = document.getElementById('goal-bar');
+    return bar && !bar.hidden ? 32 : 0;
+  }
+
   function resize() {
     var w = stage.clientWidth;
     var h = stage.clientHeight;
@@ -9141,15 +9150,23 @@ function selectedTower() {
     view.dpr = Math.min(window.devicePixelRatio || 1, 2);
     var nextW = Math.round(w * view.dpr);
     var nextH = Math.round(h * view.dpr);
-    if (view.w === w && view.h === h && canvas.width === nextW && canvas.height === nextH) return;
+    var pad = 8;
+    var topPad = goalBarPad();
+    var tile = Math.min((w - pad * 2) / COLS, (h - pad * 2 - topPad) / ROWS);
+    var originX = (w - tile * COLS) / 2;
+    var originY = topPad + Math.max(pad, (h - topPad - tile * ROWS) / 2);
+    if (
+      view.w === w && view.h === h &&
+      canvas.width === nextW && canvas.height === nextH &&
+      view.tile === tile && view.originX === originX && view.originY === originY
+    ) return;
     view.w = w;
     view.h = h;
+    view.tile = tile;
+    view.originX = originX;
+    view.originY = originY;
     canvas.width = nextW;
     canvas.height = nextH;
-    var pad = 8;
-    view.tile = Math.min((w - pad * 2) / COLS, (h - pad * 2) / ROWS);
-    view.originX = (w - view.tile * COLS) / 2;
-    view.originY = (h - view.tile * ROWS) / 2;
   }
 
   function render() {

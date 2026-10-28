@@ -221,7 +221,8 @@ button:disabled { cursor: default; }
   position: absolute;
   left: 6px;
   right: 6px;
-  bottom: 4px;
+  top: 6px;
+  bottom: auto;
   z-index: 3;
   display: flex;
   gap: 4px;
@@ -231,23 +232,30 @@ button:disabled { cursor: default; }
 .goal-bar span {
   flex: 1 1 0;
   min-width: 0;
-  height: 22px;
+  height: 24px;
   padding: 0 4px;
   border: 2px solid #161616;
   border-radius: 6px;
-  background: rgba(255, 253, 248, 0.94);
+  background: #fffdf8;
   color: #1a1a1a;
   font-size: 11px;
   font-weight: 800;
-  line-height: 18px;
+  line-height: 20px;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  box-shadow: 0 1px 0 rgba(22, 22, 22, 0.12);
 }
 .goal-bar span.is-on {
   background: #161616;
   color: #fffdf8;
+}
+.stage:has(#goal-bar:not([hidden])) .inspector {
+  top: 38px;
+}
+#app.is-compact .stage:has(#goal-bar:not([hidden])) .inspector {
+  top: 34px;
 }
 
 canvas {
