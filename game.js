@@ -874,6 +874,7 @@
     { id: 6, name: '邪教神殿', boss: '治癒王' },
     { id: 7, name: '冰霜囚牢', boss: '冰封王' },
     { id: 8, name: '廢鐵工坊', boss: '鐵甲王' },
+    { id: 9, name: '魔王城', boss: '骷髏王', art: false },
   ];
 
   var MINION_PAIRS = [
@@ -908,6 +909,10 @@
     [
       { id: 'beetle', name: '發甲甲殼蟲', color: '#b7aa9a' },
       { id: 'golem', name: '廢鐵小魔像', color: '#d9c7a6' },
+    ],
+    [
+      { id: 'bones', name: '魔城骷髏', color: '#efe6d6' },
+      { id: 'ember', name: '魔火小鬼', color: '#e07a2f' },
     ],
   ];
 
@@ -976,7 +981,15 @@
       var brutes = 0;
       if (!boss && stage >= 3 && w % 5 === 0) brutes = 1;
       if (!boss && chapter >= 6 && stage >= 4 && w === count - 1) brutes += 1;
-      waves.push({ grunts: grunts, swifts: swifts, brutes: brutes, boss: boss });
+      var bones = 0;
+      if (chapter === 9 && !boss) {
+        if (stage === 1) bones = w >= 8 && w % 2 === 0 ? 1 : 0;
+        else if (stage === 2) bones = w >= 5 ? 1 : 0;
+        else if (stage === 3) bones = w >= 4 ? (w % 3 === 0 ? 2 : 1) : 0;
+        else if (stage === 4) bones = w >= 3 ? (w % 2 === 0 ? 2 : 1) : 0;
+        else bones = w >= 4 ? 2 : (w >= 2 ? 1 : 0);
+      }
+      waves.push({ grunts: grunts, swifts: swifts, brutes: brutes, bones: bones, boss: boss });
     }
     return waves;
   }
@@ -1048,7 +1061,7 @@
 
   function buildStages() {
     var list = [];
-    for (var c = 1; c <= 8; c++) {
+    for (var c = 1; c <= CHAPTERS.length; c++) {
       for (var s = 1; s <= 5; s++) {
         var path = nudgePath(PATH_BANK[(s - 1 + c - 1) % PATH_BANK.length], (c % 3) - 1);
         list.push({
@@ -1264,9 +1277,12 @@ function selectedTower() {
 
   function bossForWave(wave) {
     if (state.mode === 'infinite' && wave === 50) {
-      return { id: 'titan', name: '迴廊巨王', blurb: state.titanBlurb || '三種王的能力' };
+      return { id: 'skull', name: '骷髏王', blurb: '隕石會把塔炸暈 1 秒' };
     }
     if (!isBossWave(wave)) return null;
+    if (state.mode === 'campaign' && state.chapter === 9) {
+      return { id: 'skull', name: '骷髏王', blurb: '隕石暈塔，並召喚小怪' };
+    }
     return BOSSES[bossIndexFor(wave) % BOSSES.length];
   }
 
@@ -1311,12 +1327,19 @@ function selectedTower() {
       placed += 1;
     }
     for (var b = 0; b < spec.brutes; b++) jobs.push({ type: 'brute', gap: 1.15 });
+    var bones = spec.bones || 0;
+    for (var bone = 0; bone < bones; bone++) jobs.push({ type: 'bone', gap: gap });
     var boss = null;
     if (spec.boss) {
-      boss = BOSSES[bossIndexFor(wave) % BOSSES.length];
-      jobs.push({ type: 'boss', gap: 1.7, bossIndex: bossIndexFor(wave) });
+      if (state.chapter === 9) {
+        boss = { id: 'skull', name: '骷髏王', blurb: '隕石暈塔，並召喚小怪' };
+        jobs.push({ type: 'skull', gap: 1.7, kit: 'castle' });
+      } else {
+        boss = BOSSES[bossIndexFor(wave) % BOSSES.length];
+        jobs.push({ type: 'boss', gap: 1.7, bossIndex: bossIndexFor(wave) });
+      }
     }
-    return { jobs: jobs, grunts: grunts, swifts: swifts, brutes: spec.brutes, boss: boss };
+    return { jobs: jobs, grunts: grunts, swifts: swifts, brutes: spec.brutes, bones: bones, boss: boss };
   }
 
   var INFINITE_PROFILES = {
@@ -1882,6 +1905,8 @@ function selectedTower() {
       rams = 1;
       jobs.splice(Math.min(jobs.length, Math.max(2, Math.floor(jobs.length * 0.35))), 0, { type: 'ram', gap: Math.max(1.3, gap * 1.6) });
     }
+    var bones = laterBoneCount(wave, diff.id === 'hell');
+    for (var bone = 0; bone < bones; bone++) jobs.push({ type: 'bone', gap: Math.max(0.9, gap) });
     var brutes = 0;
     var boss = bossForWave(wave);
     if (boss) {
@@ -1889,7 +1914,9 @@ function selectedTower() {
         jobs.push({ type: 'brute', gap: 0.9 });
         brutes += 1;
       }
-      var bossJob = { type: 'boss', gap: 1.2, bossIndex: bossIndexFor(wave) };
+      var bossJob = boss.id === 'skull'
+        ? { type: 'skull', gap: 1.2, kit: 'meteor' }
+        : { type: 'boss', gap: 1.2, bossIndex: bossIndexFor(wave) };
       if (diff.id === 'hell') jobs.splice(Math.min(3, jobs.length), 0, bossJob);
       else jobs.push(bossJob);
     } else if (wave % diff.bruteEvery === 0) {
@@ -1898,7 +1925,13 @@ function selectedTower() {
       for (var b = 0; b < pack; b++) jobs.push({ type: 'brute', gap: 1.05 });
       brutes += pack;
     }
-    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, rams: rams, boss: boss };
+    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, rams: rams, bones: bones, boss: boss };
+  }
+
+  function laterBoneCount(wave, hell) {
+    var start = hell ? 18 : 22;
+    if (wave < start) return 0;
+    return Math.min(hell ? 3 : 2, 1 + Math.floor((wave - start) / 8));
   }
 
   function planWave(wave) {
@@ -1936,13 +1969,13 @@ function selectedTower() {
       rams = 1;
       jobs.splice(Math.min(jobs.length, Math.max(2, Math.floor(jobs.length * 0.35))), 0, { type: 'ram', gap: Math.max(1.35, gap * 1.7) });
     }
+    var bones = laterBoneCount(wave, false);
+    for (var bone = 0; bone < bones; bone++) jobs.push({ type: 'bone', gap: Math.max(0.95, gap) });
     var brutes = 0;
     var boss = null;
     if (state.mode === 'infinite' && wave === 50) {
-      var traits = rollTitanTraits();
-      state.titanBlurb = titanBlurb(traits);
-      jobs.push({ type: 'titan', gap: 1.7, traits: traits });
-      boss = { id: 'titan', name: '迴廊巨王', blurb: state.titanBlurb };
+      jobs.push({ type: 'skull', gap: 1.7, kit: 'meteor' });
+      boss = { id: 'skull', name: '骷髏王', blurb: '隕石會把塔炸暈 1 秒' };
     } else {
       boss = bossForWave(wave);
       if (boss) {
@@ -1952,7 +1985,7 @@ function selectedTower() {
         brutes = 1;
       }
     }
-    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, rams: rams, boss: boss };
+    return { jobs: jobs, grunts: gruntCount, swifts: swifts, brutes: brutes, hoppers: hoppers, devils: devils, rams: rams, bones: bones, boss: boss };
   }
 
   function compositionText(plan) {
@@ -1962,6 +1995,7 @@ function selectedTower() {
       if (plan.hoppers) text += ' · 跳躍 ' + plan.hoppers;
       if (plan.devils) text += ' · 惡魔 ' + plan.devils;
       if (plan.rams) text += ' · 破塔 ' + plan.rams;
+      if (plan.bones) text += ' · 骷髏 ' + plan.bones;
       if (plan.brutes) text += ' · 精英 ' + plan.brutes;
       if (plan.boss) text += ' · ' + plan.boss.name;
       return text;
@@ -1970,6 +2004,7 @@ function selectedTower() {
     var parts = [pair[0].name + ' ' + plan.grunts];
     if (plan.swifts) parts.push(pair[1].name + ' ' + plan.swifts);
     if (plan.brutes) parts.push(pair[0].name + '精英 ' + plan.brutes);
+    if (plan.bones) parts.push('骷髏小怪 ' + plan.bones);
     if (plan.boss) parts.push(plan.boss.name);
     return parts.join(' · ');
   }
@@ -2036,17 +2071,20 @@ function selectedTower() {
       hopper: { hp: Math.round(gruntHp * 0.8), speed: Math.min((diff ? speedCap : 1.7) + 0.15, gruntSpeed * 1.25), gold: Math.max(3, softWaveGold + 1), radius: 0.26, color: '#4ec6e8', leak: 1 },
       devil: { hp: Math.round(gruntHp * 0.95), speed: Math.min((diff ? speedCap : 1.7) + 0.2, gruntSpeed * 1.2), gold: Math.max(4, softWaveGold + 2), radius: 0.28, color: '#c62828', leak: 1 },
       ram: { hp: Math.round(gruntHp * 2.8), speed: gruntSpeed * 0.82, gold: Math.max(5, softWaveGold + 3), radius: 0.36, color: '#5c4033', leak: 1 },
+      bone: { hp: Math.round(gruntHp * 0.85), speed: gruntSpeed * 0.88, gold: Math.max(3, softWaveGold + 1), radius: 0.28, color: '#efe6d6', leak: 1 },
       brute: { hp: Math.round(gruntHp * 7.5), speed: gruntSpeed * 0.52, gold: 8 + softWaveGold * 2, radius: 0.44, color: '#8d6bff', leak: 3 },
     };
     var spec = table[type] || table.grunt;
     if (goldMul !== 1) spec.gold = Math.max(2, Math.round(spec.gold * goldMul));
     var kind = type === 'ram'
       ? { id: 'ram', name: '破塔怪', color: '#5c4033' }
+      : (type === 'bone'
+      ? { id: 'bone', name: '骷髏小怪', color: '#efe6d6' }
       : (type === 'hopper'
       ? { id: 'hopper', name: '跳躍怪', color: '#4ec6e8' }
       : (type === 'devil'
         ? { id: 'devil', name: '小惡魔', color: '#c62828' }
-        : pickMinion(type === 'swift' ? 'swift' : 'grunt')));
+        : pickMinion(type === 'swift' ? 'swift' : 'grunt'))));
     var resist = (type === 'hopper' || type === 'devil') ? '' : rollResist(wave);
     return {
       id: state.nextId++,
@@ -2070,6 +2108,8 @@ function selectedTower() {
       flying: type === 'swift',
       hexCd: type === 'devil' ? 1.6 + Math.random() * 0.8 : 0,
       ramCd: 0,
+      revived: false,
+      rise: 0,
     };
   }
 
@@ -2139,6 +2179,30 @@ function selectedTower() {
     boss.abilityTimer = 3.2;
     for (var i = 0; i < picked.length; i++) {
       if (picked[i] === 'ward') boss.shield = Math.round(boss.maxHp * 0.18);
+    }
+    return boss;
+  }
+
+  function makeSkull(wave, kit) {
+    var boss = makeBoss(0, wave);
+    var castle = kit === 'castle';
+    boss.bossId = 'skull';
+    boss.name = '骷髏王';
+    boss.ability = castle ? '隕石暈塔，沿路召喚小怪' : '隕石會把塔炸暈 1 秒';
+    boss.traits = castle ? ['summon'] : [];
+    boss.color = '#f4efe4';
+    boss.radius = castle ? 0.7 : 0.82;
+    boss.shield = 0;
+    boss.meteorTimer = 2.4;
+    boss.meteorCount = castle ? 1 : 2;
+    boss.castPose = 0;
+    boss.summonTimer = 3.2;
+    if (!castle) {
+      boss.hp = Math.round(boss.hp * 2.2);
+      boss.maxHp = boss.hp;
+      boss.leak = 8;
+      boss.speed = boss.baseSpeed * 0.72;
+      boss.baseSpeed = boss.speed;
     }
     return boss;
   }
@@ -3006,7 +3070,7 @@ function selectedTower() {
   }
 
   var TITLES = [
-    { id: 'corridor', name: '無限迴廊之主', hint: '無限模式打過第 50 波巨王', ok: function (d) { return !!d.corridor; } },
+    { id: 'corridor', name: '無限迴廊之主', hint: '無限模式打過第 50 波骷髏王', ok: function (d) { return !!d.corridor; } },
     { id: 'overload', name: '運算超載', hint: '無限或自訂打到第 40 波', ok: function (d) { return (d.infiniteWave || 0) >= 40 || (d.customWave || 0) >= 40; } },
     { id: 'wheel', name: '地獄轉輪手', hint: '地獄模式打到第 10 波', ok: function (d) { return (d.hellWave || 0) >= 10; } },
     { id: 'demolish', name: '防線拆遷辦主任', hint: '累積賣掉 15 座塔', ok: function (d) { return (d.sells || 0) >= 15; } },
@@ -3744,6 +3808,7 @@ function selectedTower() {
     updateGusts(dt);
     updateFogs(dt);
     updateMeteor(dt);
+    updateSkyfalls(dt);
     updateProjectiles(dt);
     flushSpawns();
     state.enemies = state.enemies.filter(function (enemy) { return !enemy.dead; });
@@ -3758,9 +3823,11 @@ function selectedTower() {
     state.spawnTimer -= dt;
     if (state.spawnTimer > 0) return;
     var job = state.spawnQueue.shift();
-    var spawned = job.type === 'titan'
-      ? makeTitan(state.wave, job.traits)
-      : (job.type === 'boss' ? makeBoss(job.bossIndex, state.wave) : makeEnemy(job.type, state.wave));
+    var spawned = job.type === 'skull'
+      ? makeSkull(state.wave, job.kit)
+      : (job.type === 'titan'
+        ? makeTitan(state.wave, job.traits)
+        : (job.type === 'boss' ? makeBoss(job.bossIndex, state.wave) : makeEnemy(job.type, state.wave)));
     applyHellSpawnStats(spawned);
     state.enemies.push(spawned);
     state.spawnTimer = state.spawnQueue.length ? state.spawnQueue[0].gap : 0;
@@ -3791,6 +3858,7 @@ function selectedTower() {
       triggerTrap(enemy);
       if (enemy.freeze > 0) enemy.freeze -= dt;
       if (enemy.stun > 0) enemy.stun -= dt;
+      if (enemy.rise > 0) enemy.rise = Math.max(0, enemy.rise - dt);
       if (enemy.slowTime > 0) {
         enemy.slowTime -= dt;
         if (enemy.slowTime <= 0) enemy.slow = 0;
@@ -3973,9 +4041,73 @@ function selectedTower() {
     return !!(enemy && (enemy.poisonTime > 0 || enemy.poisonRuin || enemy.fogTime > 0));
   }
 
+  function castSkullMeteors(enemy) {
+    if (!state.towers.length) return;
+    if (!state.skyfalls) state.skyfalls = [];
+    var count = enemy.meteorCount || 1;
+    var used = {};
+    for (var n = 0; n < count; n++) {
+      var tower = null;
+      for (var attempt = 0; attempt < 6; attempt++) {
+        var pick = state.towers[Math.floor(Math.random() * state.towers.length)];
+        if (!used[pick.id]) {
+          tower = pick;
+          used[pick.id] = true;
+          break;
+        }
+      }
+      if (!tower) tower = state.towers[Math.floor(Math.random() * state.towers.length)];
+      var hx = tower.hero === 'sword' && tower.fx != null ? tower.fx : tower.c + 0.5;
+      var hy = tower.hero === 'sword' && tower.fy != null ? tower.fy : tower.r + 0.5;
+      state.skyfalls.push({
+        x: hx,
+        y: hy,
+        life: 0.62,
+        max: 0.62,
+        radius: 0.82,
+        armed: true,
+      });
+    }
+    enemy.castPose = 0.85;
+    var pos = pointAt(enemy.dist);
+    spawnFloater(pos.x, pos.y - 0.7, '隕石', '#e07a2f');
+  }
+
+  function updateSkyfalls(dt) {
+    var list = state.skyfalls;
+    if (!list || !list.length) return;
+    for (var i = list.length - 1; i >= 0; i--) {
+      var rock = list[i];
+      rock.life -= dt;
+      if (rock.armed && rock.life <= rock.max * 0.28) {
+        rock.armed = false;
+        for (var t = 0; t < state.towers.length; t++) {
+          var tower = state.towers[t];
+          var hx = tower.hero === 'sword' && tower.fx != null ? tower.fx : tower.c + 0.5;
+          var hy = tower.hero === 'sword' && tower.fy != null ? tower.fy : tower.r + 0.5;
+          if (Math.hypot(hx - rock.x, hy - rock.y) > rock.radius) continue;
+          tower.chill = Math.max(tower.chill || 0, 1);
+          tower.dizzy = Math.max(tower.dizzy || 0, 1);
+          spawnFloater(hx, hy - 0.45, '暈眩', '#e07a2f');
+        }
+        burst(rock.x, rock.y, '#e07a2f', 10);
+        Sfx.cannon();
+      }
+      if (rock.life <= 0) list.splice(i, 1);
+    }
+  }
+
   function tickBoss(enemy, dt) {
     enemy.pulse += dt;
     var pos = pointAt(enemy.dist);
+    if (enemy.bossId === 'skull') {
+      enemy.castPose = Math.max(0, (enemy.castPose || 0) - dt);
+      enemy.meteorTimer = (enemy.meteorTimer == null ? 2.4 : enemy.meteorTimer) - dt;
+      if (enemy.meteorTimer <= 0) {
+        enemy.meteorTimer = 4.8;
+        castSkullMeteors(enemy);
+      }
+    }
     if (bossHas(enemy, 'regen')) {
       if (healBlocked(enemy)) {
         if (enemy.poisonTime > 0 || enemy.poisonRuin) triggerPoisonCounter(enemy);
@@ -4001,7 +4133,7 @@ function selectedTower() {
       enemy.summonTimer = (enemy.summonTimer == null ? 2.4 : enemy.summonTimer) - dt;
       if (enemy.summonTimer <= 0 && state.enemies.length + state.pendingSpawns.length < 28) {
         enemy.summonTimer = 4.4;
-        var minion = makeEnemy('grunt', state.wave);
+        var minion = enemy.bossId === 'skull' ? makeEnemy('bone', state.wave) : makeEnemy('grunt', state.wave);
         minion.dist = Math.max(0, enemy.dist - 0.45);
         queueEnemy(minion);
         spawnFloater(pos.x, pos.y - 0.6, '召喚', '#f2c14e');
@@ -4484,6 +4616,7 @@ function selectedTower() {
     state.pickMode = '';
     state.cardWave = 0;
     state.meteor = null;
+    state.skyfalls = [];
     state.pendingHero = '';
     state.freeSpec = false;
     state.splashLedger = {};
@@ -5876,6 +6009,10 @@ function selectedTower() {
       spawnFloater(pos.x, pos.y - 0.35, String(damage), '#e02323');
     }
     if (enemy.hp <= 0) {
+      if (enemy.type === 'bone' && !enemy.revived) {
+        reviveBone(enemy);
+        return;
+      }
       if (opts.slashKill) spawnSlashKill(enemy);
       killEnemy(enemy);
     }
@@ -5911,6 +6048,16 @@ function selectedTower() {
     burst(pos.x, pos.y, '#e02323', 12);
   }
 
+  function reviveBone(enemy) {
+    enemy.revived = true;
+    enemy.hp = Math.max(1, Math.round(enemy.maxHp * 0.5));
+    enemy.hitFlash = 0.28;
+    enemy.rise = 0.45;
+    var pos = enemyPos(enemy);
+    spawnFloater(pos.x, pos.y - 0.55, '復活', '#e07a2f');
+    burst(pos.x, pos.y, '#efe6d6', 8);
+  }
+
   function killEnemy(enemy) {
     if (enemy.dead) return;
     enemy.dead = true;
@@ -5935,7 +6082,7 @@ function selectedTower() {
     }
     var hellSplit = hellDeffValue('split');
     if (hellSplit > 0 && !enemy.boss && !enemy.noSplit && enemy.type !== 'shard') {
-      var childType = enemy.type === 'hopper' || enemy.type === 'brute' || enemy.type === 'devil' || enemy.type === 'ram' ? 'grunt' : (enemy.type || 'grunt');
+      var childType = enemy.type === 'hopper' || enemy.type === 'brute' || enemy.type === 'devil' || enemy.type === 'ram' || enemy.type === 'bone' ? 'grunt' : (enemy.type || 'grunt');
       var childHp = Math.max(1, Math.round(enemy.maxHp * hellSplit));
       var spdBonus = hellDeffValue('speed');
       for (var h = 0; h < 2; h++) {
@@ -6220,6 +6367,7 @@ function selectedTower() {
       if (state.towers[t].swing) state.towers[t].swing = Math.max(0, state.towers[t].swing - dt * 3.4);
       if (state.towers[t].auraTime) state.towers[t].auraTime = Math.max(0, state.towers[t].auraTime - dt);
       if (state.towers[t].chill) state.towers[t].chill = Math.max(0, state.towers[t].chill - dt);
+      if (state.towers[t].dizzy) state.towers[t].dizzy = Math.max(0, state.towers[t].dizzy - dt);
       if (state.towers[t].devilFork) {
         state.towers[t].devilFork = Math.max(0, state.towers[t].devilFork - dt);
         if (state.towers[t].devilFork <= 0) state.towers[t].devilFork = 0;
@@ -6478,7 +6626,7 @@ function selectedTower() {
     {
       date: '10/27',
       title: '名片框、稱號、第 50 波巨王',
-      detail: '每一章五關都三星會得到一種名片框，八章都過關再多一個。稱號可以自己選一個，地獄榜前 10 名會再顯示一個榜上稱號。無限模式第 50 波改成迴廊巨王，身上隨機帶三種王的能力。打過這一波會得到「無限迴廊之主」。',
+      detail: '每一章五關都三星會得到一種名片框，八章都過關再多一個。稱號可以自己選一個，地獄榜前 10 名會再顯示一個榜上稱號。無限模式第 50 波是骷髏王，會放隕石把塔炸暈。打過這一波會得到「無限迴廊之主」。第八章過關後會開第九章魔王城。',
     },
     {
       date: '10/27',
@@ -7097,6 +7245,7 @@ function selectedTower() {
         else if (spec.type === 'swift') drawSwiftBody(rad, colors, 0);
         else if (spec.type === 'brute') drawBruteBody(rad, colors, 0);
         else if (spec.type === 'ram') drawRamBody(rad, colors, 0);
+        else if (spec.type === 'bone') drawBoneBody(rad, colors, 0, false);
         else drawGruntBody(rad, colors, 0);
         if (resist) {
           g.font = '800 11px ' + FONT;
@@ -7424,6 +7573,17 @@ function selectedTower() {
   function drawHomeArt(chapter) {
     var img = document.getElementById('home-art');
     if (!img) return;
+    var info = chapterById(chapter);
+    var frame = img.closest('.home-frame');
+    var blank = !!(info && info.art === false);
+    if (frame) frame.classList.toggle('is-blank', blank);
+    if (blank) {
+      img.removeAttribute('src');
+      img.alt = '';
+      img.hidden = true;
+      return;
+    }
+    img.hidden = false;
     img.src = 'assets/ui/chapters/' + chapter + '.jpg?v=3';
     img.alt = '';
   }
@@ -7589,6 +7749,17 @@ function selectedTower() {
         ],
       },
       {
+        tag: '小怪', title: '骷髏小怪', paint: { kind: 'enemy', type: 'bone', color: '#efe6d6' },
+        desc: '魔王城的小骷髏。打死會再站起來一次，復活時只剩一半血，第二次才真的倒下。復活過的眼睛會發橙。',
+        stats: [
+          '<strong>血量</strong>：普通怪 ×0.85，復活後剩一半',
+          '<strong>移速</strong>：比普通怪慢一點',
+          '<strong>復活</strong>：每隻只復活一次',
+          '<strong>作戰</strong>：只有第九章魔王城',
+          '<strong>無限、自訂</strong>：普通第 22 波起，地獄第 18 波起，每波最多 2 到 3 隻',
+        ],
+      },
+      {
         tag: '小怪', title: '破塔怪', paint: { kind: 'enemy', type: 'ram', color: '#5c4033' },
         desc: '手繪衝角獸。無限和自訂模式第 40 波起出現，走近一般塔會把塔撞破。英雄塔不會被撞掉。',
         stats: [
@@ -7651,6 +7822,15 @@ function selectedTower() {
         tag: '首領', title: '鐵甲王', paint: { kind: 'enemy', type: 'grunt', color: '#8aa0b8', bossId: 'armor' },
         desc: '手繪戴頭盔的臉，戴黃冠，外框有鐵甲邊。',
         stats: ['<strong>減傷</strong>：受到傷害減半', '<strong>克制</strong>：火塔破甲並打血量 10%'],
+      },
+      {
+        tag: '首領', title: '骷髏王', paint: { kind: 'enemy', type: 'grunt', color: '#f4efe4', bossId: 'skull' },
+        desc: '比其他王大一圈的骷髏。走路會擺動手腳，施法時舉起法杖。隕石炸到的塔會暈眩，1 秒不能攻擊。',
+        stats: [
+          '<strong>無限</strong>：第 50 波，一次兩顆隕石',
+          '<strong>魔王城</strong>：第九章首領，隕石再加上召喚骷髏小怪',
+          '<strong>暈眩</strong>：炸到的塔 1 秒不能攻擊',
+        ],
       },
       {
         tag: '地獄', title: '地獄詞綴', paint: { kind: 'hell', mark: '獄' },
@@ -8250,6 +8430,32 @@ function selectedTower() {
     inspectActions.appendChild(row);
   }
 
+  function placeInspector() {
+    if (!inspector.classList.contains('is-open')) return;
+    var tower = selectedTower();
+    if (!tower || !view.tile) return;
+    var hx = tower.c + 0.5;
+    var hy = tower.r + 0.5;
+    if (tower.hero === 'sword' && tower.fx != null) {
+      hx = tower.fx;
+      hy = tower.fy;
+    }
+    var cardW = Math.min(210, Math.max(168, view.w - 16));
+    inspector.style.width = cardW + 'px';
+    inspector.style.right = 'auto';
+    inspector.style.bottom = 'auto';
+    var cardH = inspector.offsetHeight || 92;
+    var cx = view.originX + hx * view.tile;
+    var top = view.originY + (hy - 0.5) * view.tile;
+    var bottom = top + view.tile;
+    var x = Math.max(8, Math.min(view.w - cardW - 8, cx - cardW / 2));
+    var y = top - cardH - 8;
+    if (y < 8) y = bottom + 8;
+    if (y + cardH > view.h - 8) y = Math.max(8, view.h - cardH - 8);
+    inspector.style.left = Math.round(x) + 'px';
+    inspector.style.top = Math.round(y) + 'px';
+  }
+
   function renderInspector() {
     var tower = selectedTower();
     if (!tower) {
@@ -8263,6 +8469,7 @@ function selectedTower() {
       inspectTitle.textContent = '鐵匠';
       inspectMeta.textContent = '不攻擊。在場時，其他塔可以用金幣升到 10 等。賣走之後就不能再往上升。';
       appendSellRow(Math.floor(tower.invested * sellRatio()));
+      placeInspector();
       return;
     }
     if (tower.type === 'hero') {
@@ -8279,6 +8486,7 @@ function selectedTower() {
         inspectActions.appendChild(skill);
       }
       appendSellRow(Math.floor(tower.invested * sellRatio()));
+      placeInspector();
       return;
     }
     var stats = towerStats(tower);
@@ -8306,6 +8514,7 @@ function selectedTower() {
       inspectActions.appendChild(upgrade);
     }
     appendSellRow(refund);
+    placeInspector();
   }
 
   function statLine(stats, tower) {
@@ -8470,6 +8679,34 @@ function selectedTower() {
     soundBtn.setAttribute('aria-label', Sfx.muted ? '開啟音效' : '關閉音效');
   }
 
+  function fitViewport() {
+    var app = document.getElementById('app');
+    if (!app) return;
+    var vv = window.visualViewport;
+    var narrow = window.innerWidth < 520;
+    if (narrow && vv) {
+      app.style.position = 'fixed';
+      app.style.top = Math.round(vv.offsetTop) + 'px';
+      app.style.left = '0';
+      app.style.right = '0';
+      app.style.width = '100%';
+      app.style.height = Math.round(vv.height) + 'px';
+      app.style.maxHeight = Math.round(vv.height) + 'px';
+      app.classList.toggle('is-compact', vv.height < 760);
+    } else {
+      app.style.position = '';
+      app.style.top = '';
+      app.style.left = '';
+      app.style.right = '';
+      app.style.width = '';
+      app.style.height = '';
+      app.style.maxHeight = '';
+      app.classList.remove('is-compact');
+    }
+    resize();
+    placeInspector();
+  }
+
   function resize() {
     var w = stage.clientWidth;
     var h = stage.clientHeight;
@@ -8509,6 +8746,7 @@ function selectedTower() {
     drawBeams();
     drawProjectiles();
     drawMeteors();
+    drawSkyfalls();
     drawShocks();
     drawParticles();
     drawFloaters();
@@ -8516,6 +8754,7 @@ function selectedTower() {
     drawHurt();
     drawBanner();
     drawBuildMenu();
+    if (inspector.classList.contains('is-open')) placeInspector();
     if (state.pickMode === 'level') drawHint('點一座塔，永久提升 1 等');
     else if (state.pickMode === 'heroPlace') drawHint('點空地放置' + heroName(state.pendingHero));
     else if (state.pickMode === 'fog') drawHint('點一處丟出致命毒霧');
@@ -9375,6 +9614,45 @@ function selectedTower() {
     }
   }
 
+  function drawSkyfalls() {
+    var list = state.skyfalls;
+    if (!list || !list.length) return;
+    for (var i = 0; i < list.length; i++) {
+      var rock = list[i];
+      var fall = 1 - rock.life / rock.max;
+      var x = worldX(rock.x);
+      var y = worldY(rock.y - (1 - fall) * 3.4);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = '#ffb15a';
+      ctx.globalAlpha = 0.85;
+      ctx.lineWidth = Math.max(3, view.tile * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(0, view.tile * 0.28);
+      ctx.lineTo(-view.tile * 0.16, -view.tile * 0.72);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#5a4030';
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(5, view.tile * 0.14), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#161616';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+      if (!rock.armed) {
+        ctx.save();
+        ctx.strokeStyle = '#e07a2f';
+        ctx.globalAlpha = Math.max(0, rock.life / (rock.max * 0.28));
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(worldX(rock.x), worldY(rock.y), rock.radius * view.tile, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
   function drawMeteors() {
     if (!state.meteor || !state.meteor.rocks) return;
     for (var i = 0; i < state.meteor.rocks.length; i++) {
@@ -9508,6 +9786,17 @@ function selectedTower() {
       ctx.stroke();
       ctx.setLineDash([]);
     }
+    if (tower.dizzy > 0) {
+      ctx.save();
+      ctx.translate(x, y - tile * 0.46);
+      ctx.rotate(state.time * 6);
+      ctx.fillStyle = '#e07a2f';
+      ctx.beginPath();
+      ctx.arc(-tile * 0.12, 0, Math.max(2, tile * 0.05), 0, Math.PI * 2);
+      ctx.arc(tile * 0.12, 0, Math.max(2, tile * 0.05), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
     if (tower.devilFork > 0) {
       ctx.save();
       ctx.translate(x + tile * 0.38, y - tile * 0.08);
@@ -9614,6 +9903,36 @@ function selectedTower() {
   function doodleEye(x, y, r) {
     inkCircle(x, y, r, 6);
     ctx.fill();
+  }
+
+  function drawBoneBody(rad, colors, bob, revived) {
+    ctx.translate(0, (bob || 0) * 0.3);
+    doodleInk(colors, Math.max(2, rad * 0.16));
+    ctx.strokeStyle = colors.ink;
+    ctx.fillStyle = '#f7f1e4';
+    inkLine(-rad * 0.16, rad * 0.12, -rad * 0.24, rad * 0.7, 2);
+    inkStroke();
+    inkLine(rad * 0.16, rad * 0.12, rad * 0.24, rad * 0.7, 2);
+    inkStroke();
+    inkLine(-rad * 0.26, -rad * 0.08, -rad * 0.52, rad * 0.16, 2);
+    inkStroke();
+    inkLine(rad * 0.26, -rad * 0.08, rad * 0.52, rad * 0.1, 2);
+    inkStroke();
+    inkCircle(0, 0, rad * 0.26, 12);
+    ctx.fill();
+    inkStroke();
+    inkCircle(0, -rad * 0.42, rad * 0.32, 14);
+    ctx.fill();
+    inkStroke();
+    ctx.fillStyle = revived ? '#e07a2f' : '#161616';
+    ctx.beginPath();
+    ctx.arc(-rad * 0.11, -rad * 0.46, rad * 0.07, 0, Math.PI * 2);
+    ctx.arc(rad * 0.11, -rad * 0.46, rad * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.12, -rad * 0.28);
+    ctx.lineTo(rad * 0.12, -rad * 0.28);
+    inkStroke();
   }
 
   function drawGruntBody(rad, colors, bob) {
@@ -10030,10 +10349,77 @@ function selectedTower() {
     inkStroke();
   }
 
+  function drawSkullKing(enemy, rad, colors) {
+    var t = state.time * 6 + (enemy.id || 0);
+    var step = Math.sin(t);
+    var casting = (enemy.castPose || 0) > 0;
+    ctx.fillStyle = colors.fill;
+    ctx.strokeStyle = colors.ink;
+    var hip = rad * 0.46;
+    inkLine(-rad * 0.16, hip, -rad * 0.24 + step * rad * 0.14, rad * 0.98, 2);
+    inkStroke();
+    inkLine(rad * 0.16, hip, rad * 0.24 - step * rad * 0.14, rad * 0.98, 2);
+    inkStroke();
+    inkCircle(0, rad * 0.08, rad * 0.32, 14);
+    ctx.fillStyle = '#f7f1e4';
+    ctx.fill();
+    inkStroke();
+    for (var rib = 0; rib < 3; rib++) {
+      ctx.beginPath();
+      ctx.arc(0, rad * (-0.02 + rib * 0.12), rad * 0.2, 0.2, Math.PI - 0.2);
+      inkStroke();
+    }
+    var lift = casting ? -rad * 0.62 : rad * 0.02;
+    var sway = casting ? Math.sin(state.time * 14) * rad * 0.06 : step * rad * 0.1;
+    inkLine(-rad * 0.28, -rad * 0.02, -rad * 0.64, lift + sway, 2);
+    inkStroke();
+    inkLine(rad * 0.28, 0, rad * 0.58, lift - sway * 0.35, 2);
+    inkStroke();
+    var staffX = rad * 0.62;
+    var staffTop = casting ? -rad * 1.2 : -rad * 0.82;
+    var staffBot = casting ? lift - sway * 0.35 + rad * 0.08 : rad * 0.28;
+    inkLine(staffX, staffBot, staffX, staffTop, 2);
+    inkStroke();
+    ctx.beginPath();
+    ctx.arc(staffX, staffTop, rad * 0.1, 0, Math.PI * 2);
+    ctx.fillStyle = casting ? '#ffb15a' : '#e07a2f';
+    ctx.fill();
+    ctx.strokeStyle = colors.ink;
+    ctx.stroke();
+    ctx.save();
+    ctx.rotate(casting ? -0.08 : step * 0.05);
+    inkCircle(0, -rad * 0.4, rad * 0.4, 16);
+    ctx.fillStyle = '#f7f1e4';
+    ctx.fill();
+    inkStroke();
+    ctx.fillStyle = '#161616';
+    ctx.beginPath();
+    ctx.arc(-rad * 0.14, -rad * 0.44, rad * 0.08, 0, Math.PI * 2);
+    ctx.arc(rad * 0.14, -rad * 0.44, rad * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0, -rad * 0.34);
+    ctx.lineTo(-rad * 0.05, -rad * 0.24);
+    ctx.lineTo(rad * 0.05, -rad * 0.24);
+    ctx.closePath();
+    ctx.fill();
+    var jaw = casting ? rad * 0.12 : rad * 0.03;
+    ctx.beginPath();
+    ctx.moveTo(-rad * 0.16, -rad * 0.22);
+    ctx.quadraticCurveTo(0, -rad * 0.06 + jaw, rad * 0.16, -rad * 0.22);
+    inkStroke();
+    ctx.restore();
+  }
+
   function drawBossBody(enemy, rad, colors, bob) {
     inkSeed = (enemy.bossId || 'x').charCodeAt(0) * 17 + Math.round(rad * 12);
     ctx.translate(0, bob * 0.3);
     doodleInk(colors, Math.max(2.4, rad * 0.14));
+    if (enemy.bossId === 'skull') {
+      drawSkullKing(enemy, rad, colors);
+      drawBossCrown(rad);
+      return;
+    }
     drawBossDoodle(enemy.bossId, rad, colors);
     drawBossCrown(rad);
   }
@@ -10193,6 +10579,7 @@ function selectedTower() {
       drawEnemyShadow(rad);
     }
     ctx.save();
+    if (enemy.type === 'bone' && enemy.rise > 0) ctx.scale(1 + enemy.rise * 0.4, 1 + enemy.rise * 0.4);
     if (enemy.boss) drawBossBody(enemy, rad, colors, bob);
     else if (enemy.type === 'shard') drawShardBody(rad, colors);
     else if (enemy.type === 'hopper') drawHopperBody(rad, colors, bob, !!enemy.jumping);
@@ -10200,6 +10587,7 @@ function selectedTower() {
     else if (enemy.type === 'swift') drawSwiftBody(rad, colors, bob);
     else if (enemy.type === 'brute') drawBruteBody(rad, colors, bob);
     else if (enemy.type === 'ram') drawRamBody(rad, colors, bob);
+    else if (enemy.type === 'bone') drawBoneBody(rad, colors, bob, !!enemy.revived);
     else drawGruntBody(rad, colors, bob);
     ctx.restore();
     ctx.restore();
@@ -10903,7 +11291,7 @@ function selectedTower() {
     });
     document.getElementById('home-next').addEventListener('click', function () {
       var stage = ensureHomePick();
-      var id = Math.min(8, stage.chapter + 1);
+      var id = Math.min(CHAPTERS.length, stage.chapter + 1);
       var pick = stageById(id + '-1');
       homePick = { chapter: pick.chapter, index: pick.index };
       paintPlayHome();
@@ -10967,7 +11355,11 @@ function selectedTower() {
       else if (event.key === '6') placeChosen('mint');
     });
     document.addEventListener('visibilitychange', function () { lastTs = 0; });
-    window.addEventListener('resize', resize);
+    window.addEventListener('resize', fitViewport);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', fitViewport);
+      window.visualViewport.addEventListener('scroll', fitViewport);
+    }
     if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   }
 
@@ -11038,7 +11430,7 @@ function selectedTower() {
   function boot() {
     bindUi();
     setRoute(buildInfinitePath());
-    resize();
+    fitViewport();
     showWelcome();
     syncSpeedButton();
     syncSoundButton();
