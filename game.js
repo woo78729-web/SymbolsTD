@@ -475,12 +475,17 @@
     try {
       var key = starsStorageKey();
       var raw = normalizeStarMap(JSON.parse(localStorage.getItem(key) || 'null'));
-      // 帳號第一次在這台裝置：沿用舊的本機進度，之後再跟雲端合併
-      if (!Object.keys(raw).length && key !== 'fantasy_td_stars') {
-        raw = normalizeStarMap(JSON.parse(localStorage.getItem('fantasy_td_stars') || '{}'));
+      // 帳號 key 永遠 OR 合併舊的本機進度，避免登入後把較高進度留在無帳號 key
+      if (key !== 'fantasy_td_stars') {
+        var legacy = normalizeStarMap(JSON.parse(localStorage.getItem('fantasy_td_stars') || '{}'));
+        raw = mergeStarMaps(raw, legacy);
       }
       if (!Object.keys(raw).length) raw = {};
-      return migrateLegacyStarBits(raw, key);
+      raw = migrateLegacyStarBits(raw, key);
+      if (key !== 'fantasy_td_stars') {
+        try { localStorage.setItem(key, JSON.stringify(raw)); } catch (error) { /* ignore */ }
+      }
+      return raw;
     } catch (error) { return {}; }
   }
 
@@ -3353,18 +3358,27 @@ function selectedTower() {
 
   function mergeStarMaps(a, b) {
     var out = {};
-    var seen = {};
     function eat(map) {
-      if (!map) return;
+      if (!map || typeof map !== 'object') return;
       var keys = Object.keys(map);
       for (var i = 0; i < keys.length; i++) {
         var id = keys[i];
-        seen[id] = 1;
-        out[id] = (out[id] || 0) | (map[id] || 0);
+        out[id] = (out[id] || 0) | (map[id] | 0);
       }
     }
     eat(a);
     eat(b);
+    return out;
+  }
+
+  function sanitizeStarMap(map) {
+    var out = {};
+    if (!map || typeof map !== 'object') return out;
+    var keys = Object.keys(map);
+    for (var i = 0; i < keys.length; i++) {
+      var n = map[keys[i]] | 0;
+      if (n > 0) out[keys[i]] = n;
+    }
     return out;
   }
 
@@ -3387,6 +3401,7 @@ function selectedTower() {
 
   var progressPushTimer = 0;
   var progressPullBusy = false;
+  var progressSyncBound = false;
 
   function queueCloudProgressPush() {
     if (progressPushTimer) clearTimeout(progressPushTimer);
@@ -3396,7 +3411,7 @@ function selectedTower() {
     }, 450);
   }
 
-  function buildUserCloudPayload(account) {
+  function buildUserCloudPayload(account, stars, deeds) {
     var best = profileBest();
     return {
       name: String((account && account.name) || '玩家').trim().slice(0, 24) || '玩家',
@@ -3404,15 +3419,45 @@ function selectedTower() {
       frame: frameUnlocked(account && account.frame) ? account.frame : '',
       title: titleUnlocked(account && account.title) ? account.title : '',
       bestLabel: best.label || '',
-      bestWave: best.wave || 0,
-      hellRank: hellRank(),
-      rankWeek: currentWeekKey(),
+      bestWave: best.wave | 0,
+      hellRank: hellRank() | 0,
+      rankWeek: currentWeekKey() | 0,
       guest: !!(account && account.guest),
       friendId: (account && account.friendId) || '',
-      stars: state.stars || {},
-      deeds: loadDeeds(),
+      stars: sanitizeStarMap(stars != null ? stars : state.stars),
+      deeds: deeds && typeof deeds === 'object' ? deeds : loadDeeds(),
       progressAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
+  }
+
+  // 交易讀→合併→寫，避免兩台裝置互蓋對方較高的星星
+  function syncUserProgressDoc(account) {
+    var latest = loadAccount() || account;
+    if (!validFriendId(latest.friendId)) return Promise.resolve(null);
+    var ref = cloudDb.collection('users').doc(latest.uid);
+    var localStars = mergeStarMaps(state.stars, loadStars());
+    var localDeeds = loadDeeds();
+    return cloudDb.runTransaction(function (tx) {
+      return tx.get(ref).then(function (doc) {
+        var data = doc.exists ? (doc.data() || {}) : {};
+        if (validFriendId(data.friendId) && data.friendId !== latest.friendId) {
+          latest.friendId = data.friendId;
+          saveAccount(latest);
+        }
+        var mergedStars = sanitizeStarMap(mergeStarMaps(localStars, data.stars || {}));
+        var mergedDeeds = mergeDeedsMaps(localDeeds, data.deeds || {});
+        var payload = buildUserCloudPayload(latest, mergedStars, mergedDeeds);
+        if (!validFriendId(payload.friendId)) return null;
+        tx.set(ref, payload, { merge: true });
+        return { stars: mergedStars, deeds: mergedDeeds, friendId: payload.friendId };
+      });
+    }).then(function (merged) {
+      if (!merged) return null;
+      state.stars = merged.stars;
+      try { localStorage.setItem(starsStorageKey(), JSON.stringify(merged.stars || {})); } catch (error) { /* ignore */ }
+      try { localStorage.setItem(deedsStorageKey(), JSON.stringify(merged.deeds || {})); } catch (error) { /* ignore */ }
+      return merged;
+    });
   }
 
   function pushCloudProgress() {
@@ -3420,9 +3465,7 @@ function selectedTower() {
     var account = loadAccount();
     if (!account || !progressAccountUid()) return Promise.resolve();
     return claimFriendId(account).then(function () {
-      var latest = loadAccount() || account;
-      if (!validFriendId(latest.friendId)) return null;
-      return cloudDb.collection('users').doc(latest.uid).set(buildUserCloudPayload(latest), { merge: true });
+      return syncUserProgressDoc(account);
     }).catch(function (error) {
       console.warn('cloud progress push failed', error && error.code, error && error.message);
     });
@@ -3435,28 +3478,17 @@ function selectedTower() {
     if (!account || !progressAccountUid()) return Promise.resolve();
     if (progressPullBusy) return Promise.resolve();
     progressPullBusy = true;
+    state.stars = loadStars();
     var beforeSum = starSum();
     var beforeId = account.friendId || '';
     return claimFriendId(account).then(function () {
-      var latest = loadAccount() || account;
-      return cloudDb.collection('users').doc(latest.uid).get().then(function (doc) {
-        var data = doc.exists ? (doc.data() || {}) : {};
-        if (validFriendId(data.friendId) && data.friendId !== latest.friendId) {
-          latest.friendId = data.friendId;
-          saveAccount(latest);
-        }
-        state.stars = mergeStarMaps(state.stars, data.stars || {});
-        var mergedDeeds = mergeDeedsMaps(loadDeeds(), data.deeds || {});
-        try { localStorage.setItem(starsStorageKey(), JSON.stringify(state.stars || {})); } catch (error) { /* ignore */ }
-        try { localStorage.setItem(deedsStorageKey(), JSON.stringify(mergedDeeds || {})); } catch (error) { /* ignore */ }
-        return pushCloudProgress().then(function () {
-          if (screenMenu && !screenMenu.hidden) paintPlayHome();
-          paintAccount();
-          renderFriendCode();
-          if (!opts.toast) return;
-          if (starSum() > beforeSum) toast('已同步關卡進度');
-          else if (validFriendId(latest.friendId) && latest.friendId !== beforeId) toast('已對齊帳號 ID');
-        });
+      return syncUserProgressDoc(account).then(function (merged) {
+        if (screenMenu && !screenMenu.hidden) paintPlayHome();
+        paintAccount();
+        renderFriendCode();
+        if (!opts.toast || !merged) return;
+        if (starSum() > beforeSum) toast('已同步關卡進度');
+        else if (validFriendId(merged.friendId) && merged.friendId !== beforeId) toast('已對齊帳號 ID');
       });
     }).catch(function (error) {
       console.warn('cloud progress pull failed', error && error.code, error && error.message);
@@ -3467,6 +3499,15 @@ function selectedTower() {
 
   function bindAccountProgress() {
     state.stars = loadStars();
+    if (!progressSyncBound) {
+      progressSyncBound = true;
+      window.addEventListener('focus', function () {
+        if (progressAccountUid()) pullCloudProgress({ toast: false });
+      });
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && progressAccountUid()) pullCloudProgress({ toast: false });
+      });
+    }
     return pullCloudProgress({ toast: true });
   }
 
@@ -7310,7 +7351,7 @@ function selectedTower() {
         '玩法：前八章整章首領特色；第九章魔王城',
         '首領：第五關尾波大王；前四關尾波小王',
         '難度：起始金 65；第 1 波一座 1 等可過，第 2 波起要升級或兩座塔',
-        '星星：先通關才算；廣告贈塔不算自己放的；同一 Google 換裝置會合併進度與好友 ID',
+        '星星：先通關才算；廣告贈塔不算自己放的；同一 Google 換裝置會合併較高關卡進度與好友 ID',
         '稱號：滿天星斗、魔王城征服者',
         '介面：選關進度、作戰星星位置、建造選單、目錄設定',
         '特效：各章能力施放效果',
@@ -7321,7 +7362,7 @@ function selectedTower() {
         '首領：有手腳大王只在 x-5 尾波；前四關尾波是小王（弱化能力、圓圓王圖）',
         '難度：起始金 65；第 1 波 4 普怪一座 1 等可過；第 2 波起快怪群＋更密，單座 1 等扛不住；精英約第 6 波起',
         '星星：必須真正通關才算其他星；每 5 波廣告贈塔不算自己建造',
-        '同步：Google 登入後，關卡星星、成就與好友 ID 跟帳號走；換手機／電腦會對齊同一個 ID，並合併較高進度',
+        '同步：Google 登入後，關卡星星、成就與好友 ID 跟帳號走；換手機／電腦對齊同一個 ID，並以較高進度合併（不會被另一台較少的進度蓋掉）',
         '稱號：累積 45 星「滿天星斗」；打通 9-5「魔王城征服者」',
         '介面：選關點在外框底邊；作戰星星在上方 HUD 下；建造選單點外面會收',
         '設定：目錄好友右側齒輪可開關音量、預設速度、輸入代碼、看更新細項、意見提供',
