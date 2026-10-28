@@ -3964,6 +3964,7 @@ function selectedTower() {
   }
 
   function startWave(n) {
+    dismissBuildMenu();
     Sfx.unlock();
     if (state.interestLeft > 0) {
       state.gold += 30;
@@ -7003,8 +7004,8 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/28',
-      title: '八章特色、小王、能力特效、有手腳的大王、星星條件上移',
-      detail: '前八章整章都帶該章首領的特色：再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲，小怪也算。第九章魔王城是骷髏王，會放隕石把塔炸暈；骷髏小怪打死會再站起來一次，半血。這一章跟地獄一樣，第 1 波轉 1 個詞綴，之後每 10 波再轉。選關的三顆星只顯示目前這一關拿到的顆數，放在章名下面。1 到 5 的關卡點坐在關卡圖外框底邊，不再另外畫一條線；未通關灰點有白底蓋住框線，數字會顯示，進度字放在點下面。有手腳的首領只會出現在 1-5、2-5、3-5、4-5、5-5、6-5、7-5、8-5、9-5 的最後一波。各章前四關的尾王改成小王，血比首領少、比小怪多，並帶該章能力的弱化版，外型統一用原來那張圓圓的王圖加黃冠，不另外畫再生小王。再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲施放時都會有各自的新特效：回血飄加號、狂暴衝刺殘影、召喚軌道點、六角護盾、分裂裂線、治癒十字、冰刺環、鐵甲鉚釘框，觸發瞬間還會爆一圈光。第五關首領會走路擺動，腳有腳掌、手有拳頭，畫法和骷髏王同一套。作戰時星星條件改放在上方狀態列下面，棋盤會往下讓一點，不會蓋住路徑。手機選關時，開始按鈕會留在畫面上；螢幕不夠高，關卡圖會縮小，不會被底下的模式列蓋住。',
+      title: '八章特色、小王、能力特效、有手腳的大王、星星條件上移、建造選單',
+      detail: '前八章整章都帶該章首領的特色：再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲，小怪也算。第九章魔王城是骷髏王，會放隕石把塔炸暈；骷髏小怪打死會再站起來一次，半血。這一章跟地獄一樣，第 1 波轉 1 個詞綴，之後每 10 波再轉。選關的三顆星只顯示目前這一關拿到的顆數，放在章名下面。1 到 5 的關卡點坐在關卡圖外框底邊，不再另外畫一條線；未通關灰點有白底蓋住框線，數字會顯示，進度字放在點下面。有手腳的首領只會出現在 1-5、2-5、3-5、4-5、5-5、6-5、7-5、8-5、9-5 的最後一波。各章前四關的尾王改成小王，血比首領少、比小怪多，並帶該章能力的弱化版，外型統一用原來那張圓圓的王圖加黃冠，不另外畫再生小王。再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲施放時都會有各自的新特效：回血飄加號、狂暴衝刺殘影、召喚軌道點、六角護盾、分裂裂線、治癒十字、冰刺環、鐵甲鉚釘框，觸發瞬間還會爆一圈光。第五關首領會走路擺動，腳有腳掌、手有拳頭，畫法和骷髏王同一套。作戰時星星條件改放在上方狀態列下面，棋盤會往下讓一點，不會蓋住路徑。點開建造選單後，點外面、開始波次、加速或暫停都會自動收起，不會一直佔畫面。手機選關時，開始按鈕會留在畫面上；螢幕不夠高，關卡圖會縮小，不會被底下的模式列蓋住。',
     },
     {
       date: '10/27',
@@ -8475,6 +8476,7 @@ function selectedTower() {
   function openTowerInfo() { showIndex('towers'); }
 
   function togglePause() {
+    dismissBuildMenu();
     if (state.phase === 'menu' || state.phase === 'gameover' || state.phase === 'victory') return;
     if (modal.classList.contains('is-open') && !state.userPaused) return;
     if (state.userPaused) {
@@ -9099,6 +9101,7 @@ function selectedTower() {
   }
 
   function cycleSpeed() {
+    dismissBuildMenu();
     state.speed = state.speed === 1 ? 2 : (state.speed === 2 ? 4 : 1);
     syncSpeedButton();
     Sfx.ui();
@@ -11811,6 +11814,13 @@ function selectedTower() {
     return !!heroAtPoint(point.x, point.y);
   }
 
+  function dismissBuildMenu() {
+    if (!state.buildSite) return false;
+    state.buildSite = null;
+    state.buildMenu = 'root';
+    return true;
+  }
+
   function handleTap(clientX, clientY) {
     if (modal.classList.contains('is-open') || state.adBusy) return;
     if (state.phase === 'gameover' || state.phase === 'menu') return;
@@ -11825,7 +11835,13 @@ function selectedTower() {
           return;
         }
       }
-      if (pointInRect(point.x, point.y, menu)) return;
+      // 點選單空白或畫面其他地方就收起，不要一直佔著
+      dismissBuildMenu();
+      if (pointInRect(point.x, point.y, menu)) {
+        Sfx.ui();
+        renderInspector();
+        return;
+      }
     }
     var cell = cellAt(point.x, point.y);
     if (!cell) {
@@ -11975,6 +11991,7 @@ function selectedTower() {
     waveBtn.addEventListener('click', function () {
       if (state.adBusy) return;
       if (state.hellWheel) return;
+      dismissBuildMenu();
       if (state.pickMode === 'level' || state.pickMode === 'heroPlace') {
         toast('先完成卡牌選擇');
         return;
@@ -11997,11 +12014,15 @@ function selectedTower() {
         return;
       }
       if (state.phase !== 'prep' && state.phase !== 'combat' && state.phase !== 'edit' && !countdownBuildOpen()) return;
+      dismissBuildMenu();
       state.pickMode = 'wall';
       state.banner = { text: '阻擋物', sub: '點道路，擋住怪物 10 秒', life: 4 };
       toast('點在道路上');
     });
-    itemPushBtn.addEventListener('click', usePush);
+    itemPushBtn.addEventListener('click', function () {
+      dismissBuildMenu();
+      usePush();
+    });
     routeBar.addEventListener('click', function (event) {
       var tile = event.target.closest('[data-tile]');
       if (!tile || tile.disabled) return;
