@@ -7034,8 +7034,16 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/28',
-      title: '八章特色、小王、能力特效、有手腳的大王、稱號、星星先通關、關卡難度、贈塔不影響星星',
-      detail: '前八章整章都帶該章首領的特色：再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲，小怪也算。第九章魔王城是骷髏王，會放隕石把塔炸暈；骷髏小怪打死會再站起來一次，半血。這一章跟地獄一樣，第 1 波轉 1 個詞綴，之後每 10 波再轉。選關的三顆星只顯示目前這一關拿到的顆數，放在章名下面。1 到 5 的關卡點坐在關卡圖外框底邊，不再另外畫一條線；未通關灰點有白底蓋住框線，數字會顯示，進度字放在點下面。有手腳的首領只會出現在 1-5、2-5、3-5、4-5、5-5、6-5、7-5、8-5、9-5 的最後一波。各章前四關的尾王改成小王，血比首領少、比小怪多，並帶該章能力的弱化版，外型統一用原來那張圓圓的王圖加黃冠，不另外畫再生小王。再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲施放時都會有各自的新特效：回血飄加號、狂暴衝刺殘影、召喚軌道點、六角護盾、分裂裂線、治癒十字、冰刺環、鐵甲鉚釘框，觸發瞬間還會爆一圈光。第五關首領會走路擺動，腳有腳掌、手有拳頭，畫法和骷髏王同一套。作戰時星星條件改放在上方狀態列下面，棋盤會往下讓一點，不會蓋住路徑。點開建造選單後，點外面、開始波次、加速或暫停都會自動收起，不會一直佔畫面。新增兩個稱號：累積 45 星可選「滿天星斗」，打通 9-5 可選「魔王城征服者」。關卡星星一定要先通關才會計算其他條件，進關再出來不會直接解完。手機選關時，開始按鈕會留在畫面上；螢幕不夠高，關卡圖會縮小，不會被底下的模式列蓋住。關卡平衡有調：前兩波手感差不多，同一關中後段怪會持續變硬、變多，後面章節也會明顯更難；後面關起始金幣會多一點，讓你有空間布陣，但還是要認真打才過得去。每 5 波看廣告送的塔（含低機率英雄）不算自己放的，不會讓「不放某塔」「不放英雄」這些星星條件失敗。',
+      title: '章節特色、小王／大王、稱號、星星與難度',
+      detail: [
+        '玩法：前八章整章首領特色；第九章魔王城',
+        '首領：第五關尾波大王；前四關尾波小王',
+        '難度：關卡中後段加難；後面關起始金略增',
+        '星星：先通關才算；廣告贈塔不算自己放的',
+        '稱號：滿天星斗、魔王城征服者',
+        '介面：選關進度、作戰星星位置、建造選單',
+        '特效：各章能力施放效果',
+      ],
     },
     {
       date: '10/27',
@@ -7109,6 +7117,26 @@ function selectedTower() {
     },
   ];
 
+  function fillNoticeDetail(el, detail) {
+    el.replaceChildren();
+    var lines = Array.isArray(detail)
+      ? detail.filter(function (line) { return !!line; })
+      : String(detail || '').split(/\n+/).map(function (line) { return line.trim(); }).filter(Boolean);
+    if (!lines.length) return;
+    if (lines.length === 1 && !Array.isArray(detail)) {
+      el.textContent = lines[0];
+      return;
+    }
+    var ul = document.createElement('ul');
+    ul.className = 'notice-outline';
+    lines.forEach(function (line) {
+      var li = document.createElement('li');
+      li.textContent = line;
+      ul.appendChild(li);
+    });
+    el.appendChild(ul);
+  }
+
   function renderPatchNotes(notes, page) {
     var list = document.getElementById('modal-notes');
     if (!list) return;
@@ -7134,10 +7162,10 @@ function selectedTower() {
       title.textContent = note.title;
       var more = document.createElement('span');
       more.className = 'notice-more';
-      more.textContent = '細項';
+      more.textContent = '大綱';
       var detail = document.createElement('span');
       detail.className = 'notice-detail';
-      detail.textContent = note.detail;
+      fillNoticeDetail(detail, note.detail);
       item.appendChild(date);
       item.appendChild(more);
       item.appendChild(title);
@@ -7145,7 +7173,7 @@ function selectedTower() {
       item.addEventListener('click', function () {
         var open = item.classList.toggle('is-open');
         item.setAttribute('aria-expanded', open ? 'true' : 'false');
-        more.textContent = open ? '收合' : '細項';
+        more.textContent = open ? '收合' : '大綱';
       });
       list.appendChild(item);
     });
@@ -7177,7 +7205,7 @@ function selectedTower() {
       tone: 'reward',
       kicker: '公告',
       title: '更新資訊',
-      desc: '一頁五則。點一則就能看細項。',
+      desc: '一頁五則。點一則看分類大綱；詳細說明之後會放到網站。',
       notes: PATCH_NOTES,
       actions: [{ label: '知道了', className: 'btn-ghost is-exit', onClick: closeModal }],
     });
