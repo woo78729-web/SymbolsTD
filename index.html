@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="description" content="直式塔防小遊戲，可透過 Capacitor 打包，並預留 Google AdMob 獎勵與插頁廣告。" />
   <title>SymbolsTD</title>
-  <link rel="stylesheet" href="style.css?v=96" />
+  <link rel="stylesheet" href="style.css?v=107" />
 </head>
 <body>
   <svg style="position: absolute; width: 0; height: 0; pointer-events: none;" aria-hidden="true">
@@ -76,29 +76,31 @@
           <button type="button" class="home-tool sketch-box" id="btn-open-board" aria-label="排行榜"><svg viewBox="0 0 24 24" aria-hidden="true" ><path d="M8 4h8v6a4 4 0 0 1-8 0V4z" fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 6.5H5.2A2.4 2.4 0 0 0 8 10M16 6.5h2.8A2.4 2.4 0 0 1 16 10M12 14v3M9 19.5h6" fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>排行</button>
           <button type="button" class="home-tool sketch-box" id="btn-open-friends" aria-label="加好友"><svg viewBox="0 0 24 24" aria-hidden="true" ><circle cx="9" cy="8" r="2.4" fill="none" stroke="#1a1a1a" stroke-width="2.5"/><circle cx="16" cy="9" r="1.9" fill="none" stroke="#1a1a1a" stroke-width="2.5"/><path d="M4 18.2c.6-2.4 2.6-3.8 5-3.8s4.4 1.4 5 3.8M14.2 14.8c1.5-.2 2.8.4 3.6 1.5.5.7.8 1.4.9 2" fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>好友</button>
         </nav>
-        <div class="home-stars-wrap">
-          <button type="button" class="home-stars" id="home-stars" aria-expanded="false" aria-controls="home-goals">
-            <svg class="home-star-art" viewBox="0 0 152 48" aria-hidden="true">
-              <path class="home-star-pip" transform="translate(-12,-32)" d="M38 36L42.9 51.2L58.9 51.2L46 60.6L50.9 75.8L38 66.4L25.1 75.8L30 60.6L17.1 51.2L33.1 51.2Z" />
-              <path class="home-star-pip" transform="translate(38,-32)" d="M38 36L42.9 51.2L58.9 51.2L46 60.6L50.9 75.8L38 66.4L25.1 75.8L30 60.6L17.1 51.2L33.1 51.2Z" />
-              <path class="home-star-pip" transform="translate(88,-32)" d="M38 36L42.9 51.2L58.9 51.2L46 60.6L50.9 75.8L38 66.4L25.1 75.8L30 60.6L17.1 51.2L33.1 51.2Z" />
-            </svg>
-          </button>
-          <div class="home-goal-pop" id="home-goals" hidden></div>
-        </div>
       </header>
       <div class="home-body">
         <div class="home-stage">
           <p class="home-kicker" id="home-chapter-kicker">章節 1</p>
           <h2 id="home-chapter-name">潮濕藤蔓地牢</h2>
-          <p class="home-progress" id="home-progress">進度 0/5</p>
+          <div class="home-stars-wrap">
+            <button type="button" class="home-stars" id="home-stars" aria-expanded="false" aria-controls="home-goals">
+              <svg class="home-star-art" viewBox="0 0 152 48" aria-hidden="true">
+                <path class="home-star-pip" transform="translate(-12,-32)" d="M38 36L42.9 51.2L58.9 51.2L46 60.6L50.9 75.8L38 66.4L25.1 75.8L30 60.6L17.1 51.2L33.1 51.2Z" />
+                <path class="home-star-pip" transform="translate(38,-32)" d="M38 36L42.9 51.2L58.9 51.2L46 60.6L50.9 75.8L38 66.4L25.1 75.8L30 60.6L17.1 51.2L33.1 51.2Z" />
+                <path class="home-star-pip" transform="translate(88,-32)" d="M38 36L42.9 51.2L58.9 51.2L46 60.6L50.9 75.8L38 66.4L25.1 75.8L30 60.6L17.1 51.2L33.1 51.2Z" />
+              </svg>
+            </button>
+            <div class="home-goal-pop" id="home-goals" hidden></div>
+          </div>
           <div class="home-frame sketch-box">
             <button type="button" class="home-arrow sketch-circle" id="home-prev" aria-label="上一章">‹</button>
             <img id="home-art" alt="" />
             <p class="home-lock" id="home-lock" hidden>未解鎖</p>
             <button type="button" class="home-arrow sketch-circle is-next" id="home-next" aria-label="下一章">›</button>
           </div>
-          <div class="home-stages" id="home-stages"></div>
+          <div class="home-track">
+            <div class="home-stages" id="home-stages"></div>
+            <p class="home-progress" id="home-progress">進度 0/5</p>
+          </div>
           <p class="home-reward-label"><span>獎勵</span></p>
           <div class="home-rewards">
             <div class="home-reward sketch-box"><b id="home-waves">12</b><span>波次</span></div>
@@ -316,6 +318,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script src="admob-bridge.js"></script>
-  <script src="game.js?v=91"></script>
+  <script src="game.js?v=102"></script>
 </body>
 </html>

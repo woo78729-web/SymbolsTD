@@ -985,6 +985,7 @@
     var waves = [];
     for (var w = 1; w <= count; w++) {
       var boss = stage === 5 && w === count;
+      var elite = stage < 5 && w === count;
       var beat = Math.max(1, Math.ceil((w / count) * 10));
       var grunts = 4 + beat + (chapter >= 5 ? 1 : 0);
       var swifts = 1;
@@ -1001,7 +1002,7 @@
         else if (stage === 4) bones = w >= 3 ? (w % 2 === 0 ? 2 : 1) : 0;
         else bones = w >= 4 ? 2 : (w >= 2 ? 1 : 0);
       }
-      waves.push({ grunts: grunts, swifts: swifts, brutes: brutes, bones: bones, boss: boss });
+      waves.push({ grunts: grunts, swifts: swifts, brutes: brutes, bones: bones, boss: boss, elite: elite });
     }
     return waves;
   }
@@ -1341,6 +1342,11 @@ function selectedTower() {
     for (var b = 0; b < spec.brutes; b++) jobs.push({ type: 'brute', gap: 1.15 });
     var bones = spec.bones || 0;
     for (var bone = 0; bone < bones; bone++) jobs.push({ type: 'bone', gap: gap });
+    var elite = null;
+    if (spec.elite) {
+      elite = chapterEliteDef();
+      jobs.push({ type: 'elite', gap: 1.45 });
+    }
     var boss = null;
     if (spec.boss) {
       if (state.chapter === 9) {
@@ -1351,7 +1357,51 @@ function selectedTower() {
         jobs.push({ type: 'boss', gap: 1.7, bossIndex: bossIndexFor(wave) });
       }
     }
-    return { jobs: jobs, grunts: grunts, swifts: swifts, brutes: spec.brutes, bones: bones, boss: boss };
+    return { jobs: jobs, grunts: grunts, swifts: swifts, brutes: spec.brutes, bones: bones, elite: elite, boss: boss };
+  }
+
+  function chapterEliteDef() {
+    if (state.chapter === 9) {
+      return { id: 'skull', name: '骷髏小王', blurb: '偶爾放一顆隕石，把塔炸暈一下', color: '#f4efe4' };
+    }
+    var boss = BOSSES[Math.max(0, (state.chapter || 1) - 1) % BOSSES.length];
+    return {
+      id: boss.id,
+      name: boss.name.replace(/王$/, '小王'),
+      blurb: boss.blurb,
+      color: boss.color,
+    };
+  }
+
+  function makeElite(wave) {
+    var def = chapterEliteDef();
+    var body = makeEnemy('grunt', wave);
+    var hp = Math.round(body.maxHp * 4.2);
+    body.type = 'elite';
+    body.elite = true;
+    body.bossId = def.id;
+    body.name = def.name;
+    body.ability = def.blurb;
+    body.hp = hp;
+    body.maxHp = hp;
+    body.speed *= 0.78;
+    body.baseSpeed = body.speed;
+    body.gold = Math.max(6, 6 + wave * 2);
+    body.radius = 0.42;
+    body.leak = 2;
+    body.color = def.color || body.color;
+    body.shield = def.id === 'ward' ? Math.max(1, Math.round(hp * 0.1)) : 0;
+    body.shieldCut = body.shield > 0 ? 1 : 0;
+    body.summonTimer = 7.5;
+    body.meteorTimer = 6.5;
+    body.meteorCount = 1;
+    body.frostTimer = 7;
+    body.wardTimer = 8;
+    body.mendAcc = 0;
+    body.mendPower = Math.max(4, Math.round(hp * 0.06));
+    body.splitHp = Math.max(1, Math.round(hp * 0.32));
+    body.pulse = 0;
+    return body;
   }
 
   var INFINITE_PROFILES = {
@@ -1838,7 +1888,8 @@ function selectedTower() {
 
   function applyHellBossDeff(plan) {
     if (!plan || !hasHellDeff('boss')) return plan;
-    if (plan.boss) return plan;
+    if (plan.boss || plan.elite) return plan;
+    if (state.mode === 'campaign' && state.stagePlan && state.stagePlan.index < 5) return plan;
     var idx = Math.floor(Math.random() * BOSSES.length);
     plan.boss = BOSSES[idx];
     plan.jobs = plan.jobs ? plan.jobs.slice() : [];
@@ -2085,6 +2136,7 @@ function selectedTower() {
     if (plan.swifts) parts.push(pair[1].name + ' ' + plan.swifts);
     if (plan.brutes) parts.push(pair[0].name + '精英 ' + plan.brutes);
     if (plan.bones) parts.push('骷髏小怪 ' + plan.bones);
+    if (plan.elite) parts.push(plan.elite.name);
     if (plan.boss) parts.push(plan.boss.name);
     return parts.join(' · ');
   }
@@ -3853,6 +3905,59 @@ function selectedTower() {
     while (state.particles.length > 180) state.particles.shift();
   }
 
+  var ABILITY_FX_COLOR = {
+    regen: '#3ecf8e',
+    rush: '#ff5a36',
+    summon: '#f2c14e',
+    ward: '#67e8f9',
+    split: '#c084fc',
+    mend: '#ff8fab',
+    frost: '#9bd4ff',
+    armor: '#8aa0b8',
+    skull: '#e07a2f',
+  };
+
+  function markAbilityFx(enemy, kind) {
+    enemy.abilityFx = 0.55;
+    enemy.abilityFxKind = kind;
+    var pos = enemyPos(enemy);
+    var color = ABILITY_FX_COLOR[kind] || '#161616';
+    burst(pos.x, pos.y, color, kind === 'rush' ? 14 : 10);
+    if (kind === 'ward') shatterShieldFx(pos.x, pos.y);
+    else if (kind === 'frost') {
+      for (var i = 0; i < 8; i++) {
+        var ang = (Math.PI * 2 * i) / 8;
+        state.particles.push({
+          x: pos.x, y: pos.y,
+          vx: Math.cos(ang) * 1.4,
+          vy: Math.sin(ang) * 1.4,
+          life: 0.4,
+          max: 0.4,
+          color: '#9bd4ff',
+          size: 0.09,
+          shard: true,
+          ang: ang,
+        });
+      }
+    } else if (kind === 'split') {
+      for (var s = 0; s < 6; s++) {
+        var sa = (Math.PI * 2 * s) / 6;
+        state.particles.push({
+          x: pos.x, y: pos.y,
+          vx: Math.cos(sa) * 1.6,
+          vy: Math.sin(sa) * 1.6,
+          life: 0.36,
+          max: 0.36,
+          color: '#c084fc',
+          size: 0.1,
+          shard: true,
+          ang: sa,
+        });
+      }
+    }
+    while (state.particles.length > 180) state.particles.shift();
+  }
+
   function spawnFloater(x, y, text, color) {
     state.floaters.push({ x: x, y: y, text: text, color: color, life: 0.75, vy: -0.85 });
     if (state.floaters.length > 36) state.floaters.shift();
@@ -3882,9 +3987,11 @@ function selectedTower() {
     if (refreshed && deffText) toast((chapterHasKit('wheel') ? '魔王城' : '地獄') + '詞綴 · ' + deffText);
     state.banner = plan.boss
       ? { text: '第 ' + n + ' 波 · ' + plan.boss.name, sub: deffText || plan.boss.blurb, life: 3.2 }
-      : { text: '第 ' + n + ' 波', sub: deffText || compositionText(plan), life: 2.2 };
+      : (plan.elite
+        ? { text: '第 ' + n + ' 波 · ' + plan.elite.name, sub: plan.elite.blurb, life: 2.8 }
+        : { text: '第 ' + n + ' 波', sub: deffText || compositionText(plan), life: 2.2 });
     if (state.mode === 'infinite' || state.mode === 'custom') markBest(n);
-    if (plan.boss) Sfx.boss();
+    if (plan.boss || plan.elite) Sfx.boss();
     else Sfx.fanfare();
     syncHud();
   }
@@ -3919,7 +4026,9 @@ function selectedTower() {
       ? makeSkull(state.wave, job.kit)
       : (job.type === 'titan'
         ? makeTitan(state.wave, job.traits)
-        : (job.type === 'boss' ? makeBoss(job.bossIndex, state.wave) : makeEnemy(job.type, state.wave)));
+        : (job.type === 'elite'
+          ? makeElite(state.wave)
+          : (job.type === 'boss' ? makeBoss(job.bossIndex, state.wave) : makeEnemy(job.type, state.wave))));
     applyHellSpawnStats(spawned);
     applyChapterSpawn(spawned);
     state.enemies.push(spawned);
@@ -3983,16 +4092,17 @@ function selectedTower() {
           enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * regenRate * dt * healScale(enemy));
         }
       }
-      if (chapterHasKit('regen') && !enemy.boss && enemy.hp < enemy.maxHp) {
+      if (chapterHasKit('regen') && !enemy.boss && !enemy.elite && enemy.hp < enemy.maxHp) {
         if (healBlocked(enemy)) triggerPoisonCounter(enemy);
         else enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.015 * dt * healScale(enemy));
       }
-      if (chapterHasKit('rush') && !enemy.boss && !enemy.kitRushed && enemy.hp <= enemy.maxHp * 0.5) {
+      if (chapterHasKit('rush') && !enemy.boss && !enemy.elite && !enemy.kitRushed && enemy.hp <= enemy.maxHp * 0.5) {
         enemy.kitRushed = true;
         enemy.speed *= 1.45;
         if (enemy.baseSpeed) enemy.baseSpeed *= 1.45;
         var rushPos = enemyPos(enemy);
         spawnFloater(rushPos.x, rushPos.y - 0.55, '狂暴', '#ff5a36');
+        markAbilityFx(enemy, 'rush');
       }
       var enrageMul = hellDeffValue('enrage');
       if (enrageMul > 0 && !enemy.hellEnraged && enemy.hp <= enemy.maxHp * 0.1) {
@@ -4023,6 +4133,7 @@ function selectedTower() {
         if (enemy.dead) continue;
       }
       if (enemy.boss) tickBoss(enemy, dt);
+      else if (enemy.elite) tickElite(enemy, dt);
     }
     spreadAilments();
   }
@@ -4201,8 +4312,108 @@ function selectedTower() {
     }
   }
 
+  function tickElite(enemy, dt) {
+    enemy.pulse = (enemy.pulse || 0) + dt;
+    if (enemy.abilityFx > 0) enemy.abilityFx -= dt;
+    if (enemy.regenShow > 0) enemy.regenShow -= dt;
+    var pos = pointAt(enemy.dist);
+    var id = enemy.bossId;
+    if (id === 'skull') {
+      enemy.castPose = Math.max(0, (enemy.castPose || 0) - dt);
+      enemy.meteorTimer = (enemy.meteorTimer == null ? 6.5 : enemy.meteorTimer) - dt;
+      if (enemy.meteorTimer <= 0) {
+        enemy.meteorTimer = 8.5;
+        enemy.meteorCount = 1;
+        castSkullMeteors(enemy);
+        markAbilityFx(enemy, 'skull');
+      }
+      return;
+    }
+    if (id === 'regen' && enemy.hp < enemy.maxHp) {
+      if (healBlocked(enemy)) {
+        if (enemy.poisonTime > 0 || enemy.poisonRuin) triggerPoisonCounter(enemy);
+      } else {
+        var before = enemy.hp;
+        enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.02 * dt * healScale(enemy));
+        if (enemy.hp > before && enemy.regenShow <= 0) {
+          enemy.regenShow = 1.1;
+          markAbilityFx(enemy, 'regen');
+        }
+      }
+    }
+    if (id === 'rush' && !enemy.enraged && enemy.hp <= enemy.maxHp * 0.6) {
+      enemy.enraged = true;
+      enemy.kitRushed = true;
+      enemy.speed = (enemy.baseSpeed || enemy.speed) * 1.55;
+      spawnFloater(pos.x, pos.y - 0.55, '狂暴', '#ff5a36');
+      markAbilityFx(enemy, 'rush');
+    }
+    if (id === 'summon') {
+      enemy.summonTimer = (enemy.summonTimer == null ? 7.5 : enemy.summonTimer) - dt;
+      if (enemy.summonTimer <= 0 && state.enemies.length + state.pendingSpawns.length < 24) {
+        enemy.summonTimer = 9;
+        var minion = makeEnemy('grunt', state.wave);
+        minion.dist = Math.max(0, enemy.dist - 0.4);
+        queueEnemy(minion);
+        spawnFloater(pos.x, pos.y - 0.55, '召喚', '#f2c14e');
+        markAbilityFx(enemy, 'summon');
+      }
+    }
+    if (id === 'ward' && enemy.shield <= 0) {
+      enemy.wardTimer = (enemy.wardTimer == null ? 8 : enemy.wardTimer) - dt;
+      if (enemy.wardTimer <= 0) {
+        enemy.wardTimer = 10;
+        enemy.shield = Math.max(1, Math.round(enemy.maxHp * 0.1));
+        enemy.shieldCut = 1;
+        tightenShield(enemy);
+        spawnFloater(pos.x, pos.y - 0.55, '護盾', '#67e8f9');
+        markAbilityFx(enemy, 'ward');
+      }
+    }
+    if (id === 'frost') {
+      enemy.frostTimer = (enemy.frostTimer == null ? 7 : enemy.frostTimer) - dt;
+      if (enemy.frostTimer <= 0) {
+        enemy.frostTimer = 9;
+        for (var t = 0; t < state.towers.length; t++) {
+          state.towers[t].chill = Math.max(state.towers[t].chill || 0, 0.55);
+        }
+        spawnFloater(pos.x, pos.y - 0.55, '冰封', '#9bd4ff');
+        markAbilityFx(enemy, 'frost');
+      }
+    }
+    if (id === 'mend') {
+      enemy.mendAcc = (enemy.mendAcc || 0) + dt;
+      if (enemy.mendAcc >= 1.4) {
+        enemy.mendAcc = 0;
+        if (healBlocked(enemy)) {
+          if (enemy.poisonTime > 0 || enemy.poisonRuin) triggerPoisonCounter(enemy);
+        } else {
+          var mended = false;
+          for (var i = 0; i < state.enemies.length; i++) {
+            var other = state.enemies[i];
+            if (other === enemy || other.dead || other.hp >= other.maxHp) continue;
+            var otherPos = pointAt(other.dist);
+            if (Math.hypot(otherPos.x - pos.x, otherPos.y - pos.y) > 1.35) continue;
+            if (healBlocked(other)) continue;
+            var heal = Math.min(other.maxHp - other.hp, Math.max(2, Math.round(other.maxHp * 0.04 * healScale(other))));
+            other.hp += heal;
+            other.regenShow = Math.max(other.regenShow || 0, 0.7);
+            mended = true;
+          }
+          if (mended) {
+            spawnFloater(pos.x, pos.y - 0.55, '治癒', '#ff8fab');
+            markAbilityFx(enemy, 'mend');
+          }
+        }
+      }
+    }
+    if (id === 'split') enemy.splitGlow = true;
+    if (id === 'armor') enemy.armorGlow = true;
+  }
+
   function tickBoss(enemy, dt) {
     enemy.pulse += dt;
+    if (enemy.abilityFx > 0) enemy.abilityFx -= dt;
     var pos = pointAt(enemy.dist);
     if (enemy.bossId === 'skull') {
       enemy.castPose = Math.max(0, (enemy.castPose || 0) - dt);
@@ -4210,6 +4421,7 @@ function selectedTower() {
       if (enemy.meteorTimer <= 0) {
         enemy.meteorTimer = 4.8;
         castSkullMeteors(enemy);
+        markAbilityFx(enemy, 'skull');
       }
     }
     if (bossHas(enemy, 'regen')) {
@@ -4223,6 +4435,7 @@ function selectedTower() {
         if (enemy.hp > before && enemy.hp < enemy.maxHp && enemy.regenShow <= 0) {
           enemy.regenShow = 1.15;
           spawnFloater(pos.x, pos.y - 0.6, '回復', '#3ecf8e');
+          markAbilityFx(enemy, 'regen');
         }
       }
     }
@@ -4231,6 +4444,7 @@ function selectedTower() {
         enemy.enraged = true;
         enemy.speed = enemy.baseSpeed * 2.2;
         spawnFloater(pos.x, pos.y - 0.6, '狂暴', '#ff5a36');
+        markAbilityFx(enemy, 'rush');
       }
     }
     if (bossHas(enemy, 'summon')) {
@@ -4241,6 +4455,7 @@ function selectedTower() {
         minion.dist = Math.max(0, enemy.dist - 0.45);
         queueEnemy(minion);
         spawnFloater(pos.x, pos.y - 0.6, '召喚', '#f2c14e');
+        markAbilityFx(enemy, 'summon');
       }
     }
     if (bossHas(enemy, 'ward')) {
@@ -4252,6 +4467,7 @@ function selectedTower() {
           enemy.shieldCut = 1;
           tightenShield(enemy);
           spawnFloater(pos.x, pos.y - 0.6, '護盾', '#67e8f9');
+          markAbilityFx(enemy, 'ward');
         }
       }
     }
@@ -4264,7 +4480,7 @@ function selectedTower() {
           state.towers[t].chill = 0.85;
         }
         spawnFloater(pos.x, pos.y - 0.6, '冰封', '#9bd4ff');
-        burst(pos.x, pos.y, '#9bd4ff', 12);
+        markAbilityFx(enemy, 'frost');
       }
     }
     if (bossHas(enemy, 'mend')) {
@@ -4274,6 +4490,7 @@ function selectedTower() {
         if (healBlocked(enemy)) {
           if (enemy.poisonTime > 0 || enemy.poisonRuin) triggerPoisonCounter(enemy);
         } else {
+          var mended = false;
           for (var i = 0; i < state.enemies.length; i++) {
             var other = state.enemies[i];
             if (other === enemy || other.dead || other.hp >= other.maxHp) continue;
@@ -4289,11 +4506,14 @@ function selectedTower() {
             }
             var heal = Math.min(other.maxHp - other.hp, enemy.mendPower * healScale(other));
             other.hp += heal;
+            other.regenShow = Math.max(other.regenShow || 0, 0.7);
+            mended = true;
             if (state.time - (other.lastMend || 0) > 0.9) {
               other.lastMend = state.time;
               spawnFloater(otherPos.x, otherPos.y - 0.35, '+' + heal, '#ff8fab');
             }
           }
+          if (mended) markAbilityFx(enemy, 'mend');
         }
       }
     }
@@ -6092,9 +6312,10 @@ function selectedTower() {
       }
     }
     var kitArmor = chapterHasKit('armor') && !enemy.boss;
+    var eliteArmor = !!(enemy.elite && bossHas(enemy, 'armor'));
     var pierceArmor = opts.pierce || enemy.firePierce || (enemy.burnTime > 0 && (bossHas(enemy, 'armor') || kitArmor));
-    if (bossHas(enemy, 'armor') && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.5));
-    else if (kitArmor && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.75));
+    if (bossHas(enemy, 'armor') && !enemy.elite && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.5));
+    else if ((eliteArmor || kitArmor) && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.75));
     if (enemy.shield > 0 && !opts.ignoreShield) {
       var blocked = Math.min(enemy.shield, damage);
       enemy.shield -= blocked;
@@ -6168,7 +6389,8 @@ function selectedTower() {
     if (enemy.dead) return;
     enemy.dead = true;
     if (bossHas(enemy, 'split')) {
-      for (var s = 0; s < 3; s++) {
+      var splitCount = enemy.elite ? 2 : 3;
+      for (var s = 0; s < splitCount; s++) {
         var shard = makeEnemy('swift', state.wave);
         shard.type = 'shard';
         shard.hp = enemy.splitHp;
@@ -6180,13 +6402,14 @@ function selectedTower() {
         shard.resist = '';
         shard.flying = false;
         shard.noSplit = true;
-        shard.dist = Math.max(0, Math.min(enemy.dist + (s - 1) * 0.22, WAYPOINTS.length - 1.05));
+        shard.dist = Math.max(0, Math.min(enemy.dist + (s - (splitCount - 1) / 2) * 0.22, WAYPOINTS.length - 1.05));
         queueEnemy(shard);
       }
       var splitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(splitPos.x, splitPos.y - 0.5, '分裂', '#c084fc');
+      markAbilityFx(enemy, 'split');
     }
-    if (chapterHasKit('split') && !enemy.boss && !enemy.noSplit && enemy.type !== 'shard') {
+    if (chapterHasKit('split') && !enemy.boss && !enemy.elite && !enemy.noSplit && enemy.type !== 'shard') {
       var kitChildHp = Math.max(1, Math.round(enemy.maxHp * 0.3));
       for (var ks = 0; ks < 2; ks++) {
         var kitChild = makeEnemy('grunt', state.wave);
@@ -6776,8 +6999,8 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/28',
-      title: '八章特色、第九章轉盤',
-      detail: '前八章整章都帶該章首領的特色：再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲，小怪也算。第九章魔王城是骷髏王，會放隕石把塔炸暈；骷髏小怪打死會再站起來一次，半血。這一章跟地獄一樣，第 1 波轉 1 個詞綴，之後每 10 波再轉。選關的三顆星只顯示目前這一關拿到的顆數。作戰時地圖底下會一直顯示這一關的星星條件。',
+      title: '八章特色、小王舊圖、能力特效、有手腳的大王、手機選關',
+      detail: '前八章整章都帶該章首領的特色：再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲，小怪也算。第九章魔王城是骷髏王，會放隕石把塔炸暈；骷髏小怪打死會再站起來一次，半血。這一章跟地獄一樣，第 1 波轉 1 個詞綴，之後每 10 波再轉。選關的三顆星只顯示目前這一關拿到的顆數，放在章名下面。1 到 5 的關卡點坐在關卡圖外框底邊，不再另外畫一條線；未通關灰點有白底蓋住框線，數字會顯示，進度字放在點下面。有手腳的首領只會出現在 1-5、2-5、3-5、4-5、5-5、6-5、7-5、8-5、9-5 的最後一波。各章前四關的尾王改成小王，血比首領少、比小怪多，並帶該章能力的弱化版，外型統一用原來那張圓圓的王圖加黃冠，不另外畫再生小王。再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲施放時都會有各自的新特效：回血飄加號、狂暴衝刺殘影、召喚軌道點、六角護盾、分裂裂線、治癒十字、冰刺環、鐵甲鉚釘框，觸發瞬間還會爆一圈光。第五關首領會走路擺動，腳有腳掌、手有拳頭，畫法和骷髏王同一套。作戰時地圖底下會一直顯示這一關的星星條件。手機選關時，開始按鈕會留在畫面上；螢幕不夠高，關卡圖會縮小，不會被底下的模式列蓋住。',
     },
     {
       date: '10/27',
@@ -7380,20 +7603,23 @@ function selectedTower() {
       g.fillStyle = '#ffffff';
       g.fillRect(0, 0, 96, 96);
       g.save();
-      g.translate(48, 50);
+      g.translate(48, spec.elite ? 52 : (spec.bossId ? 54 : 50));
       inkSetup(2.8);
       if (spec.kind === 'enemy') {
         var enemy = {
           type: spec.type || 'grunt',
           color: spec.color || '#e25b4a',
-          boss: !!spec.bossId,
+          boss: !!spec.bossId && !spec.elite,
+          elite: !!spec.elite,
           bossId: spec.bossId || '',
           resist: spec.resist || '',
         };
         var resist = enemy.resist && RESISTS[enemy.resist] ? RESISTS[enemy.resist] : null;
         var colors = enemyBodyColors(enemy, resist);
-        var rad = spec.bossId ? 30 : 26;
-        if (spec.bossId) {
+        var rad = spec.bossId ? (spec.elite ? 28 : 26) : 26;
+        if (spec.elite && spec.bossId) {
+          drawEliteBody(enemy, rad, colors, 0);
+        } else if (spec.bossId) {
           enemy.boss = true;
           drawBossBody(enemy, rad, colors, 0);
         } else if (spec.type === 'hopper') drawHopperBody(rad, colors, 0, false);
@@ -7775,7 +8001,11 @@ function selectedTower() {
     }
     if (waves) waves.textContent = String(stage.waves.length);
     if (gold) gold.textContent = String(stage.initialGold);
-    if (boss) boss.textContent = chapter.boss.replace(/王$/, '');
+    if (boss) {
+      var finalStage = stage.index === 5;
+      boss.textContent = finalStage ? chapter.boss.replace(/王$/, '') : '小王';
+      if (boss.nextElementSibling) boss.nextElementSibling.textContent = finalStage ? '首領' : '菁英';
+    }
     if (lock) lock.hidden = chapterUnlocked(chapter.id);
     if (start) {
       start.disabled = !unlocked;
@@ -7791,7 +8021,10 @@ function selectedTower() {
       btn.className = 'home-node sketch-circle' + (n === stage.index ? ' is-on sketch-circle-dark' : '');
       btn.disabled = !stageUnlocked(node);
       btn.setAttribute('data-stage', node.stageId);
-      btn.textContent = String(n);
+      var label = document.createElement('span');
+      label.className = 'home-node-num';
+      label.textContent = String(n);
+      btn.appendChild(label);
       box.appendChild(btn);
     }
   }
@@ -7944,55 +8177,65 @@ function selectedTower() {
         ],
       },
       {
-        tag: '首領', title: '再生王', paint: { kind: 'enemy', type: 'grunt', color: '#3ecf8e', bossId: 'regen' },
-        desc: '手繪笑臉，側邊長葉子，戴黃冠。外框泛綠回血光環。',
+        tag: '小王', title: '各章小王', paint: { kind: 'enemy', type: 'grunt', color: '#3ecf8e', bossId: 'regen', elite: true },
+        desc: '各章前四關的尾王。外型統一是舊的圓頭王圖加黃冠，不另外畫造型；差別在能力特效：回血、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲各自不同。',
         stats: [
+          '<strong>出現</strong>：1-1～1-4、2-1～2-4 … 到 9-1～9-4，每關最後一波',
+          '<strong>血量</strong>：普通怪 ×4.2',
+          '<strong>特效</strong>：施放能力時會爆光、外框跟粒子跟著變',
+          '<strong>骷髏小王</strong>：偶爾放一顆隕石暈塔',
+        ],
+      },
+      {
+        tag: '首領', title: '再生王', paint: { kind: 'enemy', type: 'grunt', color: '#3ecf8e', bossId: 'regen' },
+        desc: '有手腳的大王，頭側長綠葉，一手拿葉，戴黃冠。只會在 1-5 最後一波出現。',
+        stats: [
+          '<strong>出現</strong>：1-5 最後一波',
           '<strong>特性</strong>：戰鬥中持續回血',
           '<strong>克制</strong>：毒塔毒蝕（持續扣總血 %）',
-          '<strong>血量</strong>：首領倍率（遠高於小怪）',
         ],
       },
       {
         tag: '首領', title: '狂暴王', paint: { kind: 'enemy', type: 'grunt', color: '#ff5a36', bossId: 'rush' },
-        desc: '手繪怒臉跟亂髮，戴黃冠。殘血爆發時出現衝刺殘影。',
-        stats: ['<strong>觸發</strong>：血量低於 50%', '<strong>效果</strong>：大幅加速'],
+        desc: '有手腳的大王，紅髮張嘴，一隻手往前揮，戴黃冠。只會在 2-5 最後一波出現。',
+        stats: ['<strong>出現</strong>：2-5 最後一波', '<strong>觸發</strong>：血量低於 50%', '<strong>效果</strong>：大幅加速'],
       },
       {
         tag: '首領', title: '召喚王', paint: { kind: 'enemy', type: 'grunt', color: '#f2c14e', bossId: 'summon' },
-        desc: '手繪張嘴喊叫的臉，戴黃冠，周圍有召喚點環繞。',
-        stats: ['<strong>特性</strong>：週期召喚小怪', '<strong>壓力</strong>：增加漏關與干擾火力'],
+        desc: '有手腳的大王，一隻手高舉黃球，戴黃冠。只會在 3-5 最後一波出現。',
+        stats: ['<strong>出現</strong>：3-5 最後一波', '<strong>特性</strong>：週期召喚小怪', '<strong>壓力</strong>：增加漏關與干擾火力'],
       },
       {
         tag: '首領', title: '護盾王', paint: { kind: 'enemy', type: 'grunt', color: '#67e8f9', bossId: 'ward' },
-        desc: '手繪的臉擋在盾牌後面，戴黃冠。護盾時外框發亮。',
-        stats: ['<strong>特性</strong>：護盾期間減傷／擋彈', '<strong>克制</strong>：火塔破盾並打血量 10%'],
+        desc: '有手腳的大王，左手握著大盾，戴黃冠。只會在 4-5 最後一波出現。',
+        stats: ['<strong>出現</strong>：4-5 最後一波', '<strong>特性</strong>：護盾期間減傷／擋彈', '<strong>克制</strong>：火塔破盾並打血量 10%'],
       },
       {
         tag: '首領', title: '分裂王', paint: { kind: 'enemy', type: 'grunt', color: '#c084fc', bossId: 'split' },
-        desc: '三張手繪臉擠在一起，戴黃冠，外框有紫環。',
-        stats: ['<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：分裂體金幣較低'],
+        desc: '有手腳的大王，肩膀還長兩顆小頭，戴黃冠。只會在 5-5 最後一波出現。',
+        stats: ['<strong>出現</strong>：5-5 最後一波', '<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：分裂體金幣較低'],
       },
       {
         tag: '首領', title: '治癒王', paint: { kind: 'enemy', type: 'grunt', color: '#ff8fab', bossId: 'mend' },
-        desc: '手繪溫和笑臉，戴黃冠，外框有粉紅治癒光環。',
-        stats: ['<strong>特性</strong>：範圍治療友軍', '<strong>克制</strong>：毒塔毒蝕'],
+        desc: '有手腳的大王，一隻手高舉治療十字，戴黃冠。只會在 6-5 最後一波出現。',
+        stats: ['<strong>出現</strong>：6-5 最後一波', '<strong>特性</strong>：範圍治療友軍', '<strong>克制</strong>：毒塔毒蝕'],
       },
       {
         tag: '首領', title: '冰封王', paint: { kind: 'enemy', type: 'grunt', color: '#9bd4ff', bossId: 'frost' },
-        desc: '手繪掛著冰柱瀏海的臉，戴黃冠，外框有冰刺光環。',
-        stats: ['<strong>技能</strong>：定期凍結所有塔', '<strong>應對</strong>：預留輸出與節奏'],
+        desc: '有手腳的大王，瀏海掛冰柱，一隻手高舉冰晶，戴黃冠。只會在 7-5 最後一波出現。',
+        stats: ['<strong>出現</strong>：7-5 最後一波', '<strong>技能</strong>：定期凍結所有塔', '<strong>應對</strong>：預留輸出與節奏'],
       },
       {
         tag: '首領', title: '鐵甲王', paint: { kind: 'enemy', type: 'grunt', color: '#8aa0b8', bossId: 'armor' },
-        desc: '手繪戴頭盔的臉，戴黃冠，外框有鐵甲邊。',
-        stats: ['<strong>減傷</strong>：受到傷害減半', '<strong>克制</strong>：火塔破甲並打血量 10%'],
+        desc: '有手腳的大王，戴頭盔跟肩甲，胸前有鐵板，戴黃冠。只會在 8-5 最後一波出現。',
+        stats: ['<strong>出現</strong>：8-5 最後一波', '<strong>減傷</strong>：受到傷害減半', '<strong>克制</strong>：火塔破甲並打血量 10%'],
       },
       {
         tag: '首領', title: '骷髏王', paint: { kind: 'enemy', type: 'grunt', color: '#f4efe4', bossId: 'skull' },
-        desc: '比其他王大一圈的骷髏。走路會擺動手腳，施法時舉起法杖。隕石炸到的塔會暈眩，1 秒不能攻擊。',
+        desc: '有手腳的大王，走路會擺動，施法時舉起法杖。作戰只會在 9-5 最後一波出現；無限第 50 波也會遇到。',
         stats: [
-          '<strong>無限</strong>：第 50 波，一次兩顆隕石',
-          '<strong>魔王城</strong>：第九章首領，隕石再加上召喚骷髏小怪',
+          '<strong>出現</strong>：9-5 最後一波；無限第 50 波',
+          '<strong>魔王城</strong>：隕石再加上召喚骷髏小怪',
           '<strong>暈眩</strong>：炸到的塔 1 秒不能攻擊',
         ],
       },
@@ -8738,13 +8981,19 @@ function selectedTower() {
       var campKit = campaignKit();
       var campDeff = campKit && campKit.id === 'wheel' ? hellDeffLabel() : '';
       var bossNow = state.phase === 'combat' ? bossForWave(state.wave) : null;
+      var eliteNow = null;
+      if (!bossNow && state.phase === 'combat' && state.stagePlan && state.stagePlan.waves[state.wave - 1] && state.stagePlan.waves[state.wave - 1].elite) {
+        eliteNow = chapterEliteDef();
+      }
       hudWaveSub.textContent = bossNow
         ? '王 · ' + bossNow.name
-        : (campDeff
+        : (eliteNow
+          ? '小王 · ' + eliteNow.name
+          : (campDeff
           ? campDeff
           : (state.wave === 0
             ? ((campKit ? campKit.name + ' · ' : '') + (state.levelName || ''))
-            : ((campKit && campKit.id !== 'wheel' ? campKit.name + ' · ' : '') + '第 ' + state.wave + '/' + state.levelWaves + ' 波')));
+            : ((campKit && campKit.id !== 'wheel' ? campKit.name + ' · ' : '') + '第 ' + state.wave + '/' + state.levelWaves + ' 波'))));
     } else if (state.mode === 'custom') {
       var customName = state.difficulty === 'hell' ? '地獄' : '普通';
       hudWave.textContent = state.wave === 0 ? customName : '第 ' + state.wave + ' 波';
@@ -10590,6 +10839,229 @@ function selectedTower() {
     ctx.restore();
   }
 
+  function drawKingLimb(x1, y1, x2, y2) {
+    inkLine(x1, y1, x2, y2, 2);
+    inkStroke();
+  }
+
+  function drawKingHand(x, y, rad, fill) {
+    inkCircle(x, y, Math.max(1.8, rad * 0.1), 7);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    inkStroke();
+  }
+
+  function drawKingFoot(x, y, rad, side) {
+    ctx.beginPath();
+    ctx.ellipse(x + side * rad * 0.06, y, rad * 0.16, rad * 0.07, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    inkStroke();
+  }
+
+  function drawKingLeaf(x, y, s, accent) {
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x - s * 0.9, y - s * 0.35, x - s * 0.35, y - s * 1.05);
+    ctx.quadraticCurveTo(x + s * 0.15, y - s * 0.35, x, y);
+    ctx.closePath();
+    ctx.fill();
+    inkStroke();
+  }
+
+  function drawKingMiniHead(x, y, r, ink) {
+    inkCircle(x, y, r, 10);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    inkStroke();
+    ctx.fillStyle = ink;
+    doodleEye(x - r * 0.28, y - r * 0.08, Math.max(1.1, r * 0.18));
+    doodleEye(x + r * 0.28, y - r * 0.08, Math.max(1.1, r * 0.18));
+  }
+
+  function drawKingBody(enemy, rad, colors) {
+    var id = enemy.bossId;
+    var t = (state.time || 0) * 6 + (enemy.id || 0);
+    var step = Math.sin(t);
+    var accent = colors.accent || '#161616';
+    var hip = rad * 0.42;
+    var shoulder = -rad * 0.02;
+    var footY = rad * 1.05;
+    var lx = -rad * 0.2 + step * rad * 0.2;
+    var rx = rad * 0.2 - step * rad * 0.2;
+    var raiseRight = id === 'summon' || id === 'mend' || id === 'frost' || id === 'regen';
+    var punchRight = id === 'rush';
+    ctx.strokeStyle = colors.ink;
+    ctx.fillStyle = colors.fill;
+    ctx.lineWidth = Math.max(2.2, rad * 0.14);
+
+    drawKingLimb(-rad * 0.14, hip, lx, footY);
+    drawKingLimb(rad * 0.14, hip, rx, footY);
+    drawKingFoot(lx, footY, rad, -1);
+    drawKingFoot(rx, footY, rad, 1);
+
+    inkCircle(0, rad * 0.12, rad * 0.3, 14);
+    ctx.fillStyle = colors.fill;
+    ctx.fill();
+    inkStroke();
+    if (id === 'armor') {
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.moveTo(-rad * 0.18, -rad * 0.02);
+      ctx.lineTo(rad * 0.18, -rad * 0.02);
+      ctx.lineTo(rad * 0.14, rad * 0.34);
+      ctx.lineTo(-rad * 0.14, rad * 0.34);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      inkCircle(-rad * 0.34, shoulder, rad * 0.14, 8);
+      ctx.fill();
+      inkStroke();
+      inkCircle(rad * 0.34, shoulder, rad * 0.14, 8);
+      ctx.fill();
+      inkStroke();
+    }
+    if (id === 'split') {
+      drawKingMiniHead(-rad * 0.42, rad * 0.02, rad * 0.2, colors.ink);
+      drawKingMiniHead(rad * 0.44, rad * 0.08, rad * 0.17, colors.ink);
+    }
+
+    var leftHandX = -rad * 0.62;
+    var leftHandY = rad * 0.22 + step * rad * 0.08;
+    var rightHandX = rad * 0.6;
+    var rightHandY = rad * 0.18 - step * rad * 0.08;
+    if (raiseRight) {
+      rightHandX = rad * 0.48;
+      rightHandY = -rad * 0.58;
+    } else if (punchRight) {
+      rightHandX = rad * 0.82;
+      rightHandY = -rad * 0.12 + step * rad * 0.05;
+      leftHandX = -rad * 0.72;
+      leftHandY = rad * 0.28 - step * rad * 0.08;
+    }
+    if (id === 'ward') {
+      leftHandX = -rad * 0.38;
+      leftHandY = rad * 0.18;
+      drawKingLimb(-rad * 0.22, shoulder, leftHandX, leftHandY);
+      ctx.beginPath();
+      ctx.moveTo(-rad * 0.78, -rad * 0.18);
+      ctx.quadraticCurveTo(-rad * 0.18, -rad * 0.28, -rad * 0.16, rad * 0.12);
+      ctx.quadraticCurveTo(-rad * 0.22, rad * 0.62, -rad * 0.78, rad * 0.38);
+      ctx.closePath();
+      ctx.fillStyle = accent;
+      ctx.fill();
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(-rad * 0.62, -rad * 0.02);
+      ctx.quadraticCurveTo(-rad * 0.36, rad * 0.1, -rad * 0.54, rad * 0.3);
+      inkStroke();
+      drawKingLimb(rad * 0.22, shoulder, rightHandX, rightHandY);
+      drawKingHand(rightHandX, rightHandY, rad, colors.fill);
+    } else {
+      drawKingLimb(-rad * 0.24, shoulder, leftHandX, leftHandY);
+      drawKingHand(leftHandX, leftHandY, rad, colors.fill);
+      drawKingLimb(rad * 0.24, shoulder, rightHandX, rightHandY);
+      if (id === 'summon') {
+        inkCircle(rightHandX, rightHandY - rad * 0.12, rad * 0.14, 8);
+        ctx.fillStyle = accent;
+        ctx.fill();
+        inkStroke();
+        inkCircle(rightHandX + rad * 0.28, rightHandY + rad * 0.08, rad * 0.06, 6);
+        ctx.fillStyle = colors.fill;
+        ctx.fill();
+        inkStroke();
+      } else if (id === 'mend') {
+        drawKingHand(rightHandX, rightHandY, rad, colors.fill);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = Math.max(2.2, rad * 0.1);
+        inkLine(rightHandX, rightHandY - rad * 0.28, rightHandX, rightHandY + rad * 0.08, 2);
+        inkStroke();
+        inkLine(rightHandX - rad * 0.16, rightHandY - rad * 0.1, rightHandX + rad * 0.16, rightHandY - rad * 0.1, 2);
+        inkStroke();
+        ctx.strokeStyle = colors.ink;
+        ctx.lineWidth = Math.max(2.2, rad * 0.14);
+      } else if (id === 'frost') {
+        ctx.beginPath();
+        ctx.moveTo(rightHandX, rightHandY - rad * 0.28);
+        ctx.lineTo(rightHandX + rad * 0.16, rightHandY);
+        ctx.lineTo(rightHandX, rightHandY + rad * 0.2);
+        ctx.lineTo(rightHandX - rad * 0.16, rightHandY);
+        ctx.closePath();
+        ctx.fillStyle = accent;
+        ctx.fill();
+        inkStroke();
+      } else if (id === 'regen') {
+        drawKingHand(rightHandX, rightHandY, rad, colors.fill);
+        drawKingLeaf(leftHandX - rad * 0.02, leftHandY - rad * 0.04, rad * 0.42, accent);
+      } else {
+        drawKingHand(rightHandX, rightHandY, rad, colors.fill);
+      }
+    }
+
+    ctx.save();
+    ctx.rotate(step * 0.05);
+    inkCircle(0, -rad * 0.4, rad * 0.38, 16);
+    ctx.fillStyle = colors.fill;
+    ctx.fill();
+    inkStroke();
+    if (id === 'regen') {
+      drawKingLeaf(-rad * 0.12, -rad * 0.48, rad * 0.5, accent);
+      drawKingLeaf(rad * 0.18, -rad * 0.42, rad * 0.38, accent);
+    }
+    if (id === 'rush') {
+      var tufts = [[-rad * 0.3, -rad * 0.58], [0, -rad * 0.72], [rad * 0.3, -rad * 0.56]];
+      ctx.fillStyle = accent;
+      for (var u = 0; u < tufts.length; u++) {
+        ctx.beginPath();
+        ctx.moveTo(tufts[u][0], tufts[u][1] + rad * 0.16);
+        ctx.quadraticCurveTo(tufts[u][0] + rad * 0.18, tufts[u][1] - rad * 0.22, tufts[u][0] + rad * 0.02, tufts[u][1] - rad * 0.04);
+        ctx.quadraticCurveTo(tufts[u][0] - rad * 0.14, tufts[u][1] + rad * 0.04, tufts[u][0], tufts[u][1] + rad * 0.16);
+        ctx.closePath();
+        ctx.fill();
+        inkStroke();
+      }
+    }
+    if (id === 'frost') {
+      var drips = [-rad * 0.24, -rad * 0.04, rad * 0.14, rad * 0.28];
+      ctx.fillStyle = accent;
+      for (var d = 0; d < drips.length; d++) {
+        ctx.beginPath();
+        ctx.moveTo(drips[d] - rad * 0.07, -rad * 0.68);
+        ctx.lineTo(drips[d], -rad * 0.38);
+        ctx.lineTo(drips[d] + rad * 0.07, -rad * 0.68);
+        ctx.closePath();
+        ctx.fill();
+        inkStroke();
+      }
+    }
+    if (id === 'armor') {
+      ctx.beginPath();
+      ctx.moveTo(-rad * 0.34, -rad * 0.34);
+      ctx.quadraticCurveTo(-rad * 0.38, -rad * 0.86, 0, -rad * 0.78);
+      ctx.quadraticCurveTo(rad * 0.38, -rad * 0.86, rad * 0.34, -rad * 0.34);
+      inkStroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -rad * 0.52);
+      ctx.lineTo(0, -rad * 0.28);
+      inkStroke();
+    }
+    var mood = (id === 'rush' || id === 'summon') ? 'yell' : (id === 'frost' || id === 'armor' || id === 'ward') ? 'angry' : 'shut';
+    drawBossFace(rad, colors, -rad * 0.44, mood);
+    ctx.restore();
+    ctx.strokeStyle = colors.ink;
+    ctx.fillStyle = colors.fill;
+  }
+
+  function drawEliteBody(enemy, rad, colors, bob) {
+    inkSeed = (enemy.bossId || 'x').charCodeAt(0) * 17 + Math.round(rad * 12);
+    ctx.translate(0, bob * 0.3);
+    doodleInk(colors, Math.max(2.2, rad * 0.14));
+    if (enemy.bossId === 'skull') drawBoneBody(rad, colors, 0, false);
+    else drawBossDoodle(enemy.bossId, rad, colors);
+    drawBossCrown(rad);
+  }
+
   function drawBossBody(enemy, rad, colors, bob) {
     inkSeed = (enemy.bossId || 'x').charCodeAt(0) * 17 + Math.round(rad * 12);
     ctx.translate(0, bob * 0.3);
@@ -10599,7 +11071,7 @@ function selectedTower() {
       drawBossCrown(rad);
       return;
     }
-    drawBossDoodle(enemy.bossId, rad, colors);
+    drawKingBody(enemy, rad, colors);
     drawBossCrown(rad);
   }
 
@@ -10625,114 +11097,238 @@ function selectedTower() {
     ctx.restore();
   }
 
+  function drawAbilityPulse(x, y, rad, color, life) {
+    if (!(life > 0)) return;
+    var p = Math.max(0, Math.min(1, life / 0.55));
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(2, rad * 0.12);
+    ctx.globalAlpha = 0.75 * p;
+    ctx.beginPath();
+    ctx.arc(x, y, rad + 6 + (1 - p) * rad * 1.4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.35 * p;
+    ctx.beginPath();
+    ctx.arc(x, y, rad + 2 + (1 - p) * rad * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawRegenAbilityFx(x, y, rad, t, strong) {
+    drawInkAuraRing(x, y, rad, '#3ecf8e', t * 3, 0.05);
+    if (strong) drawInkAuraRing(x, y, rad + 5, '#3ecf8e', t * 3 + 1.1, 0.03);
+    ctx.save();
+    ctx.strokeStyle = '#3ecf8e';
+    ctx.fillStyle = '#3ecf8e';
+    ctx.lineWidth = Math.max(1.6, rad * 0.08);
+    for (var i = 0; i < 4; i++) {
+      var rise = ((t * 0.9 + i * 0.22) % 1);
+      var ang = t * 1.4 + i * 1.7;
+      var px = x + Math.cos(ang) * (rad * 0.55);
+      var py = y + rad * 0.55 - rise * rad * 1.5;
+      ctx.globalAlpha = 0.85 * (1 - rise);
+      ctx.beginPath();
+      ctx.moveTo(px - rad * 0.12, py);
+      ctx.lineTo(px + rad * 0.12, py);
+      ctx.moveTo(px, py - rad * 0.12);
+      ctx.lineTo(px, py + rad * 0.12);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawRushAbilityFx(x, y, rad, t, enraged) {
+    if (!enraged) {
+      drawInkAuraRing(x, y, rad, '#ff5a36', t * 2, 0.04);
+      return;
+    }
+    ctx.save();
+    ctx.strokeStyle = '#ff5a36';
+    ctx.lineWidth = Math.max(2, rad * 0.11);
+    ctx.globalAlpha = 0.7 + Math.sin(t * 12) * 0.2;
+    for (var s = 0; s < 4; s++) {
+      var ox = -rad * (0.75 + s * 0.32) - Math.sin(t * 9 + s) * 2;
+      var oy = (s - 1.5) * rad * 0.28 + Math.cos(t * 8 + s) * 2;
+      ctx.beginPath();
+      ctx.moveTo(x + ox, y + oy - rad * 0.22);
+      ctx.lineTo(x + ox + rad * 0.42, y + oy);
+      ctx.lineTo(x + ox, y + oy + rad * 0.22);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = Math.max(1.4, rad * 0.07);
+    ctx.beginPath();
+    ctx.ellipse(x - rad * 0.15, y, rad * 1.15, rad * 0.72, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawSummonAbilityFx(x, y, rad, t) {
+    ctx.save();
+    ctx.fillStyle = '#f2c14e';
+    ctx.strokeStyle = '#161616';
+    ctx.lineWidth = Math.max(1.2, rad * 0.06);
+    for (var d = 0; d < 4; d++) {
+      var da = t * 2.4 + d * (Math.PI * 2 / 4);
+      var dx = x + Math.cos(da) * (rad + 11);
+      var dy = y + Math.sin(da) * (rad + 11);
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.arc(dx, dy, Math.max(2.4, rad * 0.13), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.45;
+    ctx.strokeStyle = '#f2c14e';
+    ctx.lineWidth = Math.max(1.5, rad * 0.07);
+    ctx.beginPath();
+    ctx.arc(x, y, rad + 11, t, t + Math.PI * 1.2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawWardAbilityFx(x, y, rad, t) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = '#67e8f9';
+    ctx.lineWidth = Math.max(2.4, rad * 0.14);
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    for (var i = 0; i < 6; i++) {
+      var a = -Math.PI / 2 + i * Math.PI / 3 + t * 0.55;
+      var rr = rad + 9 + Math.sin(t * 5 + i) * 1.4;
+      var px = Math.cos(a) * rr;
+      var py = Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.lineWidth = Math.max(1.4, rad * 0.08);
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, rad + 4, 0, Math.PI * 2);
+    ctx.stroke();
+    for (var f = 0; f < 3; f++) {
+      var fa = t * 3 + f * 2.1;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.arc(Math.cos(fa) * (rad + 4), Math.sin(fa) * (rad + 4), Math.max(1.6, rad * 0.08), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawSplitAbilityFx(x, y, rad, t) {
+    drawInkAuraRing(x, y, rad, '#c084fc', t * 2.5, 0.06);
+    ctx.save();
+    ctx.strokeStyle = '#c084fc';
+    ctx.lineWidth = Math.max(1.6, rad * 0.08);
+    ctx.globalAlpha = 0.55;
+    for (var p = 0; p < 3; p++) {
+      var pa = t * 1.8 + p * (Math.PI * 2 / 3);
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(pa) * (rad * 0.4), y + Math.sin(pa) * (rad * 0.4), rad * 0.42, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.7;
+    for (var c = 0; c < 3; c++) {
+      var ca = t * 2.2 + c * (Math.PI * 2 / 3);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(ca) * (rad + 10), y + Math.sin(ca) * (rad + 10));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawMendAbilityFx(x, y, rad, t, strong) {
+    drawInkAuraRing(x, y, rad, '#ff8fab', t * 2.8, 0.05);
+    if (strong) drawInkAuraRing(x, y, rad + 5, '#ff8fab', t * 2.8 + 1, 0.03);
+    ctx.save();
+    ctx.strokeStyle = '#ff8fab';
+    ctx.lineWidth = Math.max(2, rad * 0.1);
+    ctx.globalAlpha = 0.8;
+    var pulse = 0.85 + Math.sin(t * 6) * 0.15;
+    ctx.beginPath();
+    ctx.moveTo(x, y - rad * 0.55 * pulse);
+    ctx.lineTo(x, y + rad * 0.55 * pulse);
+    ctx.moveTo(x - rad * 0.4 * pulse, y);
+    ctx.lineTo(x + rad * 0.4 * pulse, y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawFrostAbilityFx(x, y, rad, t) {
+    drawInkAuraRing(x, y, rad, '#9bd4ff', t * 2, 0.03);
+    ctx.save();
+    ctx.strokeStyle = '#9bd4ff';
+    ctx.fillStyle = '#9bd4ff';
+    ctx.lineWidth = Math.max(1.6, rad * 0.08);
+    ctx.globalAlpha = 0.65 + Math.sin(t * 4) * 0.15;
+    for (var c = 0; c < 6; c++) {
+      var ca = c * Math.PI / 3 + t * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(ca) * (rad + 3), y + Math.sin(ca) * (rad + 3));
+      ctx.lineTo(x + Math.cos(ca) * (rad + 13), y + Math.sin(ca) * (rad + 13));
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(ca) * (rad + 9), y + Math.sin(ca) * (rad + 9));
+      ctx.lineTo(x + Math.cos(ca + 0.25) * (rad + 7), y + Math.sin(ca + 0.25) * (rad + 7));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawArmorAbilityFx(x, y, rad, t) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = '#8aa0b8';
+    ctx.lineWidth = Math.max(2.2, rad * 0.12);
+    ctx.globalAlpha = 0.78;
+    inkRect(-rad - 6, -rad - 6, (rad + 6) * 2, (rad + 6) * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = Math.max(1.4, rad * 0.07);
+    inkRect(-rad - 2, -rad - 2, (rad + 2) * 2, (rad + 2) * 2);
+    ctx.stroke();
+    for (var r = 0; r < 4; r++) {
+      var ra = t * 1.5 + r * Math.PI / 2;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.arc(Math.cos(ra) * (rad + 6), Math.sin(ra) * (rad + 6), Math.max(1.5, rad * 0.07), 0, Math.PI * 2);
+      ctx.fillStyle = '#8aa0b8';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawEnemyStatusFx(enemy, x, y, rad) {
     inkSeed = Math.round((enemy.id || 1) * 17 + rad * 3);
     var t = state.time + (enemy.id || 0) * 0.37;
-    var healing = enemy.bossId === 'regen' || enemy.bossId === 'mend' || (hasHellDeff('regen') && !enemy.boss) || (chapterHasKit('regen') && !enemy.boss);
-    if (healing) {
-      var healColor = enemy.bossId === 'mend' ? '#ff8fab' : '#3ecf8e';
-      drawInkAuraRing(x, y, rad, healColor, t * 3, 0.05);
-      if (enemy.bossId === 'mend' || enemy.regenShow > 0) {
-        drawInkAuraRing(x, y, rad + 4, healColor, t * 3 + 1.2, 0.03);
-      }
+    var id = enemy.bossId || '';
+    var king = !!(enemy.boss || enemy.elite);
+    var regenAura = id === 'regen' || ((hasHellDeff('regen') || chapterHasKit('regen')) && !enemy.boss && !enemy.elite);
+    if (regenAura || (enemy.regenShow > 0 && id !== 'mend')) {
+      drawRegenAbilityFx(x, y, rad, t, !!(enemy.regenShow > 0 || id === 'regen'));
+    }
+    if (id === 'mend' || (enemy.regenShow > 0 && id === 'mend')) {
+      drawMendAbilityFx(x, y, rad, t, enemy.regenShow > 0 || enemy.abilityFxKind === 'mend');
     }
     var raging = (bossHas(enemy, 'rush') && enemy.enraged) || enemy.hellEnraged || enemy.kitRushed || state.berserk;
     var swiftDebuff = hasHellDeff('speed') && !enemy.boss;
-    if (raging || swiftDebuff) {
-      ctx.save();
-      ctx.strokeStyle = raging ? '#ff5a36' : '#f0a202';
-      ctx.lineWidth = Math.max(1.8, rad * 0.1);
-      ctx.globalAlpha = 0.55 + Math.sin(t * 10) * 0.2;
-      for (var s = 0; s < 3; s++) {
-        var ox = -rad * (0.85 + s * 0.28) - Math.sin(t * 8 + s) * 2;
-        var oy = (s - 1) * rad * 0.35 + Math.cos(t * 7 + s) * 2;
-        ctx.beginPath();
-        ctx.moveTo(x + ox, y + oy - rad * 0.2);
-        ctx.lineTo(x + ox + rad * 0.35, y + oy);
-        ctx.lineTo(x + ox, y + oy + rad * 0.2);
-        ctx.stroke();
-      }
-      ctx.restore();
+    if (raging || swiftDebuff || (bossHas(enemy, 'rush') && !enemy.enraged)) {
+      drawRushAbilityFx(x, y, rad, t, raging || !!swiftDebuff);
     }
-    if (enemy.shield > 0) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.strokeStyle = '#67e8f9';
-      ctx.lineWidth = Math.max(2.4, rad * 0.14);
-      ctx.globalAlpha = 0.85;
-      ctx.beginPath();
-      for (var i = 0; i < 8; i++) {
-        var a = -Math.PI / 2 + i * Math.PI / 4 + t * 0.4;
-        var rr = rad + 8 + Math.sin(t * 5 + i) * 1.2;
-        var px = Math.cos(a) * rr;
-        var py = Math.sin(a) * rr;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.stroke();
-      ctx.lineWidth = Math.max(1.4, rad * 0.08);
-      ctx.globalAlpha = 0.45;
-      ctx.beginPath();
-      ctx.arc(0, 0, rad + 5, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+    if (enemy.shield > 0) drawWardAbilityFx(x, y, rad, t);
+    if ((bossHas(enemy, 'armor') || (chapterHasKit('armor') && !enemy.boss && !enemy.elite)) && !enemy.firePierce) {
+      drawArmorAbilityFx(x, y, rad, t);
     }
-    if (bossHas(enemy, 'armor') && !enemy.firePierce) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.strokeStyle = '#8aa0b8';
-      ctx.lineWidth = Math.max(2.2, rad * 0.12);
-      ctx.globalAlpha = 0.7;
-      inkRect(-rad - 5, -rad - 5, (rad + 5) * 2, (rad + 5) * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-    if (enemy.bossId === 'summon') {
-      ctx.save();
-      ctx.fillStyle = '#f2c14e';
-      for (var d = 0; d < 3; d++) {
-        var da = t * 2.2 + d * (Math.PI * 2 / 3);
-        var dx = x + Math.cos(da) * (rad + 10);
-        var dy = y + Math.sin(da) * (rad + 10);
-        ctx.globalAlpha = 0.75;
-        ctx.beginPath();
-        ctx.arc(dx, dy, Math.max(2.5, rad * 0.14), 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-    if (bossHas(enemy, 'split')) {
-      drawInkAuraRing(x, y, rad, '#c084fc', t * 2.5, 0.06);
-      ctx.save();
-      ctx.strokeStyle = '#c084fc';
-      ctx.lineWidth = 1.6;
-      ctx.globalAlpha = 0.5;
-      for (var p = 0; p < 3; p++) {
-        var pa = t * 1.8 + p * (Math.PI * 2 / 3);
-        ctx.beginPath();
-        ctx.arc(x + Math.cos(pa) * (rad * 0.35), y + Math.sin(pa) * (rad * 0.35), rad * 0.45, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-    if (enemy.bossId === 'frost') {
-      ctx.save();
-      ctx.strokeStyle = '#9bd4ff';
-      ctx.lineWidth = Math.max(1.6, rad * 0.08);
-      ctx.globalAlpha = 0.55 + Math.sin(t * 4) * 0.15;
-      for (var c = 0; c < 3; c++) {
-        var ca = c * Math.PI / 3 + t * 0.5;
-        ctx.beginPath();
-        ctx.moveTo(x + Math.cos(ca) * (rad + 4), y + Math.sin(ca) * (rad + 4));
-        ctx.lineTo(x + Math.cos(ca) * (rad + 12), y + Math.sin(ca) * (rad + 12));
-        ctx.stroke();
-      }
-      drawInkAuraRing(x, y, rad, '#9bd4ff', t * 2, 0.03);
-      ctx.restore();
-    }
-    if (bossHas(enemy, 'rush') && !enemy.enraged) {
-      drawInkAuraRing(x, y, rad, '#ff5a36', t * 2, 0.04);
+    if (id === 'summon' || (king && id === 'skull' && enemy.castPose > 0)) drawSummonAbilityFx(x, y, rad, t);
+    if (bossHas(enemy, 'split')) drawSplitAbilityFx(x, y, rad, t);
+    if (id === 'frost') drawFrostAbilityFx(x, y, rad, t);
+    if (enemy.abilityFx > 0) {
+      drawAbilityPulse(x, y, rad, ABILITY_FX_COLOR[enemy.abilityFxKind] || '#161616', enemy.abilityFx);
     }
   }
 
@@ -10760,6 +11356,7 @@ function selectedTower() {
     ctx.save();
     if (enemy.type === 'bone' && enemy.rise > 0) ctx.scale(1 + enemy.rise * 0.4, 1 + enemy.rise * 0.4);
     if (enemy.boss) drawBossBody(enemy, rad, colors, bob);
+    else if (enemy.elite) drawEliteBody(enemy, rad, colors, bob);
     else if (enemy.type === 'shard') drawShardBody(rad, colors);
     else if (enemy.type === 'hopper') drawHopperBody(rad, colors, bob, !!enemy.jumping);
     else if (enemy.type === 'devil') drawDevilBody(rad, colors, bob);
@@ -10818,7 +11415,7 @@ function selectedTower() {
       ctx.fillStyle = ratio < 0.3 ? '#e02323' : '#161616';
       ctx.fillRect(bx, by, Math.max(0, bw * Math.max(0, ratio)), bh);
     }
-    if (enemy.boss) {
+    if (enemy.boss || enemy.elite) {
       ctx.font = '700 ' + Math.max(10, Math.round(view.tile * 0.22)) + 'px ' + FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
