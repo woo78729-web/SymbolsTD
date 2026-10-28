@@ -988,18 +988,35 @@
       var elite = stage < 5 && w === count;
       var beat = Math.max(1, Math.ceil((w / count) * 10));
       var late = Math.max(0, beat - 2);
-      var grunts = 6 + beat + Math.floor(late * 1.05) + (chapter >= 2 ? 1 : 0) + (chapter >= 5 ? 1 : 0) + (chapter >= 7 ? 1 : 0);
-      var swifts = beat >= 2 ? 2 : 1;
+      var grunts = 7 + beat + Math.floor(late * 1.2) + Math.floor(w / 5) + (chapter >= 2 ? 1 : 0) + (chapter >= 5 ? 1 : 0) + (chapter >= 7 ? 1 : 0);
+      var swifts = beat >= 2 ? 3 : 2;
       if (beat >= 3) swifts += 1;
       if (beat >= 5) swifts += Math.floor(beat / 2);
-      if (stage >= 2 && beat >= 4) swifts += 1;
+      if (stage >= 2 && beat >= 3) swifts += 1;
+      if (stage >= 4 && beat >= 4) swifts += 1;
       if (chapter >= 3 && beat >= 5) swifts += 1;
       var brutes = 0;
-      if (!boss && stage >= 2 && beat >= 3 && w % 2 === 0) brutes = 1;
-      if (!boss && stage >= 3 && beat >= 5) brutes = Math.max(brutes, 1);
-      if (!boss && stage >= 4 && beat >= 6) brutes += (w % 2 === 0 ? 1 : 0);
-      if (!boss && chapter >= 5 && stage >= 3 && beat >= 7) brutes += 1;
+      if (!boss && w >= 4) brutes = 1;
+      if (!boss && stage >= 2 && beat >= 4) brutes = Math.max(brutes, 1);
+      if (!boss && stage >= 3 && beat >= 5) brutes += 1;
+      if (!boss && stage >= 4 && beat >= 6) brutes += 1;
+      if (!boss && stage === 5 && beat >= 4 && w % 2 === 0) brutes += 1;
+      if (!boss && chapter >= 5 && stage >= 3 && beat >= 6) brutes += 1;
       if (!boss && chapter >= 7 && stage >= 4 && w === count - 1) brutes += 1;
+      var hoppers = 0;
+      if (!boss && w >= 5) {
+        hoppers = 1 + Math.floor((w - 5) / 5);
+        if (stage >= 3 && w >= 8) hoppers += 1;
+        if (chapter >= 4 && beat >= 6) hoppers += 1;
+        hoppers = Math.min(stage >= 4 ? 3 : 2, hoppers);
+      }
+      var devils = 0;
+      if (!boss && w >= 7) {
+        devils = 1 + Math.floor((w - 7) / 6);
+        if (stage >= 4 && w >= 10) devils += 1;
+        if (chapter >= 5 && beat >= 7) devils += 1;
+        devils = Math.min(stage >= 5 ? 3 : 2, devils);
+      }
       var bones = 0;
       if (chapter === 9 && !boss) {
         if (stage === 1) bones = w >= 8 && w % 2 === 0 ? 1 : 0;
@@ -1008,7 +1025,16 @@
         else if (stage === 4) bones = w >= 3 ? (w % 2 === 0 ? 2 : 1) : 0;
         else bones = w >= 4 ? 2 : (w >= 2 ? 1 : 0);
       }
-      waves.push({ grunts: grunts, swifts: swifts, brutes: brutes, bones: bones, boss: boss, elite: elite });
+      waves.push({
+        grunts: grunts,
+        swifts: swifts,
+        brutes: brutes,
+        hoppers: hoppers,
+        devils: devils,
+        bones: bones,
+        boss: boss,
+        elite: elite,
+      });
     }
     return waves;
   }
@@ -1091,8 +1117,8 @@
           path: path,
           waves: buildWaves(c, s),
           goals: stageGoalList(c, s),
-          initialGold: 52 + (c - 1) * 5 + (s - 1) * 3 + (c >= 5 ? 6 : 0) + (c >= 7 ? 8 : 0),
-          hpScale: Math.round((1 + (c - 1) * 0.09 + (s - 1) * 0.04) * 1.13 * 100) / 100,
+          initialGold: 55 + (c - 1) * 5 + (s - 1) * 3 + (c >= 5 ? 8 : 0) + (c >= 7 ? 10 : 0),
+          hpScale: Math.round((1 + (c - 1) * 0.09 + (s - 1) * 0.04) * 1.15 * 100) / 100,
         });
       }
     }
@@ -1288,10 +1314,16 @@ function selectedTower() {
     if (state.mode === 'campaign' && state.stagePlan) {
       var total = (state.stagePlan.waves && state.stagePlan.waves.length) || 12;
       var progress = (wave - 1) / Math.max(1, total - 1);
-      // Mid waves ramp early so three corner towers cannot cruise; late chapters rise more gently.
-      var within = 1 + progress * 10.8 + Math.pow(progress, 1.15) * 3.6;
-      var stageBoost = (state.stagePlan.chapter - 1) * 0.55 + (state.stagePlan.index - 1) * 0.62;
-      return within + stageBoost;
+      // Absolute wave matters: long stages used to stay easy for 10+ waves under progress-only scaling.
+      var within = 1 + (wave - 1) * 0.78;
+      if (wave >= 3) within += (Math.min(wave, 12) - 2) * 0.55;
+      if (wave > 12) within += (wave - 12) * 0.24;
+      within += progress * 1.6;
+      var stageBoost = (state.stagePlan.chapter - 1) * 0.48 + (state.stagePlan.index - 1) * 0.48;
+      var raw = within + stageBoost;
+      // Soft-cap very high threat so late bosses do not explode while mid-run stays harsh.
+      if (raw > 16) return 16 + (raw - 16) * 0.42;
+      return raw;
     }
     if ((state.mode === 'infinite' || state.mode === 'custom') && wave > 30) {
       return wave + (wave - 30) * 0.18;
@@ -1333,33 +1365,37 @@ function selectedTower() {
   }
 
   function planFromSpec(spec, wave) {
-    var gap = Math.max(0.34, 0.9 - (wave - 1) * 0.045);
+    var gap = Math.max(0.28, 0.84 - (wave - 1) * 0.048);
     if (state.mode === 'campaign' && state.stagePlan) {
-      gap = Math.max(0.3, gap - (state.stagePlan.chapter - 1) * 0.016 - Math.max(0, wave - 3) * 0.018);
+      gap = Math.max(0.24, gap - (state.stagePlan.chapter - 1) * 0.018 - Math.max(0, wave - 2) * 0.02);
     }
     var jobs = [];
     var grunts = spec.grunts;
     var swifts = spec.swifts;
     var placed = 0;
     var every = Math.max(2, Math.floor(grunts / (swifts + 1)));
-    // Lead with a couple swifts so sparse corner setups get tested early in the pack.
-    var lead = Math.min(2, swifts);
+    // Lead with swifts so two corner arrow towers cannot casually clear the pack.
+    var lead = Math.min(3, swifts);
     for (var leadI = 0; leadI < lead; leadI++) {
-      jobs.push({ type: 'swift', gap: gap * 0.55 });
+      jobs.push({ type: 'swift', gap: gap * 0.48 });
       placed += 1;
     }
     for (var i = 0; i < grunts; i++) {
       if (placed < swifts && i > 0 && i % every === 0) {
-        jobs.push({ type: 'swift', gap: gap * 0.55 });
+        jobs.push({ type: 'swift', gap: gap * 0.48 });
         placed += 1;
       }
       jobs.push({ type: 'grunt', gap: gap });
     }
     while (placed < swifts) {
-      jobs.push({ type: 'swift', gap: gap * 0.55 });
+      jobs.push({ type: 'swift', gap: gap * 0.48 });
       placed += 1;
     }
-    for (var b = 0; b < spec.brutes; b++) jobs.push({ type: 'brute', gap: 1.15 });
+    for (var b = 0; b < spec.brutes; b++) jobs.push({ type: 'brute', gap: 1.0 });
+    var hoppers = spec.hoppers || 0;
+    for (var h = 0; h < hoppers; h++) jobs.push({ type: 'hopper', gap: Math.max(1.15, gap * 2.0) });
+    var devils = spec.devils || 0;
+    for (var d = 0; d < devils; d++) jobs.push({ type: 'devil', gap: Math.max(1.05, gap * 1.7) });
     var bones = spec.bones || 0;
     for (var bone = 0; bone < bones; bone++) jobs.push({ type: 'bone', gap: gap });
     var elite = null;
@@ -1377,7 +1413,17 @@ function selectedTower() {
         jobs.push({ type: 'boss', gap: 1.7, bossIndex: bossIndexFor(wave) });
       }
     }
-    return { jobs: jobs, grunts: grunts, swifts: swifts, brutes: spec.brutes, bones: bones, elite: elite, boss: boss };
+    return {
+      jobs: jobs,
+      grunts: grunts,
+      swifts: swifts,
+      brutes: spec.brutes,
+      hoppers: hoppers,
+      devils: devils,
+      bones: bones,
+      elite: elite,
+      boss: boss,
+    };
   }
 
   function chapterEliteDef() {
@@ -2155,6 +2201,8 @@ function selectedTower() {
     var parts = [pair[0].name + ' ' + plan.grunts];
     if (plan.swifts) parts.push(pair[1].name + ' ' + plan.swifts);
     if (plan.brutes) parts.push(pair[0].name + '精英 ' + plan.brutes);
+    if (plan.hoppers) parts.push('跳躍怪 ' + plan.hoppers);
+    if (plan.devils) parts.push('小惡魔 ' + plan.devils);
     if (plan.bones) parts.push('骷髏小怪 ' + plan.bones);
     if (plan.elite) parts.push(plan.elite.name);
     if (plan.boss) parts.push(plan.boss.name);
@@ -2207,11 +2255,11 @@ function selectedTower() {
       speedGrow = diff.speedGrow;
       speedCap = diff.speedCap;
     } else if (state.mode === 'campaign') {
-      growth = 1.19;
-      goldMul = 0.62;
-      speedMul = 1.08;
-      speedGrow = 0.042;
-      speedCap = 1.62;
+      growth = 1.17;
+      goldMul = 0.52;
+      speedMul = 1.12;
+      speedGrow = 0.048;
+      speedCap = 1.72;
     } else if (state.mode === 'custom') {
       growth = 1.2;
       hpMul *= 1.22;
@@ -2220,7 +2268,7 @@ function selectedTower() {
       speedGrow = 0.038;
       speedCap = 1.55;
     }
-    var baseHp = state.mode === 'campaign' ? 34 : 32;
+    var baseHp = state.mode === 'campaign' ? 42 : 32;
     var gruntHp = Math.round(baseHp * Math.pow(growth, scaledWave - 1) * hpMul);
     var gruntSpeed = Math.min(speedCap, (1.0 + (scaledWave - 1) * speedGrow) * speedMul);
     var softWaveGold = wave <= 20 ? wave : Math.round(20 + (wave - 20) * 0.4);
@@ -7054,7 +7102,7 @@ function selectedTower() {
       detail: [
         '玩法：前八章整章首領特色；第九章魔王城',
         '首領：第五關尾波大王；前四關尾波小王',
-        '難度：中段起壓力更大、快怪更多更密；擊殺金再降；後面關起始金略增',
+        '難度：依實際波數加壓；作戰也會出精英、跳躍怪、小惡魔；擊殺金再降',
         '星星：先通關才算；廣告贈塔不算自己放的',
         '稱號：滿天星斗、魔王城征服者',
         '介面：選關進度、作戰星星位置、建造選單',
