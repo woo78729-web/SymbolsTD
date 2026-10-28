@@ -272,7 +272,14 @@
     waveGoldEarned: 0,
     waveDoubled: false,
     waveGiftDone: false,
-    speed: 1,
+    speed: (function () {
+      try {
+        var n = Number(localStorage.getItem('fantasia-td-speed') || 1);
+        return n === 2 || n === 4 ? n : 1;
+      } catch (error) {
+        return 1;
+      }
+    })(),
     adBusy: false,
     banner: null,
     rangePing: null,
@@ -988,32 +995,41 @@
       var elite = stage < 5 && w === count;
       var beat = Math.max(1, Math.ceil((w / count) * 10));
       var late = Math.max(0, beat - 2);
-      var grunts = 7 + beat + Math.floor(late * 1.2) + Math.floor(w / 5) + (chapter >= 2 ? 1 : 0) + (chapter >= 5 ? 1 : 0) + (chapter >= 7 ? 1 : 0);
-      var swifts = beat >= 2 ? 3 : 2;
-      if (beat >= 3) swifts += 1;
-      if (beat >= 5) swifts += Math.floor(beat / 2);
-      if (stage >= 2 && beat >= 3) swifts += 1;
-      if (stage >= 4 && beat >= 4) swifts += 1;
+      var grunts = 4 + beat + Math.floor(late * 0.9) + Math.floor(w / 6) + (chapter >= 2 ? 1 : 0) + (chapter >= 5 ? 1 : 0) + (chapter >= 7 ? 1 : 0);
+      // Opening: wave 1 holds with one Lv1; wave 2+ needs upgrade or a second tower.
+      if (w === 1) grunts = 4;
+      else if (w === 2) grunts = 8;
+      else if (w === 3) grunts = Math.max(grunts, 8);
+      else if (w === 4) grunts = Math.max(grunts, 9);
+      var swifts = 0;
+      if (w === 2) swifts = 3;
+      else if (w === 3) swifts = 3;
+      else if (w === 4) swifts = 4;
+      else if (w >= 5) swifts = beat >= 2 ? 2 : 1;
+      if (w >= 5 && beat >= 3) swifts += 1;
+      if (beat >= 5) swifts += Math.floor(beat / 2.5);
+      if (stage >= 3 && beat >= 4) swifts += 1;
+      if (stage >= 5 && beat >= 5) swifts += 1;
       if (chapter >= 3 && beat >= 5) swifts += 1;
       var brutes = 0;
-      if (!boss && w >= 4) brutes = 1;
-      if (!boss && stage >= 2 && beat >= 4) brutes = Math.max(brutes, 1);
-      if (!boss && stage >= 3 && beat >= 5) brutes += 1;
-      if (!boss && stage >= 4 && beat >= 6) brutes += 1;
-      if (!boss && stage === 5 && beat >= 4 && w % 2 === 0) brutes += 1;
-      if (!boss && chapter >= 5 && stage >= 3 && beat >= 6) brutes += 1;
+      // Elite from wave 6 so early 1-5 is not an auto-leak.
+      if (!boss && w >= 6) brutes = 1;
+      if (!boss && stage >= 3 && beat >= 5 && w >= 8) brutes = Math.max(brutes, 1);
+      if (!boss && stage >= 4 && beat >= 6 && w >= 10) brutes += 1;
+      if (!boss && stage === 5 && beat >= 5 && w >= 10 && w % 2 === 0) brutes += 1;
+      if (!boss && chapter >= 5 && stage >= 3 && beat >= 6 && w >= 10) brutes += 1;
       if (!boss && chapter >= 7 && stage >= 4 && w === count - 1) brutes += 1;
       var hoppers = 0;
-      if (!boss && w >= 5) {
-        hoppers = 1 + Math.floor((w - 5) / 5);
-        if (stage >= 3 && w >= 8) hoppers += 1;
+      if (!boss && w >= 6) {
+        hoppers = 1 + Math.floor((w - 6) / 5);
+        if (stage >= 3 && w >= 10) hoppers += 1;
         if (chapter >= 4 && beat >= 6) hoppers += 1;
         hoppers = Math.min(stage >= 4 ? 3 : 2, hoppers);
       }
       var devils = 0;
-      if (!boss && w >= 7) {
-        devils = 1 + Math.floor((w - 7) / 6);
-        if (stage >= 4 && w >= 10) devils += 1;
+      if (!boss && w >= 8) {
+        devils = 1 + Math.floor((w - 8) / 6);
+        if (stage >= 4 && w >= 12) devils += 1;
         if (chapter >= 5 && beat >= 7) devils += 1;
         devils = Math.min(stage >= 5 ? 3 : 2, devils);
       }
@@ -1117,8 +1133,8 @@
           path: path,
           waves: buildWaves(c, s),
           goals: stageGoalList(c, s),
-          initialGold: 55 + (c - 1) * 5 + (s - 1) * 3 + (c >= 5 ? 8 : 0) + (c >= 7 ? 10 : 0),
-          hpScale: Math.round((1 + (c - 1) * 0.09 + (s - 1) * 0.04) * 1.15 * 100) / 100,
+          initialGold: 65 + (c - 1) * 4 + (s - 1) * 2 + (c >= 5 ? 6 : 0) + (c >= 7 ? 8 : 0),
+          hpScale: Math.round((1 + (c - 1) * 0.08 + (s - 1) * 0.03) * 1.05 * 100) / 100,
         });
       }
     }
@@ -1314,12 +1330,16 @@ function selectedTower() {
     if (state.mode === 'campaign' && state.stagePlan) {
       var total = (state.stagePlan.waves && state.stagePlan.waves.length) || 12;
       var progress = (wave - 1) / Math.max(1, total - 1);
-      // Absolute wave matters: long stages used to stay easy for 10+ waves under progress-only scaling.
-      var within = 1 + (wave - 1) * 0.78;
-      if (wave >= 3) within += (Math.min(wave, 12) - 2) * 0.55;
+      // Wave 1 stays soft for one Lv1; from wave 2 threat jumps so a lone Lv1 cannot cruise.
+      if (wave <= 1) {
+        return 1 + (state.stagePlan.chapter - 1) * 0.2;
+      }
+      var within = 2.6 + (wave - 2) * 0.95;
+      if (wave >= 5) within += (Math.min(wave, 12) - 4) * 0.4;
       if (wave > 12) within += (wave - 12) * 0.24;
-      within += progress * 1.6;
-      var stageBoost = (state.stagePlan.chapter - 1) * 0.48 + (state.stagePlan.index - 1) * 0.48;
+      within += progress * 1.2;
+      var stageRamp = Math.min(1, Math.max(0, (wave - 1) / 5));
+      var stageBoost = (state.stagePlan.chapter - 1) * 0.48 + (state.stagePlan.index - 1) * 0.48 * stageRamp;
       var raw = within + stageBoost;
       // Soft-cap very high threat so late bosses do not explode while mid-run stays harsh.
       if (raw > 16) return 16 + (raw - 16) * 0.42;
@@ -1365,17 +1385,21 @@ function selectedTower() {
   }
 
   function planFromSpec(spec, wave) {
-    var gap = Math.max(0.28, 0.84 - (wave - 1) * 0.048);
+    var gap = Math.max(0.4, 1.05 - (wave - 1) * 0.035);
+    if (wave === 1) gap = Math.max(gap, 1.35);
+    else if (wave === 2) gap = 0.55;
+    else if (wave === 3) gap = 0.5;
+    else if (wave === 4) gap = 0.46;
     if (state.mode === 'campaign' && state.stagePlan) {
-      gap = Math.max(0.24, gap - (state.stagePlan.chapter - 1) * 0.018 - Math.max(0, wave - 2) * 0.02);
+      gap = Math.max(0.32, gap - (state.stagePlan.chapter - 1) * 0.012 - Math.max(0, wave - 6) * 0.014);
     }
     var jobs = [];
     var grunts = spec.grunts;
     var swifts = spec.swifts;
     var placed = 0;
     var every = Math.max(2, Math.floor(grunts / (swifts + 1)));
-    // Lead with swifts so two corner arrow towers cannot casually clear the pack.
-    var lead = Math.min(3, swifts);
+    // Wave 1: no lead swift. Wave 2-4: dump swifts first so one Lv1 cannot hold.
+    var lead = wave <= 1 ? 0 : Math.min(wave <= 4 ? Math.min(3, swifts) : (wave <= 7 ? 1 : 2), swifts);
     for (var leadI = 0; leadI < lead; leadI++) {
       jobs.push({ type: 'swift', gap: gap * 0.48 });
       placed += 1;
@@ -2255,11 +2279,11 @@ function selectedTower() {
       speedGrow = diff.speedGrow;
       speedCap = diff.speedCap;
     } else if (state.mode === 'campaign') {
-      growth = 1.17;
-      goldMul = 0.52;
-      speedMul = 1.12;
-      speedGrow = 0.048;
-      speedCap = 1.72;
+      growth = 1.15;
+      goldMul = 0.72;
+      speedMul = 1.02;
+      speedGrow = 0.032;
+      speedCap = 1.48;
     } else if (state.mode === 'custom') {
       growth = 1.2;
       hpMul *= 1.22;
@@ -2268,10 +2292,12 @@ function selectedTower() {
       speedGrow = 0.038;
       speedCap = 1.55;
     }
-    var baseHp = state.mode === 'campaign' ? 42 : 32;
+    var baseHp = state.mode === 'campaign' ? 30 : 32;
     var gruntHp = Math.round(baseHp * Math.pow(growth, scaledWave - 1) * hpMul);
     var gruntSpeed = Math.min(speedCap, (1.0 + (scaledWave - 1) * speedGrow) * speedMul);
     var softWaveGold = wave <= 20 ? wave : Math.round(20 + (wave - 20) * 0.4);
+    // Early campaign kills leave enough for an upgrade or second tower after wave 1.
+    if (state.mode === 'campaign' && wave <= 3) softWaveGold = Math.max(softWaveGold, 5);
     var table = {
       grunt: { hp: gruntHp, speed: gruntSpeed, gold: Math.max(2, softWaveGold), radius: 0.3, color: '#e25b4a', leak: 1 },
       swift: { hp: Math.round(gruntHp * 0.62), speed: Math.min(diff ? speedCap + 0.45 : 2.1, gruntSpeed * 1.55), gold: Math.max(2, softWaveGold - 1), radius: 0.23, color: '#f0a202', leak: 1 },
@@ -7098,86 +7124,217 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/28',
-      title: '章節特色、小王／大王、稱號、星星與難度',
+      title: '章節特色、小王／大王、稱號、設定與難度',
       detail: [
         '玩法：前八章整章首領特色；第九章魔王城',
         '首領：第五關尾波大王；前四關尾波小王',
-        '難度：依實際波數加壓；作戰也會出精英、跳躍怪、小惡魔；擊殺金再降',
+        '難度：起始金 65；第 1 波一座 1 等可過，第 2 波起要升級或兩座塔',
         '星星：先通關才算；廣告贈塔不算自己放的',
         '稱號：滿天星斗、魔王城征服者',
-        '介面：選關進度、作戰星星位置、建造選單',
+        '介面：選關進度、作戰星星位置、建造選單、目錄設定',
         '特效：各章能力施放效果',
+      ],
+      full: [
+        '玩法：前八章整章帶該章首領特色（再生／狂暴／召喚／護盾／分裂／治癒／冰封／鐵甲），小怪也算',
+        '第九章：骷髏王隕石暈塔；骷髏小怪打死再站一次（半血）；命運轉盤同地獄',
+        '首領：有手腳大王只在 x-5 尾波；前四關尾波是小王（弱化能力、圓圓王圖）',
+        '難度：起始金 65；第 1 波 4 普怪一座 1 等可過；第 2 波起快怪群＋更密，單座 1 等扛不住；精英約第 6 波起',
+        '星星：必須真正通關才算其他星；每 5 波廣告贈塔不算自己建造',
+        '稱號：累積 45 星「滿天星斗」；打通 9-5「魔王城征服者」',
+        '介面：選關點在外框底邊；作戰星星在上方 HUD 下；建造選單點外面會收',
+        '設定：目錄好友右側齒輪可開關音量、預設速度、輸入代碼、看更新細項、意見提供',
       ],
     },
     {
       date: '10/27',
       title: '名片框、稱號、第 50 波巨王',
-      detail: '每一章五關都三星會得到一種名片框，八章都過關再多一個。稱號可以自己選一個，地獄榜前 10 名會再顯示一個榜上稱號。無限模式第 50 波是骷髏王，會放隕石把塔炸暈。打過這一波會得到「無限迴廊之主」。第八章過關後會開第九章魔王城。',
+      detail: [
+        '收集：章節三星框；八章通關再多一框',
+        '稱號：可自選；地獄榜前 10 另有榜上稱號',
+        '無限：第 50 波骷髏王；過關得「無限迴廊之主」',
+        '章節：第八章後開啟第九章魔王城',
+      ],
+      full: [
+        '每一章五關都三星會得到一種名片框，八章都過關再多一個',
+        '稱號可以自己選一個，地獄榜前 10 名會再顯示一個榜上稱號',
+        '無限模式第 50 波是骷髏王，會放隕石把塔炸暈；打過得「無限迴廊之主」',
+        '第八章過關後會開第九章魔王城',
+      ],
     },
     {
       date: '10/27',
       title: '關卡星星各關不同',
-      detail: '作戰選關時，點左上的星星可以看這一關的三個條件。第一個是通關。另外兩個會換成無傷、少受傷、至少放幾座塔、不放產錢或某種屬性塔、某座塔升到 5 等、塔數上限、不賣塔或不放英雄。看過廣告復活只保留通關那一顆。',
+      detail: [
+        '條件：通關＋兩項挑戰（各關不同）',
+        '種類：無傷、少受傷、禁塔、升等、塔數等',
+        '復活：看廣告復活只保留通關星',
+      ],
+      full: [
+        '作戰選關時，點左上星星可看這一關三個條件',
+        '第一個是通關；另外兩個含無傷、少受傷、至少放幾座塔、不放產錢或某屬性塔、某塔升到 5 等、塔數上限、不賣塔或不放英雄',
+        '看過廣告復活只保留通關那一顆',
+      ],
     },
     {
       date: '10/27',
       title: '鐵匠讓塔升到 10 等',
-      detail: '第 20 波起，或已經有塔升滿時，建造選單會多出鐵匠，480 金，不攻擊。有他在場，其他塔可以用原本的升級一路升到 10 等。賣走之後不能再往上升，已經升過的等級會留著。',
+      detail: [
+        '解鎖：第 20 波起，或已有塔升滿',
+        '效果：鐵匠在場可升到 10 等',
+        '限制：賣走鐵匠後不能再往上升',
+      ],
+      full: [
+        '第 20 波起，或已經有塔升滿時，建造選單會多出鐵匠，480 金，不攻擊',
+        '有他在場，其他塔可用原本升級一路升到 10 等',
+        '賣走之後不能再往上升，已升過的等級會留著',
+      ],
     },
     {
       date: '10/27',
       title: '打太久怪物會狂暴',
-      detail: '每一波戰鬥超過 2 分鐘不會直接失敗。場上的怪會狂暴，緩速、麻痺、冰凍都對牠們無效。點英雄技能後，底下的資訊框會收起來。點資訊框外面也會把框關掉。',
+      detail: [
+        '觸發：單波戰鬥超過 2 分鐘',
+        '效果：緩速、麻痺、冰凍無效',
+        '介面：點技能或資訊框外會收起框',
+      ],
+      full: [
+        '每一波戰鬥超過 2 分鐘不會直接失敗；場上怪會狂暴，緩速、麻痺、冰凍無效',
+        '點英雄技能後，底下資訊框會收起來；點資訊框外面也會關掉',
+      ],
     },
     {
       date: '10/27',
       title: '第 40 波出現破塔怪',
-      detail: '無限和自訂從第 40 波起，每波多一隻破塔怪。它走近一般塔會把塔撞破，塔直接消失，不退金幣。英雄塔不會被撞掉。',
+      detail: [
+        '出現：無限／自訂第 40 波起每波一隻',
+        '效果：撞破一般塔，不退金幣',
+        '例外：英雄塔不會被撞掉',
+      ],
+      full: [
+        '無限和自訂從第 40 波起，每波多一隻破塔怪',
+        '走近一般塔會把塔撞破，直接消失不退金幣；英雄塔不會被撞掉',
+      ],
     },
     {
       date: '10/27',
       title: '30 波以後無限和自訂更難',
-      detail: '第 30 波之後，無限和自訂的怪物血量、速度和數量會再往上加。一般關卡不受這段加難。一般關卡起始金幣改回 50，怪物血量稍微提高一點。',
+      detail: [
+        '無限／自訂：30 波後血量、速度、數量再加',
+        '作戰：不受這段加難影響',
+      ],
+      full: [
+        '第 30 波之後，無限和自訂的怪物血量、速度和數量會再往上加',
+        '一般關卡不受這段加難；當時一般關起始金改回 50，血量略提高',
+      ],
     },
     {
       date: '10/27',
       title: '血量百分比技能調低',
-      detail: '致命節奏、修羅附體、隕石術、致命毒霧，還有獵手打護盾的百分比傷害都調低了。火塔在打掉護盾、第一次打穿護甲或厚皮時，只額外打一次約 6% 總血。毒蝕還是每秒約 3% 總血。',
+      detail: [
+        '技能：致命節奏、修羅、隕石、毒霧等調低',
+        '火塔：破盾／破甲額外約 6% 總血',
+        '毒蝕：仍約每秒 3% 總血',
+      ],
+      full: [
+        '致命節奏、修羅附體、隕石術、致命毒霧，以及獵手打護盾的百分比傷害都調低',
+        '火塔打掉護盾、第一次打穿護甲或厚皮時，只額外打一次約 6% 總血',
+        '毒蝕還是每秒約 3% 總血',
+      ],
     },
     {
       date: '10/27',
       title: '名片可以改名、選頭像',
-      detail: '點名片可以改名字，也能選手繪頭像。本週地獄榜第 1 到 10 名會暫時多一個獎盃頭像。八個章節的第 5 關都有星星時，會多一個通關頭像。',
+      detail: [
+        '名片：可改名、選手繪頭像',
+        '頭像：地獄榜前 10 暫有獎盃頭像',
+        '頭像：八章第 5 關有星再開通關頭像',
+      ],
+      full: [
+        '點名片可以改名字，也能選手繪頭像',
+        '本週地獄榜第 1 到 10 名會暫時多一個獎盃頭像',
+        '八個章節的第 5 關都有星星時，會多一個通關頭像',
+      ],
     },
     {
       date: '10/27',
       title: '快怪改成飛行蝙蝠',
-      detail: '快怪改成會飛的蝙蝠。雷塔麻痺時間拉長，打飛行怪和跳躍怪（含跳起來的時候）傷害更高。小惡魔還是走在地上。',
+      detail: [
+        '快怪：改為飛行蝙蝠',
+        '雷塔：麻痺更久，對飛行／跳躍傷害更高',
+        '小惡魔：仍走在地上',
+      ],
+      full: [
+        '快怪改成會飛的蝙蝠',
+        '雷塔麻痺時間拉長，打飛行怪和跳躍怪（含跳起來時）傷害更高',
+        '小惡魔還是走在地上',
+      ],
     },
     {
       date: '10/27',
       title: '地獄成績記到雲端排行',
-      detail: '用 Google 登入後，無限地獄和自訂地獄的波次會進同一張週榜，不限好友。每週一 00:00（台北時間）結算。打過第 25 波才能進前 10。第 1 到 3 名可在祭壇召喚全知全能的神，第 4 到 10 名可召喚光之神使。第 1 名鑽石、絕對王者；第 2 名黃金、不滅霸主；第 3 名黃金、災厄之主；第 4、5 名白銀；第 6 到 10 名青銅。',
+      detail: [
+        '榜單：無限／自訂地獄週榜（需登入）',
+        '結算：每週一 00:00（台北）',
+        '獎勵：前 10 名階梯光環與召喚權',
+      ],
+      full: [
+        'Google 登入後，無限地獄和自訂地獄波次進同一張週榜',
+        '每週一 00:00（台北時間）結算；打過第 25 波才能進前 10',
+        '第 1～3 名可召全知全能的神；第 4～10 名可召光之神使',
+        '第 1 名鑽石／絕對王者；第 2 黃金／不滅霸主；第 3 黃金／災厄之主；第 4～5 白銀；第 6～10 青銅',
+      ],
     },
     {
       date: '10/27',
       title: '可以加好友看名片',
-      detail: '登入後有一組 6 碼 ID。把 ID 給對方，或貼上對方的 ID，就能看到他的頭像、最高紀錄，以及這週的地獄光環。關卡星星還是留在自己的手機上。',
+      detail: [
+        'ID：登入後有 6 碼好友碼',
+        '名片：可看對方頭像、紀錄、地獄光環',
+        '星星：關卡星仍只留在自己裝置',
+      ],
+      full: [
+        '登入後有一組 6 碼 ID；把 ID 給對方或貼上對方 ID 即可加好友',
+        '好友名片會顯示頭像、最高紀錄，以及這週地獄光環',
+        '關卡星星還是留在自己的手機上',
+      ],
     },
     {
       date: '10/26',
       title: '關卡目錄換成章節圖',
-      detail: '進目錄後，中間是這一章的圖，左右箭頭換章，下面 1 到 5 是關卡。八張圖依序是潮濕藤蔓地牢、部落熔岩、碎骨殿堂、晶礦大廳、劇毒巢穴、邪教神殿、冰霜囚牢、廢鐵工坊。',
+      detail: [
+        '目錄：章節圖＋左右換章＋1～5 關',
+        '章圖：八章地牢主題圖',
+      ],
+      full: [
+        '進目錄後，中間是這一章的圖，左右箭頭換章，下面 1 到 5 是關卡',
+        '八張圖依序是潮濕藤蔓地牢、部落熔岩、碎骨殿堂、晶礦大廳、劇毒巢穴、邪教神殿、冰霜囚牢、廢鐵工坊',
+      ],
     },
     {
       date: '10/26',
       title: '按鈕和外框改成手繪線',
-      detail: '圖鑑、排行、好友、開始，還有底下的作戰，都用同一套手繪框。作戰是黑底白字。自訂和無限維持文字按鈕。',
+      detail: [
+        '介面：圖鑑、排行、好友、開始用手繪框',
+        '作戰：黑底白字；自訂／無限維持文字鈕',
+      ],
+      full: [
+        '圖鑑、排行、好友、開始，還有底下的作戰，都用同一套手繪框',
+        '作戰是黑底白字；自訂和無限維持文字按鈕',
+      ],
     },
     {
       date: '10/26',
       title: '祭壇改成商品卡',
-      detail: '召喚英雄改成兩欄。每張卡有英雄圖、名字、能力和價錢，一隻 1000 金。名次不夠的全知全能的神、光之神使是灰色，寫著未解鎖。地圖上的祭壇是一顆圓，中間是空心尖頂。',
+      detail: [
+        '祭壇：兩欄英雄商品卡，一隻 1000 金',
+        '鎖定：名次不夠的神／神使顯示未解鎖',
+        '地圖：圓形祭壇＋空心尖頂',
+      ],
+      full: [
+        '召喚英雄改成兩欄；每張卡有英雄圖、名字、能力和價錢，一隻 1000 金',
+        '名次不夠的全知全能的神、光之神使是灰色，寫著未解鎖',
+        '地圖上的祭壇是一顆圓，中間是空心尖頂',
+      ],
     },
   ];
 
@@ -7264,14 +7421,168 @@ function selectedTower() {
     list.appendChild(pager);
   }
 
+  function patchNotesForView(kind) {
+    return PATCH_NOTES.map(function (note) {
+      return {
+        date: note.date,
+        title: note.title,
+        detail: kind === 'full' ? (note.full || note.detail) : note.detail,
+      };
+    });
+  }
+
   function openPatchNotes() {
     openModal({
       tone: 'reward',
       kicker: '公告',
       title: '更新資訊',
-      desc: '一頁五則。點一則看分類大綱；詳細說明之後會放到網站。',
-      notes: PATCH_NOTES,
+      desc: '一頁五則。點一則看分類大綱；更細的數值請到設定 → 更新細項。',
+      notes: patchNotesForView('outline'),
       actions: [{ label: '知道了', className: 'btn-ghost is-exit', onClick: closeModal }],
+    });
+  }
+
+  function preferredSpeed() {
+    var n = loadNumber('fantasia-td-speed');
+    return n === 2 || n === 4 ? n : 1;
+  }
+
+  function setPreferredSpeed(speed) {
+    var n = speed === 2 || speed === 4 ? speed : 1;
+    saveNumber('fantasia-td-speed', n);
+    state.speed = n;
+    syncSpeedButton();
+  }
+
+  function cyclePreferredSpeed() {
+    var cur = preferredSpeed();
+    setPreferredSpeed(cur === 1 ? 2 : (cur === 2 ? 4 : 1));
+    Sfx.ui();
+    openSettings();
+  }
+
+  function togglePreferredMute() {
+    Sfx.muted = !Sfx.muted;
+    saveNumber('fantasia-td-mute', Sfx.muted ? 1 : 0);
+    syncSoundButton();
+    if (!Sfx.muted) {
+      Sfx.unlock();
+      Sfx.ui();
+    }
+    openSettings();
+  }
+
+  function loadRedeemedCodes() {
+    try {
+      var raw = JSON.parse(localStorage.getItem('symbols-td-redeemed') || '{}');
+      return raw && typeof raw === 'object' ? raw : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function saveRedeemedCodes(map) {
+    try { localStorage.setItem('symbols-td-redeemed', JSON.stringify(map || {})); } catch (error) { /* ignore */ }
+  }
+
+  // 之後在這裡加可用代碼與獎勵；目前先保留輸入流程。
+  var REDEEM_CODES = {};
+
+  function redeemCode(raw) {
+    var code = String(raw || '').trim().toUpperCase();
+    if (!code) {
+      toast('請輸入代碼');
+      return false;
+    }
+    var used = loadRedeemedCodes();
+    if (used[code]) {
+      toast('這個代碼用過了');
+      return false;
+    }
+    var gift = REDEEM_CODES[code];
+    if (!gift) {
+      toast('代碼無效或尚未開放');
+      return false;
+    }
+    used[code] = Date.now();
+    saveRedeemedCodes(used);
+    toast(gift.message || '兌換成功');
+    Sfx.unlock();
+    return true;
+  }
+
+  function openCodeRedeem() {
+    openModal({
+      tone: 'reward',
+      kicker: '設定',
+      title: '輸入代碼',
+      desc: '輸入兌換碼後按下兌換。之後可用來領免廣告券、神使券等。',
+      actions: [
+        {
+          label: '兌換',
+          className: 'btn-gold',
+          onClick: function () {
+            var input = document.getElementById('redeem-code-input');
+            if (redeemCode(input && input.value)) {
+              if (input) input.value = '';
+            }
+          },
+        },
+        { label: '返回設定', className: 'btn-ghost', onClick: openSettings },
+      ],
+    });
+    var desc = document.getElementById('modal-desc');
+    if (!desc) return;
+    var wrap = document.createElement('label');
+    wrap.className = 'settings-code';
+    wrap.textContent = '代碼';
+    var input = document.createElement('input');
+    input.id = 'redeem-code-input';
+    input.maxLength = 24;
+    input.placeholder = '貼上或輸入代碼';
+    input.autocomplete = 'off';
+    wrap.appendChild(input);
+    desc.insertAdjacentElement('afterend', wrap);
+    setTimeout(function () { input.focus(); }, 40);
+  }
+
+  function openPatchFullNotes() {
+    openModal({
+      tone: 'reward',
+      kicker: '設定',
+      title: '更新細項',
+      desc: '大綱以外的實際改動與數值。一頁五則，點一則展開。',
+      notes: patchNotesForView('full'),
+      actions: [{ label: '返回設定', className: 'btn-ghost', onClick: openSettings }],
+    });
+  }
+
+  function openFeedback() {
+    openModal({
+      tone: 'reward',
+      kicker: '設定',
+      title: '意見提供',
+      desc: '之後提供回饋可送券。券系統好了再開這個入口，現在先保留按鈕。',
+      actions: [{ label: '返回設定', className: 'btn-ghost', onClick: openSettings }],
+    });
+  }
+
+  function openSettings() {
+    var muteLabel = Sfx.muted ? '音量：關' : '音量：開';
+    var speedLabel = '預設速度：×' + preferredSpeed();
+    openModal({
+      tone: 'reward',
+      kicker: '目錄',
+      title: '設定',
+      desc: '音量、預設速度、代碼與更新細項。',
+      actions: [
+        { label: muteLabel, className: 'btn-ghost', onClick: togglePreferredMute },
+        { label: speedLabel, className: 'btn-ghost', onClick: cyclePreferredSpeed },
+        { label: '輸入代碼', className: 'btn-ghost', onClick: openCodeRedeem },
+        { label: '更新細項', className: 'btn-ghost', onClick: openPatchFullNotes },
+        { label: '意見提供', className: 'btn-ghost', onClick: openFeedback },
+        { label: '關閉', className: 'btn-ghost is-exit', onClick: closeModal },
+      ],
     });
   }
 
@@ -7284,6 +7595,8 @@ function selectedTower() {
     modalKicker.textContent = options.kicker;
     modalTitle.textContent = options.title;
     modalDesc.textContent = options.desc;
+    var stale = modal.querySelectorAll('.settings-code');
+    for (var s = 0; s < stale.length; s++) stale[s].remove();
     renderPatchNotes(options.notes);
     if (options.profile) renderProfileEditor();
     modalActions.replaceChildren();
@@ -8678,6 +8991,8 @@ function selectedTower() {
     state.phase = 'prep';
     state.paused = false;
     state.userPaused = false;
+    state.speed = preferredSpeed();
+    syncSpeedButton();
     if (pauseBtn) pauseBtn.setAttribute('aria-pressed', 'false');
     state.adBusy = false;
     state.towers = [];
@@ -12185,6 +12500,8 @@ function selectedTower() {
     });
     if (openBoardBtn) openBoardBtn.addEventListener('click', openBoard);
     if (openFriendsBtn) openFriendsBtn.addEventListener('click', openFriends);
+    var openSettingsBtn = document.getElementById('btn-open-settings');
+    if (openSettingsBtn) openSettingsBtn.addEventListener('click', function () { Sfx.ui(); openSettings(); });
     if (openAuraBtn) openAuraBtn.addEventListener('click', openAuraPreview);
     if (auraBack) auraBack.addEventListener('click', showMenu);
     if (friendsBack) friendsBack.addEventListener('click', showMenu);
