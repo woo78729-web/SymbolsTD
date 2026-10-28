@@ -2863,6 +2863,21 @@ body #screen-menu.play-home,
 .play-home .home-rewards .home-reward:nth-child(2).sketch-box::before { border-radius: 16px 12px 18px 14px; }
 .play-home .home-rewards .home-reward:nth-child(3).sketch-box::before { border-radius: 12px 16px 14px 18px; }
 .play-home .home-frame.is-blank { min-height: 156px; }
+.play-home .home-frame.is-zoom { min-height: 172px; }
+.play-home .home-frame.is-zoom img {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  width: auto;
+  height: calc(100% - 12px);
+  max-width: calc(100% - 12px);
+  max-height: none;
+  transform: translateX(-50%);
+  object-fit: contain;
+  object-position: center;
+  z-index: 0;
+}
+.play-home .home-frame.is-zoom .home-lock { z-index: 2; }
 .play-home .home-frame img[hidden] { display: none !important; }
 .play-home .home-frame img {
   position: static;

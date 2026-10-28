@@ -874,7 +874,7 @@
     { id: 6, name: '邪教神殿', boss: '治癒王' },
     { id: 7, name: '冰霜囚牢', boss: '冰封王' },
     { id: 8, name: '廢鐵工坊', boss: '鐵甲王' },
-    { id: 9, name: '魔王城', boss: '骷髏王', art: false },
+    { id: 9, name: '魔王城', boss: '骷髏王' },
   ];
 
   var MINION_PAIRS = [
@@ -7576,7 +7576,10 @@ function selectedTower() {
     var info = chapterById(chapter);
     var frame = img.closest('.home-frame');
     var blank = !!(info && info.art === false);
-    if (frame) frame.classList.toggle('is-blank', blank);
+    if (frame) {
+      frame.classList.toggle('is-blank', blank);
+      frame.classList.toggle('is-zoom', chapter === 9 && !blank);
+    }
     if (blank) {
       img.removeAttribute('src');
       img.alt = '';
@@ -7584,7 +7587,7 @@ function selectedTower() {
       return;
     }
     img.hidden = false;
-    img.src = 'assets/ui/chapters/' + chapter + '.jpg?v=3';
+    img.src = 'assets/ui/chapters/' + chapter + '.jpg?v=4';
     img.alt = '';
   }
 
