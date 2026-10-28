@@ -987,13 +987,16 @@
       var boss = stage === 5 && w === count;
       var elite = stage < 5 && w === count;
       var beat = Math.max(1, Math.ceil((w / count) * 10));
-      var grunts = 4 + beat + (chapter >= 5 ? 1 : 0);
+      var late = Math.max(0, beat - 3);
+      var grunts = 4 + beat + Math.floor(late * 0.6) + (chapter >= 4 ? 1 : 0) + (chapter >= 7 ? 1 : 0);
       var swifts = 1;
-      if (stage >= 2 && beat >= 2) swifts += Math.floor(beat / 3);
-      if (stage >= 4 && beat >= 4) swifts += 1;
+      if (beat >= 3) swifts += Math.floor(beat / 3);
+      if (stage >= 3 && beat >= 5) swifts += 1;
+      if (chapter >= 5 && beat >= 6) swifts += 1;
       var brutes = 0;
-      if (!boss && stage >= 3 && w % 5 === 0) brutes = 1;
-      if (!boss && chapter >= 6 && stage >= 4 && w === count - 1) brutes += 1;
+      if (!boss && stage >= 2 && beat >= 5 && w % 4 === 0) brutes = 1;
+      if (!boss && stage >= 3 && w % 5 === 0) brutes = Math.max(brutes, 1);
+      if (!boss && chapter >= 6 && stage >= 4 && (w === count - 1 || (beat >= 7 && w % 3 === 0))) brutes += 1;
       var bones = 0;
       if (chapter === 9 && !boss) {
         if (stage === 1) bones = w >= 8 && w % 2 === 0 ? 1 : 0;
@@ -1085,8 +1088,8 @@
           path: path,
           waves: buildWaves(c, s),
           goals: stageGoalList(c, s),
-          initialGold: 50,
-          hpScale: Math.round((1 + (c - 1) * 0.07 + (s - 1) * 0.02) * 1.06 * 100) / 100,
+          initialGold: 50 + (c - 1) * 3 + (s - 1) * 2 + (c >= 6 ? 5 : 0) + (c >= 8 ? 5 : 0),
+          hpScale: Math.round((1 + (c - 1) * 0.085 + (s - 1) * 0.028) * 1.07 * 100) / 100,
         });
       }
     }
@@ -1280,7 +1283,12 @@ function selectedTower() {
 
   function threatWave(wave) {
     if (state.mode === 'campaign' && state.stagePlan) {
-      return Math.min(wave, 4) + (state.stagePlan.chapter - 1) * 0.8 + (state.stagePlan.index - 1) * 0.35;
+      var total = (state.stagePlan.waves && state.stagePlan.waves.length) || 12;
+      var progress = (wave - 1) / Math.max(1, total - 1);
+      // Early waves stay close to the old feel; mid/late keep rising so two towers cannot cruise.
+      var within = 1 + progress * 8.2;
+      var stageBoost = (state.stagePlan.chapter - 1) * 0.82 + (state.stagePlan.index - 1) * 0.38;
+      return within + stageBoost;
     }
     if ((state.mode === 'infinite' || state.mode === 'custom') && wave > 30) {
       return wave + (wave - 30) * 0.18;
@@ -1322,7 +1330,10 @@ function selectedTower() {
   }
 
   function planFromSpec(spec, wave) {
-    var gap = Math.max(0.55, 1.05 - (wave - 1) * 0.04);
+    var gap = Math.max(0.5, 1.02 - (wave - 1) * 0.038);
+    if (state.mode === 'campaign' && state.stagePlan) {
+      gap = Math.max(0.46, gap - (state.stagePlan.chapter - 1) * 0.012 - Math.max(0, wave - 6) * 0.012);
+    }
     var jobs = [];
     var grunts = spec.grunts;
     var swifts = spec.swifts;
@@ -3212,8 +3223,14 @@ function selectedTower() {
     try { localStorage.setItem('symbols-td-deeds', JSON.stringify(deeds)); } catch (error) { /* ignore */ }
   }
 
+  function castleCleared() {
+    return (state.stars['9-5'] || 0) >= 1;
+  }
+
   var TITLES = [
     { id: 'corridor', name: '無限迴廊之主', hint: '無限模式打過第 50 波骷髏王', ok: function (d) { return !!d.corridor; } },
+    { id: 'starmap', name: '滿天星斗', hint: '累積拿到 45 顆星星', ok: function () { return starSum() >= 45; } },
+    { id: 'castle', name: '魔王城征服者', hint: '打通 9-5', ok: function () { return castleCleared(); } },
     { id: 'overload', name: '運算超載', hint: '無限或自訂打到第 40 波', ok: function (d) { return (d.infiniteWave || 0) >= 40 || (d.customWave || 0) >= 40; } },
     { id: 'wheel', name: '地獄轉輪手', hint: '地獄模式打到第 10 波', ok: function (d) { return (d.hellWave || 0) >= 10; } },
     { id: 'demolish', name: '防線拆遷辦主任', hint: '累積賣掉 15 座塔', ok: function (d) { return (d.sells || 0) >= 15; } },
@@ -6539,7 +6556,9 @@ function selectedTower() {
     if (state.mode === 'campaign' && state.wave >= state.levelWaves) {
       state.phase = 'victory';
       state.outcome = 'victory';
+      var beforeStars = unlockedTitleIds();
       var mask = recordStarMask();
+      noteNewTitles(beforeStars);
       beginClearCountdown('victory');
       if (state.banner) state.banner.text = starGlyph(starCount(mask)) + ' 通過';
       return;
@@ -6595,10 +6614,17 @@ function selectedTower() {
     return false;
   }
 
+  function stageClearedNow() {
+    return state.phase === 'victory' || state.outcome === 'victory';
+  }
+
   function goalMet(goal) {
     if (!goal) return false;
-    if (goal.kind !== 'clear' && state.reviveUsed) return false;
-    if (goal.kind === 'clear') return true;
+    // 通關星：一定要真正打通這一關
+    if (goal.kind === 'clear') return stageClearedNow();
+    // 其他星：先通關才算；看廣告復活只留通關
+    if (!stageClearedNow()) return false;
+    if (state.reviveUsed) return false;
     if (goal.kind === 'flawless') return state.lifeLost <= 0;
     if (goal.kind === 'bruise') return state.lifeLost <= goal.max;
     if (goal.kind === 'ban') return !(state.built && state.built[goal.type]);
@@ -6612,8 +6638,10 @@ function selectedTower() {
 
   function runStarMask() {
     var goals = state.stagePlan && state.stagePlan.goals;
-    if (!goals || !goals.length) return 1;
+    if (!goals || !goals.length) return stageClearedNow() ? 1 : 0;
     var mask = 0;
+    // 沒通關就不給任何星
+    if (!stageClearedNow()) return 0;
     for (var i = 0; i < goals.length && i < 3; i++) {
       if (goalMet(goals[i])) mask |= 1 << i;
     }
@@ -6646,7 +6674,7 @@ function selectedTower() {
     var parts = [];
     var flags = [];
     for (var i = 0; i < goals.length && i < 3; i++) {
-      var on = goals[i].kind === 'clear' ? state.phase === 'victory' : goalMet(goals[i]);
+      var on = goalMet(goals[i]);
       flags.push(on ? '1' : '0');
       parts.push((on ? '★' : '☆') + goalLabel(goals[i]));
     }
@@ -7004,8 +7032,8 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/28',
-      title: '八章特色、小王、能力特效、有手腳的大王、星星條件上移、建造選單',
-      detail: '前八章整章都帶該章首領的特色：再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲，小怪也算。第九章魔王城是骷髏王，會放隕石把塔炸暈；骷髏小怪打死會再站起來一次，半血。這一章跟地獄一樣，第 1 波轉 1 個詞綴，之後每 10 波再轉。選關的三顆星只顯示目前這一關拿到的顆數，放在章名下面。1 到 5 的關卡點坐在關卡圖外框底邊，不再另外畫一條線；未通關灰點有白底蓋住框線，數字會顯示，進度字放在點下面。有手腳的首領只會出現在 1-5、2-5、3-5、4-5、5-5、6-5、7-5、8-5、9-5 的最後一波。各章前四關的尾王改成小王，血比首領少、比小怪多，並帶該章能力的弱化版，外型統一用原來那張圓圓的王圖加黃冠，不另外畫再生小王。再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲施放時都會有各自的新特效：回血飄加號、狂暴衝刺殘影、召喚軌道點、六角護盾、分裂裂線、治癒十字、冰刺環、鐵甲鉚釘框，觸發瞬間還會爆一圈光。第五關首領會走路擺動，腳有腳掌、手有拳頭，畫法和骷髏王同一套。作戰時星星條件改放在上方狀態列下面，棋盤會往下讓一點，不會蓋住路徑。點開建造選單後，點外面、開始波次、加速或暫停都會自動收起，不會一直佔畫面。手機選關時，開始按鈕會留在畫面上；螢幕不夠高，關卡圖會縮小，不會被底下的模式列蓋住。',
+      title: '八章特色、小王、能力特效、有手腳的大王、稱號、星星先通關、關卡難度',
+      detail: '前八章整章都帶該章首領的特色：再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲，小怪也算。第九章魔王城是骷髏王，會放隕石把塔炸暈；骷髏小怪打死會再站起來一次，半血。這一章跟地獄一樣，第 1 波轉 1 個詞綴，之後每 10 波再轉。選關的三顆星只顯示目前這一關拿到的顆數，放在章名下面。1 到 5 的關卡點坐在關卡圖外框底邊，不再另外畫一條線；未通關灰點有白底蓋住框線，數字會顯示，進度字放在點下面。有手腳的首領只會出現在 1-5、2-5、3-5、4-5、5-5、6-5、7-5、8-5、9-5 的最後一波。各章前四關的尾王改成小王，血比首領少、比小怪多，並帶該章能力的弱化版，外型統一用原來那張圓圓的王圖加黃冠，不另外畫再生小王。再生、狂暴、召喚、護盾、分裂、治癒、冰封、鐵甲施放時都會有各自的新特效：回血飄加號、狂暴衝刺殘影、召喚軌道點、六角護盾、分裂裂線、治癒十字、冰刺環、鐵甲鉚釘框，觸發瞬間還會爆一圈光。第五關首領會走路擺動，腳有腳掌、手有拳頭，畫法和骷髏王同一套。作戰時星星條件改放在上方狀態列下面，棋盤會往下讓一點，不會蓋住路徑。點開建造選單後，點外面、開始波次、加速或暫停都會自動收起，不會一直佔畫面。新增兩個稱號：累積 45 星可選「滿天星斗」，打通 9-5 可選「魔王城征服者」。關卡星星一定要先通關才會計算其他條件，進關再出來不會直接解完。手機選關時，開始按鈕會留在畫面上；螢幕不夠高，關卡圖會縮小，不會被底下的模式列蓋住。關卡平衡有調：前兩波手感差不多，同一關中後段怪會持續變硬、變多，後面章節也會明顯更難；後面關起始金幣會多一點，讓你有空間布陣，但還是要認真打才過得去。',
     },
     {
       date: '10/27',
