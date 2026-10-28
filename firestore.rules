@@ -67,6 +67,9 @@ service cloud.firestore {
       function validFriendCode(code) {
         return code is string && code.matches('^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$');
       }
+      function isNum(v) {
+        return v is int || v is float;
+      }
       function validUserWrite() {
         return request.resource.data.name is string
           && request.resource.data.name.size() > 0
@@ -79,13 +82,13 @@ service cloud.firestore {
           && request.resource.data.title.size() <= 24
           && request.resource.data.bestLabel is string
           && request.resource.data.bestLabel.size() <= 24
-          && request.resource.data.bestWave is int
+          && isNum(request.resource.data.bestWave)
           && request.resource.data.bestWave >= 0
           && request.resource.data.bestWave <= 9999
-          && request.resource.data.hellRank is int
+          && isNum(request.resource.data.hellRank)
           && request.resource.data.hellRank >= 0
           && request.resource.data.hellRank <= 9999
-          && request.resource.data.rankWeek is int
+          && isNum(request.resource.data.rankWeek)
           && request.resource.data.rankWeek >= 0
           && request.resource.data.rankWeek <= 1000000
           && request.resource.data.guest is bool
@@ -93,10 +96,11 @@ service cloud.firestore {
           && request.resource.data.stars is map
           && request.resource.data.deeds is map
           && (!('progressAt' in request.resource.data.keys()) || request.resource.data.progressAt is timestamp)
-          && request.resource.data.keys().hasOnly([
+          // hasAll：舊文件若多了欄位也不擋寫入；進度同步欄位必須齊
+          && request.resource.data.keys().hasAll([
             'name', 'picture', 'frame', 'title',
             'bestLabel', 'bestWave', 'hellRank', 'rankWeek',
-            'guest', 'friendId', 'stars', 'deeds', 'progressAt'
+            'guest', 'friendId', 'stars', 'deeds'
           ]);
       }
       allow read: if true;
