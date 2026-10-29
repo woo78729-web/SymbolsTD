@@ -124,12 +124,12 @@
       category: 'economy',
       upgradeCost: [50, 80, 115, 155, 200, 270, 360, 480, 640],
       levels: [
-        { damage: 0, range: 0, cooldown: 5.0, goldGen: 6 },
-        { damage: 0, range: 0, cooldown: 4.6, goldGen: 8 },
-        { damage: 0, range: 0, cooldown: 4.2, goldGen: 11 },
-        { damage: 0, range: 0, cooldown: 3.8, goldGen: 14 },
-        { damage: 0, range: 0, cooldown: 3.4, goldGen: 18 },
-        { damage: 0, range: 0, cooldown: 3.0, goldGen: 22 },
+        { damage: 0, range: 0, cooldown: 5.0, goldGen: 5 },
+        { damage: 0, range: 0, cooldown: 4.6, goldGen: 6 },
+        { damage: 0, range: 0, cooldown: 4.2, goldGen: 8 },
+        { damage: 0, range: 0, cooldown: 3.8, goldGen: 10 },
+        { damage: 0, range: 0, cooldown: 3.4, goldGen: 13 },
+        { damage: 0, range: 0, cooldown: 3.0, goldGen: 16 },
       ],
     },
     smith: {
@@ -181,6 +181,7 @@
   var waveBtnLabel = document.getElementById('wave-btn-label');
   var waveBtnSub = document.getElementById('wave-btn-sub');
   var soundBtn = document.getElementById('btn-sound');
+  var bgmBtn = document.getElementById('btn-bgm');
   var pauseBtn = document.getElementById('btn-pause');
   var screenWelcome = document.getElementById('screen-welcome');
   var screenIndex = document.getElementById('screen-index');
@@ -305,6 +306,16 @@
   var lastVibrate = 0;
   var lastTs = 0;
 
+  function loadBgmMuted() {
+    try {
+      var raw = localStorage.getItem('fantasia-td-bgm-mute');
+      if (raw == null) return loadNumber('fantasia-td-mute') === 1;
+      return Number(raw) === 1;
+    } catch (error) {
+      return false;
+    }
+  }
+
   var Sfx = {
     muted: loadNumber('fantasia-td-mute') === 1,
     ctx: null,
@@ -408,6 +419,199 @@
       src.stop(t + dur);
     } catch (error) { /* ignore */ }
   }
+
+  // 輕量 Web Audio 循環 BGM：選單輕鬆冒險、章節特色、王關緊張、無限刺激輪換
+  var Bgm = {
+    muted: loadBgmMuted(),
+    master: null,
+    key: '',
+    profile: null,
+    step: 0,
+    nextTime: 0,
+    timer: 0,
+    profiles: {
+      menu: { bpm: 86, root: 62, gain: 0.028, type: 'triangle', scale: [0, 2, 4, 7, 9], bass: [0, 0, 7, 4], style: 'soft' },
+      regen: { bpm: 94, root: 60, gain: 0.026, type: 'sine', scale: [0, 2, 3, 5, 7, 9], bass: [0, 5, 0, 7], style: 'soft' },
+      rush: { bpm: 126, root: 57, gain: 0.03, type: 'square', scale: [0, 2, 4, 5, 7, 10], bass: [0, 0, 5, 7], style: 'drive' },
+      summon: { bpm: 100, root: 55, gain: 0.027, type: 'triangle', scale: [0, 1, 4, 5, 7, 8], bass: [0, 7, 3, 7], style: 'mystic' },
+      ward: { bpm: 98, root: 64, gain: 0.025, type: 'sine', scale: [0, 2, 5, 7, 9, 12], bass: [0, 7, 0, 5], style: 'glass' },
+      split: { bpm: 112, root: 58, gain: 0.028, type: 'triangle', scale: [0, 3, 5, 7, 10], bass: [0, 3, 7, 3], style: 'drive' },
+      mend: { bpm: 92, root: 61, gain: 0.026, type: 'sine', scale: [0, 2, 4, 5, 7, 9], bass: [0, 4, 7, 4], style: 'soft' },
+      frost: { bpm: 84, root: 66, gain: 0.024, type: 'sine', scale: [0, 2, 5, 7, 11], bass: [0, 7, 5, 0], style: 'ice' },
+      armor: { bpm: 104, root: 50, gain: 0.03, type: 'triangle', scale: [0, 2, 5, 7, 8], bass: [0, 0, 5, 0], style: 'heavy' },
+      wheel: { bpm: 108, root: 48, gain: 0.03, type: 'sawtooth', scale: [0, 1, 3, 6, 7, 10], bass: [0, 3, 6, 3], style: 'dark' },
+      tension: { bpm: 118, root: 52, gain: 0.032, type: 'triangle', scale: [0, 1, 3, 5, 7, 8], bass: [0, 0, 3, 7], style: 'tense' },
+      boss: { bpm: 122, root: 45, gain: 0.034, type: 'sawtooth', scale: [0, 1, 3, 6, 7], bass: [0, 0, 1, 3], style: 'boss' },
+      intense0: { bpm: 138, root: 50, gain: 0.033, type: 'square', scale: [0, 2, 3, 5, 7, 10], bass: [0, 0, 5, 7], style: 'drive' },
+      intense1: { bpm: 146, root: 53, gain: 0.034, type: 'sawtooth', scale: [0, 1, 4, 5, 7, 11], bass: [0, 5, 0, 7], style: 'drive' },
+      intense2: { bpm: 142, root: 48, gain: 0.035, type: 'square', scale: [0, 3, 5, 6, 7, 10], bass: [0, 0, 3, 6], style: 'boss' },
+    },
+    midiHz: function (midi) {
+      return 440 * Math.pow(2, (midi - 69) / 12);
+    },
+    ensure: function () {
+      if (!Sfx.ctx) Sfx.unlock();
+      if (!Sfx.ctx) return null;
+      if (!this.master) {
+        this.master = Sfx.ctx.createGain();
+        this.master.gain.value = 0.0001;
+        this.master.connect(Sfx.ctx.destination);
+      }
+      return this.master;
+    },
+    note: function (when, midi, dur, type, gain) {
+      var ctx = Sfx.ctx;
+      var dest = this.ensure();
+      if (!ctx || !dest) return;
+      try {
+        var osc = ctx.createOscillator();
+        var amp = ctx.createGain();
+        osc.type = type || 'triangle';
+        osc.frequency.setValueAtTime(this.midiHz(midi), when);
+        amp.gain.setValueAtTime(0.0001, when);
+        amp.gain.exponentialRampToValueAtTime(Math.max(0.0001, gain), when + 0.02);
+        amp.gain.exponentialRampToValueAtTime(0.0001, when + Math.max(0.05, dur));
+        osc.connect(amp);
+        amp.connect(dest);
+        osc.start(when);
+        osc.stop(when + dur + 0.03);
+      } catch (error) { /* ignore */ }
+    },
+    kick: function (when, gain) {
+      var ctx = Sfx.ctx;
+      var dest = this.ensure();
+      if (!ctx || !dest) return;
+      try {
+        var osc = ctx.createOscillator();
+        var amp = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(110, when);
+        osc.frequency.exponentialRampToValueAtTime(42, when + 0.12);
+        amp.gain.setValueAtTime(Math.max(0.0001, gain), when);
+        amp.gain.exponentialRampToValueAtTime(0.0001, when + 0.14);
+        osc.connect(amp);
+        amp.connect(dest);
+        osc.start(when);
+        osc.stop(when + 0.16);
+      } catch (error) { /* ignore */ }
+    },
+    resolveKey: function () {
+      if (this.muted) return '';
+      if (state.phase === 'menu' || state.phase === 'gameover' || (screenMenu && !screenMenu.hidden)) return 'menu';
+      if (state.mode === 'infinite' || state.mode === 'custom') {
+        if (state.wave > 0 && isBossWave(state.wave)) return 'boss';
+        if (state.wave <= 0) return 'intense0';
+        return 'intense' + ((state.wave + (state.difficulty === 'hell' ? 1 : 0)) % 3);
+      }
+      if (state.mode === 'campaign') {
+        var kit = campaignKit();
+        var kitId = (kit && kit.id) || 'regen';
+        var bossStage = !!(state.stagePlan && state.stagePlan.index === 5);
+        if (state.wave > 0 && isBossWave(state.wave)) return 'boss';
+        if (bossStage) return 'tension';
+        if (kitId === 'wheel') return 'wheel';
+        return kitId;
+      }
+      return 'menu';
+    },
+    fadeTo: function (level) {
+      var dest = this.ensure();
+      var ctx = Sfx.ctx;
+      if (!dest || !ctx) return;
+      try {
+        dest.gain.cancelScheduledValues(ctx.currentTime);
+        dest.gain.setValueAtTime(Math.max(0.0001, dest.gain.value), ctx.currentTime);
+        dest.gain.exponentialRampToValueAtTime(Math.max(0.0001, level), ctx.currentTime + 0.35);
+      } catch (error) { /* ignore */ }
+    },
+    stop: function () {
+      if (!this.key && !this.timer) return;
+      this.key = '';
+      this.profile = null;
+      this.fadeTo(0.0001);
+      if (this.timer) {
+        clearInterval(this.timer);
+        this.timer = 0;
+      }
+    },
+    start: function (key) {
+      var profile = this.profiles[key];
+      if (!profile) {
+        this.stop();
+        return;
+      }
+      Sfx.unlock();
+      if (!this.ensure()) return;
+      this.key = key;
+      this.profile = profile;
+      this.step = 0;
+      this.nextTime = Sfx.ctx.currentTime + 0.08;
+      this.fadeTo(1);
+      if (!this.timer) {
+        var self = this;
+        this.timer = setInterval(function () { self.pump(); }, 80);
+      }
+      this.pump();
+    },
+    sync: function () {
+      if (this.muted || document.hidden) {
+        this.stop();
+        return;
+      }
+      var key = this.resolveKey();
+      if (!key) {
+        this.stop();
+        return;
+      }
+      if (key !== this.key) this.start(key);
+    },
+    pump: function () {
+      if (this.muted || !this.profile || !Sfx.ctx) return;
+      var ctx = Sfx.ctx;
+      var profile = this.profile;
+      var stepSec = 60 / profile.bpm / 2;
+      var scale = profile.scale;
+      var bass = profile.bass || [0, 0, 7, 4];
+      while (this.nextTime < ctx.currentTime + 0.14) {
+        var i = this.step;
+        var when = this.nextTime;
+        var beat = i % 8;
+        var bar = Math.floor(i / 8) % 4;
+        var bassDeg = bass[i % bass.length];
+        this.note(when, profile.root + bassDeg - 12, stepSec * 1.6, 'triangle', profile.gain * 0.9);
+        if (profile.style === 'drive' || profile.style === 'boss' || profile.style === 'tense' || profile.style === 'heavy') {
+          if (beat % 2 === 0) this.kick(when, profile.gain * (profile.style === 'boss' ? 1.15 : 0.9));
+        } else if (beat === 0 || beat === 4) {
+          this.kick(when, profile.gain * 0.55);
+        }
+        var leadDeg = scale[(i * (profile.style === 'mystic' ? 3 : 2) + bar) % scale.length];
+        if (profile.style === 'soft' || profile.style === 'glass' || profile.style === 'ice') {
+          if (beat % 2 === 0) {
+            this.note(when, profile.root + leadDeg, stepSec * 1.8, profile.type, profile.gain);
+            if (profile.style === 'glass' || profile.style === 'ice') {
+              this.note(when + 0.02, profile.root + leadDeg + 12, stepSec * 1.1, 'sine', profile.gain * 0.45);
+            }
+          }
+        } else if (profile.style === 'mystic' || profile.style === 'dark') {
+          this.note(when, profile.root + leadDeg, stepSec * 1.3, profile.type, profile.gain);
+          if (beat === 3 || beat === 7) {
+            this.note(when, profile.root + scale[(leadDeg + 2) % scale.length] + 12, stepSec * 0.9, 'sine', profile.gain * 0.5);
+          }
+        } else {
+          this.note(when, profile.root + leadDeg, stepSec * 1.15, profile.type, profile.gain);
+          if (beat === 2 || beat === 6) {
+            var hop = scale[(i + 3) % scale.length];
+            this.note(when + stepSec * 0.5, profile.root + hop + 12, stepSec * 0.7, 'triangle', profile.gain * 0.55);
+          }
+          if ((profile.style === 'boss' || profile.style === 'tense') && beat === 0) {
+            this.note(when, profile.root + 3 - 12, stepSec * 3, 'sawtooth', profile.gain * 0.35);
+          }
+        }
+        this.nextTime += stepSec;
+        this.step += 1;
+      }
+    },
+  };
 
   function vibrate(pattern) {
     try {
@@ -1296,6 +1500,7 @@
 
   function tryHopperJump(enemy) {
     if (!PATH_JUMPS.length || enemy.jumpCd > 0 || enemy.jumping) return;
+    if (enemy.recoverGuard > 0) return;
     if (!state.berserk && (enemy.freeze > 0 || enemy.stun > 0)) return;
     if (hoppingCount() >= HOPPER_JUMP_MAX) return;
     var best = null;
@@ -4292,7 +4497,41 @@ function selectedTower() {
     frost: '#9bd4ff',
     armor: '#8aa0b8',
     skull: '#e07a2f',
+    recover: '#fde68a',
   };
+
+  function spawnRecoverGuardFx(x, y) {
+    burst(x, y, '#fde68a', 14);
+    burst(x, y, '#86efac', 8);
+    for (var i = 0; i < 10; i++) {
+      var ang = (Math.PI * 2 * i) / 10;
+      var life = 0.45 + Math.random() * 0.2;
+      state.particles.push({
+        x: x,
+        y: y,
+        vx: Math.cos(ang) * 1.8,
+        vy: Math.sin(ang) * 1.8,
+        life: life,
+        max: life,
+        color: i % 2 ? '#fde68a' : '#ffffff',
+        size: 0.1 + Math.random() * 0.08,
+        shard: true,
+        ang: ang,
+      });
+    }
+    while (state.particles.length > 180) state.particles.shift();
+  }
+
+  // 破甲結束：原地短暫無敵再回復能力
+  function beginRecoverGuard(enemy) {
+    if (!enemy || enemy.dead) return;
+    enemy.recoverGuard = Math.max(enemy.recoverGuard || 0, 0.85);
+    clearControl(enemy);
+    markAbilityFx(enemy, 'recover');
+    var pos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+    spawnRecoverGuardFx(pos.x, pos.y);
+    spawnFloater(pos.x, pos.y - 0.55, '恢復', '#fde68a');
+  }
 
   function markAbilityFx(enemy, kind) {
     enemy.abilityFx = 0.55;
@@ -4371,6 +4610,7 @@ function selectedTower() {
     if (state.mode === 'infinite' || state.mode === 'custom') markBest(n);
     if (plan.boss || plan.elite) Sfx.boss();
     else Sfx.fanfare();
+    Bgm.sync();
     syncHud();
   }
 
@@ -4436,6 +4676,9 @@ function selectedTower() {
       if (enemy.type === 'devil') tickDevilHex(enemy, dt);
       if (enemy.type === 'ram') tickRam(enemy, dt);
       triggerTrap(enemy);
+      tickLateWaveControlWard(enemy, dt);
+      tickFireBreak(enemy, dt);
+      tickRecoverGuard(enemy, dt);
       if (enemy.freeze > 0) enemy.freeze -= dt;
       if (enemy.stun > 0) enemy.stun -= dt;
       if (enemy.rise > 0) enemy.rise = Math.max(0, enemy.rise - dt);
@@ -4460,6 +4703,7 @@ function selectedTower() {
         if (enemy.poisonRuinTime <= 0) {
           enemy.poisonRuin = false;
           enemy.poisonRuinAcc = 0;
+          beginRecoverGuard(enemy);
         }
       }
       var regenRate = hellDeffValue('regen');
@@ -4596,7 +4840,8 @@ function selectedTower() {
     var fresh = !enemy.poisonRuin;
     enemy.poisonRuin = true;
     enemy.poisonRuinRate = 0.03;
-    enemy.poisonRuinTime = Math.max(enemy.poisonRuinTime || 0, 4.5);
+    // 破再生／治癒約 3 秒，之後可再回復
+    enemy.poisonRuinTime = Math.max(enemy.poisonRuinTime || 0, 3);
     if (fresh) {
       var pos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(pos.x, pos.y - 0.7, hasHellDeff('regen') && !isHealRegenEnemy(enemy) ? '克制回血' : '毒蝕', '#3cbf4a');
@@ -4611,18 +4856,28 @@ function selectedTower() {
       enemy.shield = 0;
       fresh = !enemy.fireShieldPaid;
       enemy.fireShieldPaid = true;
+      // 破盾後約 3 秒可再長護盾
+      enemy.wardTimer = Math.min(enemy.wardTimer == null ? 3 : enemy.wardTimer, 3);
       spawnFloater(pos.x, pos.y - 0.55, '破盾', '#e02323');
       shatterShieldFx(pos.x, pos.y);
     }
-    if ((bossHas(enemy, 'armor') || (chapterHasKit('armor') && !enemy.boss)) && !enemy.firePierce) {
+    if (bossHas(enemy, 'armor') || (chapterHasKit('armor') && !enemy.boss)) {
+      if (!enemy.firePierce) {
+        fresh = true;
+        spawnFloater(pos.x, pos.y - 0.75, '破甲', '#e02323');
+      }
       enemy.firePierce = true;
-      fresh = true;
-      spawnFloater(pos.x, pos.y - 0.75, '破甲', '#e02323');
     }
-    if (hasHellDeff('thick') && !enemy.fireThickPaid) {
+    if (hasHellDeff('thick')) {
+      if (!enemy.fireThickPaid) {
+        fresh = true;
+        spawnFloater(pos.x, pos.y - 0.95, '克制厚皮', '#e02323');
+      }
       enemy.fireThickPaid = true;
-      fresh = true;
-      spawnFloater(pos.x, pos.y - 0.95, '克制厚皮', '#e02323');
+    }
+    // 破甲／厚皮／護盾壓制約 3 秒，之後能力可回復
+    if (fresh || enemy.firePierce || enemy.fireThickPaid || enemy.fireShieldPaid) {
+      enemy.fireBreakTime = Math.max(enemy.fireBreakTime || 0, 3);
     }
     if (!fresh) return;
     if (enemy.firePctAt && state.time - enemy.firePctAt < 0.85) return;
@@ -4631,7 +4886,43 @@ function selectedTower() {
   }
 
   function healBlocked(enemy) {
-    return !!(enemy && (enemy.poisonTime > 0 || enemy.poisonRuin || enemy.fogTime > 0));
+    return !!(enemy && (enemy.poisonTime > 0 || enemy.poisonRuin || enemy.fogTime > 0 || (enemy.fireBreakTime > 0)));
+  }
+
+  function controlImmune(enemy) {
+    return !!(enemy && enemy.controlWard > 0);
+  }
+
+  function tickLateWaveControlWard(enemy, dt) {
+    if (!enemy || enemy.dead || state.wave <= 50) return;
+    if (enemy.controlWard > 0) {
+      enemy.controlWard -= dt;
+      if (enemy.controlWard <= 0) enemy.controlWard = 0;
+    }
+    enemy.controlWardCd = (enemy.controlWardCd == null ? (3 + Math.random() * 5) : enemy.controlWardCd) - dt;
+    if (enemy.controlWardCd > 0) return;
+    enemy.controlWardCd = 6 + Math.random() * 8;
+    enemy.controlWard = 2;
+    clearControl(enemy);
+    var pos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+    spawnFloater(pos.x, pos.y - 0.55, '抗控', '#c4b5fd');
+  }
+
+  function tickFireBreak(enemy, dt) {
+    if (!enemy || !(enemy.fireBreakTime > 0)) return;
+    enemy.fireBreakTime -= dt;
+    if (enemy.fireBreakTime > 0) return;
+    enemy.fireBreakTime = 0;
+    enemy.firePierce = false;
+    enemy.fireThickPaid = false;
+    enemy.fireShieldPaid = false;
+    beginRecoverGuard(enemy);
+  }
+
+  function tickRecoverGuard(enemy, dt) {
+    if (!enemy || !(enemy.recoverGuard > 0)) return;
+    enemy.recoverGuard -= dt;
+    if (enemy.recoverGuard <= 0) enemy.recoverGuard = 0;
   }
 
   function castSkullMeteors(enemy) {
@@ -4738,9 +5029,9 @@ function selectedTower() {
       }
     }
     if (id === 'ward' && enemy.shield <= 0) {
-      enemy.wardTimer = (enemy.wardTimer == null ? 8 : enemy.wardTimer) - dt;
+      enemy.wardTimer = (enemy.wardTimer == null ? 3 : enemy.wardTimer) - dt;
       if (enemy.wardTimer <= 0) {
-        enemy.wardTimer = 10;
+        enemy.wardTimer = 7;
         enemy.shield = Math.max(1, Math.round(enemy.maxHp * 0.1));
         enemy.shieldCut = 1;
         tightenShield(enemy);
@@ -4840,7 +5131,7 @@ function selectedTower() {
       if (enemy.shield <= 0) {
         enemy.wardTimer = (enemy.wardTimer == null ? 3 : enemy.wardTimer) - dt;
         if (enemy.wardTimer <= 0) {
-          enemy.wardTimer = 7;
+          enemy.wardTimer = 6;
           enemy.shield = Math.round(enemy.maxHp * 0.2);
           enemy.shieldCut = 1;
           tightenShield(enemy);
@@ -5000,13 +5291,14 @@ function selectedTower() {
 
   function rankBoost(stats) {
     var copy = cloneStats(stats);
-    copy.damage = Math.max(1, Math.round(copy.damage * 1.4));
-    if (copy.range) copy.range = Math.round(copy.range * 1.4 * 100) / 100;
-    if (copy.splash) copy.splash = Math.round(copy.splash * 1.4 * 100) / 100;
-    if (copy.chainRange) copy.chainRange = Math.round(copy.chainRange * 1.4 * 100) / 100;
-    if (copy.poison) copy.poison = Math.max(1, Math.round(copy.poison * 1.4));
-    if (copy.burn) copy.burn = Math.max(1, Math.round(copy.burn * 1.4));
-    if (copy.goldGen) copy.goldGen = Math.max(1, Math.round(copy.goldGen * 1.4));
+    // 6 等覺醒加成略降，避免 10 等後期傷害失控
+    copy.damage = Math.max(1, Math.round(copy.damage * 1.25));
+    if (copy.range) copy.range = Math.round(copy.range * 1.35 * 100) / 100;
+    if (copy.splash) copy.splash = Math.round(copy.splash * 1.3 * 100) / 100;
+    if (copy.chainRange) copy.chainRange = Math.round(copy.chainRange * 1.3 * 100) / 100;
+    if (copy.poison) copy.poison = Math.max(1, Math.round(copy.poison * 1.25));
+    if (copy.burn) copy.burn = Math.max(1, Math.round(copy.burn * 1.25));
+    if (copy.goldGen) copy.goldGen = Math.max(1, Math.round(copy.goldGen * 1.2));
     return copy;
   }
 
@@ -5017,13 +5309,15 @@ function selectedTower() {
 
   function growPastCap(stats, steps) {
     var copy = cloneStats(stats);
-    var power = Math.pow(1.15, steps);
-    var haste = Math.pow(1.05, steps);
+    // 超過表定等數後每等約 +8%（舊 15%），產金更保守
+    var power = Math.pow(1.08, steps);
+    var goldPower = Math.pow(1.05, steps);
+    var haste = Math.pow(1.04, steps);
     if (copy.damage) copy.damage = Math.max(1, Math.round(copy.damage * power));
     if (copy.poison) copy.poison = Math.max(1, Math.round(copy.poison * power));
     if (copy.burn) copy.burn = Math.max(1, Math.round(copy.burn * power));
-    if (copy.goldGen) copy.goldGen = Math.max(1, Math.round(copy.goldGen * power));
-    if (copy.range) copy.range = Math.round(copy.range * (1 + steps * 0.02) * 100) / 100;
+    if (copy.goldGen) copy.goldGen = Math.max(1, Math.round(copy.goldGen * goldPower));
+    if (copy.range) copy.range = Math.round(copy.range * (1 + steps * 0.015) * 100) / 100;
     if (copy.cooldown) copy.cooldown = Math.max(0.08, copy.cooldown / haste);
     return copy;
   }
@@ -5360,7 +5654,7 @@ function selectedTower() {
       var trap = state.traps[i];
       if (trap.c !== c || trap.r !== r) continue;
       state.traps.splice(i, 1);
-      if (state.berserk) spawnFloater(pos.x, pos.y - 0.4, '狂暴', '#ff5a36');
+      if (state.berserk || controlImmune(enemy)) spawnFloater(pos.x, pos.y - 0.4, state.berserk ? '狂暴' : '抗控', '#c4b5fd');
       else if (resists(enemy, 'freeze')) resistFloater(enemy, '抗凍');
       else {
         enemy.freeze = Math.max(enemy.freeze || 0, 3);
@@ -6176,8 +6470,9 @@ function selectedTower() {
   }
 
   function moveSpeed(enemy) {
+    if (enemy.recoverGuard > 0) return 0;
     var speed = enemy.speed;
-    if (!state.berserk) {
+    if (!state.berserk && !controlImmune(enemy)) {
       if (enemy.freeze > 0 || enemy.stun > 0) return 0;
       if (enemy.slowTime > 0) speed *= 1 - (enemy.slow || 0);
     }
@@ -6294,7 +6589,7 @@ function selectedTower() {
   }
 
   function stunEnemy(enemy, time) {
-    if (!enemy || enemy.dead || state.berserk || resists(enemy, 'shock')) return;
+    if (!enemy || enemy.dead || state.berserk || controlImmune(enemy) || resists(enemy, 'shock')) return;
     var fresh = !(enemy.stun > 0);
     enemy.stun = Math.max(enemy.stun || 0, time || 1);
     if (!fresh) return;
@@ -6616,7 +6911,7 @@ function selectedTower() {
   }
 
   function chillEnemy(enemy, slow, slowTime) {
-    if (state.berserk) return;
+    if (state.berserk || controlImmune(enemy)) return;
     var pos = pointAt(enemy.dist);
     if (resists(enemy, 'slow')) resistFloater(enemy, '抗緩');
     else {
@@ -6676,6 +6971,7 @@ function selectedTower() {
 
   function hurtEnemy(enemy, amount, ownerId, opts) {
     if (!enemy || enemy.dead || state.phase !== 'combat') return;
+    if (enemy.recoverGuard > 0) return;
     opts = opts || {};
     if (ownerId) {
       var owner = towerById(ownerId);
@@ -7114,6 +7410,7 @@ function selectedTower() {
     state.phase = 'gameover';
     state.paused = true;
     Sfx.gameOver();
+    Bgm.sync();
     openGameOverModal();
   }
 
@@ -7392,6 +7689,25 @@ function selectedTower() {
   }
 
   var PATCH_NOTES = [
+    {
+      date: '10/29',
+      title: '後期壓力、抗控、破甲恢復、背景音樂、產錢調整',
+      detail: [
+        '難度：10 等後傷害成長變緩；第 50 波後敵人會不定時抗控 2 秒',
+        '克制：毒／火破甲約 3 秒後回復；回復時原地無敵一下並有光環特效',
+        '音樂：輕鬆冒險 BGM；各章特色、王關緊張；無限／自訂以刺激循環為主',
+        '介面：設定可分開開關音樂與音效',
+        '經濟：產錢塔產金下調',
+      ],
+      full: [
+        '傷害：6 等覺醒約 ×1.25（舊 ×1.4）；超過表定等後每等約 +8%（舊 +15%）',
+        '第 50 波後：敵人不定時進入抗控 2 秒，期間麻痺／冰凍／緩速無效，並清掉身上控場',
+        '破甲節奏：毒蝕／火破壓制約 3 秒；結束時原地無敵約 0.85 秒再回復能力，並有金綠光環與碎片特效',
+        'BGM：選單輕鬆冒險；作戰依章節特色；第五關與首領波偏緊張；無限／自訂刺激輪換',
+        '設定／作戰右上：音樂與音效各一個開關',
+        '產錢塔：各等產金 5／6／8／10／13／16；高階產金成長也較慢',
+      ],
+    },
     {
       date: '10/28',
       title: '章節特色、小王／大王、稱號、設定、難度、進度與 ID 同步',
@@ -7732,14 +8048,35 @@ function selectedTower() {
     openSettings();
   }
 
-  function togglePreferredMute() {
-    Sfx.muted = !Sfx.muted;
+  function setSfxMuted(on) {
+    Sfx.muted = !!on;
     saveNumber('fantasia-td-mute', Sfx.muted ? 1 : 0);
     syncSoundButton();
     if (!Sfx.muted) {
       Sfx.unlock();
       Sfx.ui();
     }
+  }
+
+  function setBgmMuted(on) {
+    Bgm.muted = !!on;
+    saveNumber('fantasia-td-bgm-mute', Bgm.muted ? 1 : 0);
+    syncSoundButton();
+    if (!Bgm.muted) {
+      Sfx.unlock();
+      Bgm.sync();
+    } else {
+      Bgm.stop();
+    }
+  }
+
+  function togglePreferredSfx() {
+    setSfxMuted(!Sfx.muted);
+    openSettings();
+  }
+
+  function togglePreferredBgm() {
+    setBgmMuted(!Bgm.muted);
     openSettings();
   }
 
@@ -7839,15 +8176,17 @@ function selectedTower() {
   }
 
   function openSettings() {
-    var muteLabel = Sfx.muted ? '音量：關' : '音量：開';
+    var musicLabel = Bgm.muted ? '音樂：關' : '音樂：開';
+    var sfxLabel = Sfx.muted ? '音效：關' : '音效：開';
     var speedLabel = '預設速度：×' + preferredSpeed();
     openModal({
       tone: 'reward',
       kicker: '目錄',
       title: '設定',
-      desc: '音量、預設速度、代碼與更新細項。',
+      desc: '音樂、音效、預設速度、代碼與更新細項。',
       actions: [
-        { label: muteLabel, className: 'btn-ghost', onClick: togglePreferredMute },
+        { label: musicLabel, className: 'btn-ghost', onClick: togglePreferredBgm },
+        { label: sfxLabel, className: 'btn-ghost', onClick: togglePreferredSfx },
         { label: speedLabel, className: 'btn-ghost', onClick: cyclePreferredSpeed },
         { label: '輸入代碼', className: 'btn-ghost', onClick: openCodeRedeem },
         { label: '更新細項', className: 'btn-ghost', onClick: openPatchFullNotes },
@@ -8604,6 +8943,7 @@ function selectedTower() {
     if (screenWelcome) screenWelcome.hidden = false;
     paintAccount();
     syncRouteBar();
+    Bgm.sync();
   }
 
   var homePick = null;
@@ -8754,6 +9094,7 @@ function selectedTower() {
     paintAccount();
     paintPlayHome();
     syncRouteBar();
+    Bgm.sync();
   }
 
   function appendInfoCard(list, entry) {
@@ -9346,6 +9687,7 @@ function selectedTower() {
         },
       });
     }
+    Bgm.sync();
   }
 
   function resetGame() {
@@ -9820,8 +10162,14 @@ function selectedTower() {
   }
 
   function syncSoundButton() {
-    soundBtn.setAttribute('aria-pressed', Sfx.muted ? 'true' : 'false');
-    soundBtn.setAttribute('aria-label', Sfx.muted ? '開啟音效' : '關閉音效');
+    if (soundBtn) {
+      soundBtn.setAttribute('aria-pressed', Sfx.muted ? 'true' : 'false');
+      soundBtn.setAttribute('aria-label', Sfx.muted ? '開啟音效' : '關閉音效');
+    }
+    if (bgmBtn) {
+      bgmBtn.setAttribute('aria-pressed', Bgm.muted ? 'true' : 'false');
+      bgmBtn.setAttribute('aria-label', Bgm.muted ? '開啟音樂' : '關閉音樂');
+    }
   }
 
   function fitViewport() {
@@ -12034,11 +12382,41 @@ function selectedTower() {
     ctx.restore();
   }
 
+  function drawRecoverGuardFx(x, y, rad, life) {
+    if (!(life > 0)) return;
+    var p = Math.max(0, Math.min(1, life / 0.85));
+    var pulse = 0.5 + 0.5 * Math.sin(state.time * 14);
+    ctx.save();
+    ctx.strokeStyle = '#fde68a';
+    ctx.lineWidth = Math.max(2.4, rad * 0.14);
+    ctx.globalAlpha = (0.55 + 0.35 * pulse) * p;
+    ctx.beginPath();
+    ctx.arc(x, y, rad + 8 + pulse * 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = '#86efac';
+    ctx.lineWidth = Math.max(1.6, rad * 0.08);
+    ctx.globalAlpha = 0.45 * p;
+    ctx.beginPath();
+    ctx.arc(x, y, rad + 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#fde68a';
+    for (var i = 0; i < 6; i++) {
+      var ang = state.time * 3 + i * Math.PI / 3;
+      var rr = rad + 10 + pulse * 2;
+      ctx.globalAlpha = 0.8 * p;
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(ang) * rr, y + Math.sin(ang) * rr, Math.max(1.8, rad * 0.08), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawEnemyStatusFx(enemy, x, y, rad) {
     inkSeed = Math.round((enemy.id || 1) * 17 + rad * 3);
     var t = state.time + (enemy.id || 0) * 0.37;
     var id = enemy.bossId || '';
     var king = !!(enemy.boss || enemy.elite);
+    if (enemy.recoverGuard > 0) drawRecoverGuardFx(x, y, rad, enemy.recoverGuard);
     var regenAura = id === 'regen' || ((hasHellDeff('regen') || chapterHasKit('regen')) && !enemy.boss && !enemy.elite);
     if (regenAura || (enemy.regenShow > 0 && id !== 'mend')) {
       drawRegenAbilityFx(x, y, rad, t, !!(enemy.regenShow > 0 || id === 'regen'));
@@ -12071,7 +12449,7 @@ function selectedTower() {
     var resist = enemy.resist && RESISTS[enemy.resist] ? RESISTS[enemy.resist] : null;
     var colors = enemyBodyColors(enemy, resist);
     var bob = Math.sin(state.time * (enemy.type === 'swift' ? 11 : 7) + enemy.id * 1.7) * rad * 0.08;
-    if (enemy.freeze > 0 && !state.berserk) bob = 0;
+    if ((enemy.freeze > 0 && !state.berserk) || enemy.recoverGuard > 0) bob = 0;
     ctx.save();
     ctx.translate(x, y);
     ctx.lineJoin = 'round';
@@ -12757,7 +13135,9 @@ function selectedTower() {
     var playerCard = document.getElementById('player-card');
     var boardBack = document.getElementById('btn-board-back');
     if (welcomeStart) welcomeStart.addEventListener('click', function () {
+      Sfx.unlock();
       showMenu();
+      Bgm.sync();
       openPatchNotes();
     });
     if (welcomeAccount) welcomeAccount.addEventListener('click', beginGoogleSignIn);
@@ -12855,15 +13235,16 @@ function selectedTower() {
       }
     });
     speedBtn.addEventListener('click', cycleSpeed);
-    soundBtn.addEventListener('click', function () {
-      Sfx.muted = !Sfx.muted;
-      saveNumber('fantasia-td-mute', Sfx.muted ? 1 : 0);
-      syncSoundButton();
-      if (!Sfx.muted) {
-        Sfx.unlock();
-        Sfx.ui();
-      }
-    });
+    if (bgmBtn) {
+      bgmBtn.addEventListener('click', function () {
+        setBgmMuted(!Bgm.muted);
+      });
+    }
+    if (soundBtn) {
+      soundBtn.addEventListener('click', function () {
+        setSfxMuted(!Sfx.muted);
+      });
+    }
     window.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
         if (state.userPaused || (state.phase !== 'menu' && !modal.classList.contains('is-open'))) togglePause();
@@ -12907,6 +13288,9 @@ function selectedTower() {
         updateCosmetic(dt * rate);
         syncHud();
         syncRouteBar();
+        if (Sfx.ctx && !Bgm.muted) Bgm.sync();
+      } else if (Bgm.key) {
+        Bgm.stop();
       }
       render();
     } catch (error) {
