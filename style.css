@@ -930,40 +930,10 @@ canvas[hidden] { display: none !important; }
   height: 100%;
   margin: 0;
   object-fit: cover;
-  object-position: center center;
+  object-position: center top;
   pointer-events: none;
   user-select: none;
   z-index: 0;
-}
-.welcome-logo {
-  position: absolute;
-  left: 50%;
-  top: 26%;
-  width: min(92%, 420px);
-  height: auto;
-  max-height: min(28cqh, 26%);
-  margin: 0;
-  transform: translate(-50%, -50%);
-  object-fit: contain;
-  image-rendering: auto;
-  filter: drop-shadow(0 4px 0 rgba(22, 22, 22, 0.12));
-  z-index: 2;
-  animation: logo-breathe 3.4s ease-in-out infinite;
-  transform-origin: center center;
-  pointer-events: none;
-}
-@keyframes logo-breathe {
-  0%, 100% {
-    transform: translate(-50%, -50%) scale(1);
-    filter: drop-shadow(0 4px 0 rgba(22, 22, 22, 0.12));
-  }
-  50% {
-    transform: translate(-50%, calc(-50% - 5px)) scale(1.045);
-    filter: drop-shadow(0 8px 0 rgba(22, 22, 22, 0.08));
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .welcome-logo { animation: none; transform: translate(-50%, -50%); }
 }
 .welcome-user[hidden],
 .welcome-account[hidden],
