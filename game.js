@@ -22,7 +22,7 @@
       cost: 40,
       color: '#9aa69a',
       category: 'neutral',
-      upgradeCost: [35, 60, 95, 135, 180, 250, 340, 460, 620],
+      upgradeCost: [40, 70, 110, 155, 205, 280, 385, 520, 700],
       levels: [
         { damage: 20, range: 2.35, cooldown: 0.38, splash: 0, targets: 1 },
         { damage: 33, range: 2.5, cooldown: 0.32, splash: 0, targets: 1 },
@@ -58,7 +58,7 @@
       cost: 80,
       color: '#3cbf4a',
       category: 'element',
-      upgradeCost: [55, 85, 120, 160, 210, 290, 390, 520, 700],
+      upgradeCost: [60, 95, 135, 180, 235, 325, 440, 585, 785],
       levels: [
         { damage: 15, range: 2.35, cooldown: 1.05, splash: 0, effect: 'poison', poison: 28, poisonTime: 3.2, poisonEvery: 0.4 },
         { damage: 18, range: 2.4, cooldown: 0.95, splash: 0, effect: 'poison', poison: 35, poisonTime: 3.2, poisonEvery: 0.4 },
@@ -74,7 +74,7 @@
       cost: 90,
       color: '#ff7a45',
       category: 'element',
-      upgradeCost: [60, 95, 135, 180, 230, 310, 420, 560, 750],
+      upgradeCost: [70, 105, 150, 200, 260, 350, 470, 630, 840],
       levels: [
         { damage: 60, range: 2.25, cooldown: 1.1, splash: 0.95, effect: 'burn', burn: 5, burnTime: 2.4, burnEvery: 0.5 },
         { damage: 73, range: 2.3, cooldown: 1.0, splash: 1.02, effect: 'burn', burn: 6, burnTime: 2.4, burnEvery: 0.5 },
@@ -90,7 +90,7 @@
       cost: 85,
       color: '#8fd4ff',
       category: 'element',
-      upgradeCost: [55, 90, 130, 175, 220, 300, 400, 540, 720],
+      upgradeCost: [60, 100, 145, 195, 250, 335, 450, 605, 810],
       levels: [
         { damage: 35, range: 2.3, cooldown: 1.1, splash: 1.1, effect: 'slow', slow: 0.35, slowTime: 1.8 },
         { damage: 43, range: 2.35, cooldown: 1.0, splash: 1.2, effect: 'slow', slow: 0.38, slowTime: 1.8 },
@@ -106,7 +106,7 @@
       cost: 85,
       color: '#e0b000',
       category: 'element',
-      upgradeCost: [55, 90, 130, 175, 220, 300, 400, 540, 720],
+      upgradeCost: [60, 100, 145, 195, 250, 335, 450, 605, 810],
       levels: [
         { damage: 30, range: 2.45, cooldown: 0.72, splash: 0, targets: 1, chain: 2, chainRange: 1.75, stunTime: 1.0 },
         { damage: 40, range: 2.5, cooldown: 0.64, splash: 0, targets: 1, chain: 2, chainRange: 1.85, stunTime: 1.05 },
@@ -122,7 +122,7 @@
       cost: 70,
       color: '#f2c14e',
       category: 'economy',
-      upgradeCost: [50, 80, 115, 155, 200, 270, 360, 480, 640],
+      upgradeCost: [55, 90, 130, 175, 225, 300, 405, 540, 720],
       levels: [
         { damage: 0, range: 0, cooldown: 5.0, goldGen: 5 },
         { damage: 0, range: 0, cooldown: 4.6, goldGen: 6 },
@@ -1239,12 +1239,16 @@
       var elite = stage < 5 && w === count;
       var beat = Math.max(1, Math.ceil((w / count) * 10));
       var late = Math.max(0, beat - 2);
+      var press = chapter > 1 || stage >= 3;
       var grunts = 4 + beat + Math.floor(late * 0.9) + Math.floor(w / 6) + (chapter >= 2 ? 1 : 0) + (chapter >= 5 ? 1 : 0) + (chapter >= 7 ? 1 : 0);
       // Opening: wave 1 holds with one Lv1; wave 2+ needs upgrade or a second tower.
       if (w === 1) grunts = 4;
       else if (w === 2) grunts = 8;
       else if (w === 3) grunts = Math.max(grunts, 8);
       else if (w === 4) grunts = Math.max(grunts, 9);
+      if (press && w >= 3) grunts += 1;
+      if (press && w >= 6) grunts += 1;
+      if (stage >= 4 && w >= 8) grunts += 1;
       var swifts = 0;
       if (w === 2) swifts = 3;
       else if (w === 3) swifts = 3;
@@ -1255,25 +1259,26 @@
       if (stage >= 3 && beat >= 4) swifts += 1;
       if (stage >= 5 && beat >= 5) swifts += 1;
       if (chapter >= 3 && beat >= 5) swifts += 1;
+      if (press && w >= 4) swifts += 1;
       var brutes = 0;
-      // Elite from wave 6 so early 1-5 is not an auto-leak.
-      if (!boss && w >= 6) brutes = 1;
-      if (!boss && stage >= 3 && beat >= 5 && w >= 8) brutes = Math.max(brutes, 1);
-      if (!boss && stage >= 4 && beat >= 6 && w >= 10) brutes += 1;
+      // Elite from wave 6 so early 1-1／1-2 不會秒漏；1-3 起提前加壓
+      if (!boss && w >= (press ? 5 : 6)) brutes = 1;
+      if (!boss && stage >= 3 && beat >= 5 && w >= 7) brutes = Math.max(brutes, 1);
+      if (!boss && stage >= 4 && beat >= 6 && w >= 9) brutes += 1;
       if (!boss && stage === 5 && beat >= 5 && w >= 10 && w % 2 === 0) brutes += 1;
       if (!boss && chapter >= 5 && stage >= 3 && beat >= 6 && w >= 10) brutes += 1;
       if (!boss && chapter >= 7 && stage >= 4 && w === count - 1) brutes += 1;
       var hoppers = 0;
-      if (!boss && w >= 6) {
-        hoppers = 1 + Math.floor((w - 6) / 5);
-        if (stage >= 3 && w >= 10) hoppers += 1;
+      if (!boss && w >= (press ? 5 : 6)) {
+        hoppers = 1 + Math.floor((w - (press ? 5 : 6)) / 5);
+        if (stage >= 3 && w >= 9) hoppers += 1;
         if (chapter >= 4 && beat >= 6) hoppers += 1;
         hoppers = Math.min(stage >= 4 ? 3 : 2, hoppers);
       }
       var devils = 0;
-      if (!boss && w >= 8) {
-        devils = 1 + Math.floor((w - 8) / 6);
-        if (stage >= 4 && w >= 12) devils += 1;
+      if (!boss && w >= (press ? 7 : 8)) {
+        devils = 1 + Math.floor((w - (press ? 7 : 8)) / 6);
+        if (stage >= 4 && w >= 11) devils += 1;
         if (chapter >= 5 && beat >= 7) devils += 1;
         devils = Math.min(stage >= 5 ? 3 : 2, devils);
       }
@@ -1378,7 +1383,15 @@
           waves: buildWaves(c, s),
           goals: stageGoalList(c, s),
           initialGold: 65 + (c - 1) * 4 + (s - 1) * 2 + (c >= 5 ? 6 : 0) + (c >= 7 ? 8 : 0),
-          hpScale: Math.round((1 + (c - 1) * 0.08 + (s - 1) * 0.03) * 1.05 * 100) / 100,
+          hpScale: (function () {
+            var hp = (1 + (c - 1) * 0.08 + (s - 1) * 0.03) * 1.05;
+            // 1-1／1-2 維持教學手感；1-3 起血量壓力明顯上升
+            if (!(c === 1 && s <= 2)) {
+              var pressure = 1.14 + Math.max(0, s - 2) * 0.03 + Math.max(0, c - 1) * 0.02;
+              hp *= Math.min(1.28, pressure);
+            }
+            return Math.round(hp * 100) / 100;
+          })(),
         });
       }
     }
@@ -1585,6 +1598,10 @@ function selectedTower() {
       within += progress * 1.2;
       var stageRamp = Math.min(1, Math.max(0, (wave - 1) / 5));
       var stageBoost = (state.stagePlan.chapter - 1) * 0.48 + (state.stagePlan.index - 1) * 0.48 * stageRamp;
+      // 1-3 起額外威脅；1-1／1-2 維持原曲線
+      if (!(state.stagePlan.chapter === 1 && state.stagePlan.index <= 2)) {
+        stageBoost += 0.4 + (state.stagePlan.index - 1) * 0.14 + Math.max(0, state.stagePlan.chapter - 1) * 0.1;
+      }
       var raw = within + stageBoost;
       // Soft-cap very high threat so late bosses do not explode while mid-run stays harsh.
       if (raw > 16) return 16 + (raw - 16) * 0.42;
@@ -2524,11 +2541,12 @@ function selectedTower() {
       speedGrow = diff.speedGrow;
       speedCap = diff.speedCap;
     } else if (state.mode === 'campaign') {
-      growth = 1.15;
-      goldMul = 0.72;
-      speedMul = 1.02;
-      speedGrow = 0.032;
-      speedCap = 1.48;
+      var stagePress = state.stagePlan && !(state.stagePlan.chapter === 1 && state.stagePlan.index <= 2);
+      growth = stagePress ? 1.165 : 1.15;
+      goldMul = stagePress ? 0.68 : 0.72;
+      speedMul = stagePress ? 1.04 : 1.02;
+      speedGrow = stagePress ? 0.036 : 0.032;
+      speedCap = stagePress ? 1.52 : 1.48;
     } else if (state.mode === 'custom') {
       growth = 1.2;
       hpMul *= 1.22;
@@ -7169,25 +7187,34 @@ function selectedTower() {
     burst(pos.x, pos.y, '#efe6d6', 8);
   }
 
+  function splitSpawnDist(base, offset) {
+    // 不要貼在終點，否則分裂體一出來就漏關
+    var cap = Math.max(0, WAYPOINTS.length - 1.55);
+    return Math.max(0, Math.min((base || 0) + (offset || 0), cap));
+  }
+
   function killEnemy(enemy) {
     if (enemy.dead) return;
     enemy.dead = true;
+    var parentGold = Math.max(0, Math.round(Number(enemy.gold) || 0));
     if (bossHas(enemy, 'split')) {
       var splitCount = enemy.elite ? 2 : 3;
+      var shardHp = Math.max(1, Math.round(Number(enemy.splitHp) || enemy.maxHp * 0.28 || 1));
       for (var s = 0; s < splitCount; s++) {
         var shard = makeEnemy('swift', state.wave);
         shard.type = 'shard';
-        shard.hp = enemy.splitHp;
-        shard.maxHp = enemy.splitHp;
+        shard.hp = shardHp;
+        shard.maxHp = shardHp;
         shard.color = '#e4c6ff';
         shard.radius = 0.26;
-        shard.gold = 5 + state.wave;
+        shard.gold = 0;
         shard.leak = 1;
         shard.resist = '';
         shard.flying = false;
         shard.noSplit = true;
-        shard.dist = Math.max(0, Math.min(enemy.dist + (s - (splitCount - 1) / 2) * 0.22, WAYPOINTS.length - 1.05));
-        queueEnemy(shard);
+        shard.skipHellStats = true;
+        shard.dist = splitSpawnDist(enemy.dist, (s - (splitCount - 1) / 2) * 0.22);
+        pushEnemy(shard);
       }
       var splitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(splitPos.x, splitPos.y - 0.5, '分裂', '#c084fc');
@@ -7199,12 +7226,13 @@ function selectedTower() {
         var kitChild = makeEnemy('grunt', state.wave);
         kitChild.hp = kitChildHp;
         kitChild.maxHp = kitChildHp;
-        kitChild.gold = Math.max(1, Math.floor((enemy.gold || 1) * 0.2));
+        kitChild.gold = 0;
         kitChild.leak = 1;
         kitChild.noSplit = true;
+        kitChild.skipHellStats = true;
         kitChild.radius = Math.max(0.2, (enemy.radius || 0.3) * 0.78);
-        kitChild.dist = Math.max(0, Math.min(enemy.dist + (ks === 0 ? -0.18 : 0.18), WAYPOINTS.length - 1.05));
-        queueEnemy(kitChild);
+        kitChild.dist = splitSpawnDist(enemy.dist, ks === 0 ? -0.18 : 0.18);
+        pushEnemy(kitChild);
       }
       var kitSplitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(kitSplitPos.x, kitSplitPos.y - 0.45, '分裂', '#c084fc');
@@ -7218,27 +7246,30 @@ function selectedTower() {
         var child = makeEnemy(childType, state.wave);
         child.hp = childHp;
         child.maxHp = childHp;
-        child.gold = Math.max(1, Math.floor((enemy.gold || 1) * 0.2));
+        child.gold = 0;
         child.leak = 1;
         child.noSplit = true;
         child.skipHellStats = true;
         child.resist = enemy.resist || '';
         child.radius = Math.max(0.2, (enemy.radius || 0.3) * 0.78);
         if (spdBonus > 0) child.speed *= 1 + spdBonus;
-        child.dist = Math.max(0, Math.min(enemy.dist + (h === 0 ? -0.18 : 0.18), WAYPOINTS.length - 1.05));
-        queueEnemy(child);
+        child.dist = splitSpawnDist(enemy.dist, h === 0 ? -0.18 : 0.18);
+        pushEnemy(child);
       }
       var hellPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(hellPos.x, hellPos.y - 0.45, '裂殖', '#ff8fab');
     }
-    var gain = scaledKillGold(enemy.gold);
-    state.gold += gain;
-    state.waveGoldEarned += gain;
+    var gain = parentGold > 0 ? Math.max(1, scaledKillGold(parentGold)) : 0;
+    if (gain > 0) {
+      state.gold += gain;
+      state.waveGoldEarned += gain;
+      var pos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+      spawnFloater(pos.x, pos.y - 0.1, '+' + gain, '#f2c14e');
+    }
     enemy.gold = gain;
     rewardHeroKill(enemy);
-    var pos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
-    spawnFloater(pos.x, pos.y - 0.1, '+' + enemy.gold, '#f2c14e');
-    burst(pos.x, pos.y, enemy.color, 10);
+    var burstPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+    burst(burstPos.x, burstPos.y, enemy.color, 10);
     Sfx.kill();
   }
 
@@ -7801,12 +7832,15 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/30',
-      title: '排行榜同步、歡迎頁、塔等傷害與 11 等',
+      title: '排行榜同步、歡迎頁、塔等傷害與 11 等、關卡加壓',
       detail: [
         '排行：同一 Google 手機／電腦地獄成績會合併上榜；本機較高波次登入後會補推雲端',
         '介面：歡迎頁新插畫；整頁內縮；Google 登入改彩色標誌單行文案',
         '玩法：1–10 等塔傷約提高 1/4；「塔升級」卡可到 11 等，同屬塔越多複合 buff 越高',
         '外觀：箭／砲／毒／火／冰／雷 11 等各有傳奇造型；圖鑑塔明細下方可預覽',
+        '修正：分裂體不貼終點秒漏；分裂出來的怪擊殺不給金幣',
+        '難度：1-3 起關卡明顯變難（血量、數量、速度）；1-1／1-2 仍偏教學',
+        '經濟：各塔金幣升級費用約提高一成多',
       ],
       full: [
         '排行：寫入規則允許名片框／稱號；地獄榜成績不再被擋',
@@ -7816,6 +7850,10 @@ function selectedTower() {
         '等級：金幣仍最高 10（需鐵匠）；只有「塔升級」卡可到 11',
         '11 等：半徑約 2.6 格；同屬塔越多複合越高（每座攻擊 +8%／攻速 +3.5%，上限 40%／18%），可與樂手疊加',
         '11 等造型：金環五芒星暈；箭雙矢金鏃、砲焰口、毒多滴、火雙焰、冰晶雪、雷弧閃；圖鑑「塔明細」各塔下方有 ★11 預覽',
+        '分裂：分裂體出生點遠離終點；分裂體／裂殖體擊殺金幣為 0（本體仍給錢）',
+        '關卡：1-1／1-2 不變；1-3 起 hpScale 約 +14～28%、波次怪數增加、精英／跳躍／惡魔提早出現',
+        '關卡：加壓關成長約 1.165、金幣 ×0.68、移速略升；威脅曲線額外加成',
+        '升級金：無屬 40→70→110…；毒／火／冰／雷／產錢各表約 ×1.12；鐵匠之後超表仍依末檔 ×1.32 遞增',
       ],
     },
     {
@@ -9398,7 +9436,7 @@ function selectedTower() {
       {
         tag: '首領', title: '分裂王', paint: { kind: 'enemy', type: 'grunt', color: '#c084fc', bossId: 'split' },
         desc: '有手腳的大王，肩膀還長兩顆小頭，戴黃冠。只會在 5-5 最後一波出現。',
-        stats: ['<strong>出現</strong>：5-5 最後一波', '<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：分裂體金幣較低'],
+        stats: ['<strong>出現</strong>：5-5 最後一波', '<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：本體有錢；分裂體擊殺不給錢'],
       },
       {
         tag: '首領', title: '治癒王', paint: { kind: 'enemy', type: 'grunt', color: '#ff8fab', bossId: 'mend' },
@@ -9452,7 +9490,7 @@ function selectedTower() {
       stats: [
         '<strong>造價</strong>：40',
         '<strong>1→2 等</strong>：傷 16→26 · 射程 2.35→2.5',
-        '<strong>升級金</strong>：35 → 60 →（分支）',
+        '<strong>升級金</strong>：40 → 70 →（分支）',
       ],
     });
     appendInfoCard(list, {
@@ -9659,7 +9697,7 @@ function selectedTower() {
       if (def.id === 'speed') detail = '<strong>數值</strong>：移速 +' + Math.round(def.full * 100) + '%';
       else if (def.id === 'lock') detail = '<strong>數值</strong>：隨機鎖塔 ' + def.full + ' 秒';
       else if (def.id === 'boss') detail = '<strong>效果</strong>：每波額外隨機出一支王';
-      else if (def.id === 'split') detail = '<strong>數值</strong>：死後裂成兩隻，各帶 ' + Math.round(def.full * 100) + '% 血';
+      else if (def.id === 'split') detail = '<strong>數值</strong>：死後裂成兩隻，各帶 ' + Math.round(def.full * 100) + '% 血；分裂體擊殺不給錢';
       else if (def.id === 'regen') detail = '<strong>數值</strong>：每秒回復 ' + Math.round(def.full * 100) + '% 血 · 毒克制';
       else if (def.id === 'enrage') detail = '<strong>觸發</strong>：血量 ≤10% 時加速 ' + Math.round(def.full * 100) + '%';
       else if (def.id === 'thick') detail = '<strong>數值</strong>：血量 +' + Math.round(def.full * 100) + '% · 火克制';
