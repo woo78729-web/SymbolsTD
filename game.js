@@ -1282,6 +1282,18 @@
         if (chapter >= 5 && beat >= 7) devils += 1;
         devils = Math.min(stage >= 5 ? 3 : 2, devils);
       }
+      // 第 10 波後中後期偏鬆，補數量與特殊怪壓力（首領波不加精英堆疊）
+      if (w >= 11) {
+        grunts += 2 + Math.floor((w - 10) / 3);
+        swifts += 1 + (w >= 14 ? 1 : 0);
+        if (!boss) {
+          brutes = Math.max(brutes, 1);
+          if (w >= 13) brutes += 1;
+          if (w >= 16 && w % 2 === 0) brutes += 1;
+          hoppers = Math.min(stage >= 4 ? 4 : 3, hoppers + 1 + (w >= 15 ? 1 : 0));
+          devils = Math.min(stage >= 5 ? 4 : 3, Math.max(devils, 1) + (w >= 14 ? 1 : 0));
+        }
+      }
       var bones = 0;
       if (chapter === 9 && !boss) {
         if (stage === 1) bones = w >= 8 && w % 2 === 0 ? 1 : 0;
@@ -1596,6 +1608,11 @@ function selectedTower() {
       var within = 2.6 + (wave - 2) * 0.95;
       if (wave >= 5) within += (Math.min(wave, 12) - 4) * 0.4;
       if (wave > 12) within += (wave - 12) * 0.24;
+      // 第 10 波後威脅續爬，避免中後期血量成長掉速
+      if (wave >= 11) {
+        within += (wave - 10) * 0.62;
+        if (wave >= 15) within += (wave - 14) * 0.28;
+      }
       within += progress * 1.2;
       var stageRamp = Math.min(1, Math.max(0, (wave - 1) / 5));
       var stageBoost = (state.stagePlan.chapter - 1) * 0.48 + (state.stagePlan.index - 1) * 0.48 * stageRamp;
@@ -1604,8 +1621,10 @@ function selectedTower() {
         stageBoost += 0.35 + (state.stagePlan.index - 1) * 0.12 + Math.max(0, state.stagePlan.chapter - 1) * 0.08;
       }
       var raw = within + stageBoost;
-      // Soft-cap very high threat so late bosses do not explode while mid-run stays harsh.
-      if (raw > 16) return 16 + (raw - 16) * 0.42;
+      // Soft-cap：第 10 波後門檻提高、衰減變緩，讓長關後半仍有壓力
+      var softAt = wave >= 11 ? 18.5 : 16;
+      var softFactor = wave >= 11 ? 0.58 : 0.42;
+      if (raw > softAt) return softAt + (raw - softAt) * softFactor;
       return raw;
     }
     if ((state.mode === 'infinite' || state.mode === 'custom') && wave > 30) {
@@ -2548,6 +2567,11 @@ function selectedTower() {
       speedMul = stagePress ? 1.035 : 1.02;
       speedGrow = stagePress ? 0.034 : 0.032;
       speedCap = stagePress ? 1.50 : 1.48;
+      if (wave >= 11) {
+        hpMul *= 1.08 + Math.min(0.14, (wave - 10) * 0.018);
+        speedMul *= 1.03;
+        speedCap = Math.min(1.62, speedCap + 0.04 + Math.min(0.08, (wave - 10) * 0.01));
+      }
     } else if (state.mode === 'custom') {
       growth = 1.2;
       hpMul *= 1.22;
@@ -7841,7 +7865,7 @@ function selectedTower() {
         '玩法：1–10 等塔傷約提高 1/4；「塔升級」卡可到 11 等，同屬塔越多複合 buff 越高',
         '外觀：箭／砲／毒／火／冰／雷 11 等各有傳奇造型；圖鑑塔明細下方可預覽',
         '修正：分裂體不貼終點秒漏；分裂出來的怪擊殺不給金幣',
-        '難度：1-3 起仍比教學關難；配合升級金上調，血量／威脅／金幣略收回一截',
+        '難度：1-3 起仍比教學關難；一般關第 10 波後補中後期壓力',
         '經濟：各塔金幣升級費用約提高一成多；廣告贈塔改為 1～2 等',
       ],
       full: [
@@ -7853,8 +7877,9 @@ function selectedTower() {
         '11 等：半徑約 2.6 格；同屬塔越多複合越高（每座攻擊 +8%／攻速 +3.5%，上限 40%／18%），可與樂手疊加',
         '11 等造型：金環五芒星暈；箭雙矢金鏃、砲焰口、毒多滴、火雙焰、冰晶雪、雷弧閃；圖鑑「塔明細」各塔下方有 ★11 預覽',
         '分裂：分裂體出生點遠離終點；分裂體／裂殖體擊殺金幣為 0（本體仍給錢）',
-        '關卡：1-1／1-2 不變；1-3 起 hpScale 壓力約 1.12～1.26（較上一檔收回）',
-        '關卡：加壓關成長約 1.16、金幣 ×0.70、移速微升；威脅加成略收；中後波怪數不再額外加一檔',
+        '關卡：1-1／1-2 前半不變；1-3 起 hpScale 壓力約 1.12～1.26',
+        '關卡：加壓關成長約 1.16、金幣 ×0.70；第 11 波起小怪／飛行／精英／跳躍／惡魔加量',
+        '關卡：第 11 波起威脅續爬、軟上限放寬；血量約 +8% 起、移速上限略升',
         '升級金：無屬 40→70→110…；毒／火／冰／雷／產錢各表約 ×1.12；鐵匠之後超表仍依末檔 ×1.32 遞增',
         '廣告贈塔：隨機 1 或 2 等（不再出 3 等／直接分支）',
       ],
