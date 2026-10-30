@@ -7244,7 +7244,7 @@ function selectedTower() {
         shard.noSplit = true;
         shard.skipHellStats = true;
         shard.dist = splitSpawnDist(enemy.dist, (s - (splitCount - 1) / 2) * 0.22);
-        pushEnemy(shard);
+        queueEnemy(shard);
       }
       var splitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(splitPos.x, splitPos.y - 0.5, '分裂', '#c084fc');
@@ -7262,7 +7262,7 @@ function selectedTower() {
         kitChild.skipHellStats = true;
         kitChild.radius = Math.max(0.2, (enemy.radius || 0.3) * 0.78);
         kitChild.dist = splitSpawnDist(enemy.dist, ks === 0 ? -0.18 : 0.18);
-        pushEnemy(kitChild);
+        queueEnemy(kitChild);
       }
       var kitSplitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(kitSplitPos.x, kitSplitPos.y - 0.45, '分裂', '#c084fc');
@@ -7284,7 +7284,7 @@ function selectedTower() {
         child.radius = Math.max(0.2, (enemy.radius || 0.3) * 0.78);
         if (spdBonus > 0) child.speed *= 1 + spdBonus;
         child.dist = splitSpawnDist(enemy.dist, h === 0 ? -0.18 : 0.18);
-        pushEnemy(child);
+        queueEnemy(child);
       }
       var hellPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
       spawnFloater(hellPos.x, hellPos.y - 0.45, '裂殖', '#ff8fab');
@@ -7863,13 +7863,13 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/30',
-      title: '排行榜同步、歡迎頁、塔等傷害與 11 等、關卡加壓',
+      title: '排行榜同步、歡迎頁、塔等傷害與 11 等、關卡加壓、分裂金幣',
       detail: [
         '排行：同一 Google 手機／電腦地獄成績會合併上榜；本機較高波次登入後會補推雲端',
         '介面：歡迎頁新插畫；整頁內縮；Google 登入改彩色標誌單行文案',
         '玩法：1–10 等塔傷約提高 1/4；「塔升級」卡可到 11 等，同屬塔越多複合 buff 越高',
         '外觀：箭／砲／毒／火／冰／雷 11 等各有傳奇造型；圖鑑塔明細下方可預覽',
-        '修正：分裂體不貼終點秒漏；本體正常掉錢，分裂體擊殺只給很少金幣',
+        '修正：分裂章／分裂王擊殺會正常掉錢並長出分裂體；分裂體擊殺只給很少金幣',
         '難度：1-3 起仍比教學關難；一般關第 10 波後補中後期壓力',
         '經濟：各塔金幣升級費用約提高一成多；廣告贈塔改為 1～2 等',
       ],
@@ -7881,7 +7881,7 @@ function selectedTower() {
         '等級：金幣仍最高 10（需鐵匠）；只有「塔升級」卡可到 11',
         '11 等：半徑約 2.6 格；同屬塔越多複合越高（每座攻擊 +8%／攻速 +3.5%，上限 40%／18%），可與樂手疊加',
         '11 等造型：金環五芒星暈；箭雙矢金鏃、砲焰口、毒多滴、火雙焰、冰晶雪、雷弧閃；圖鑑「塔明細」各塔下方有 ★11 預覽',
-        '分裂：分裂體出生點遠離終點；本體正常掉錢；分裂體／裂殖體擊殺約正常兩成（至少 1）',
+        '分裂：修好擊殺中斷；本體正常掉錢；分裂體／裂殖體約正常兩成（至少 1）；出生點遠離終點',
         '關卡：1-1／1-2 前半不變；1-3 起 hpScale 壓力約 1.12～1.26',
         '關卡：加壓關成長約 1.16、金幣 ×0.70；第 11 波起小怪／飛行／精英／跳躍／惡魔加量',
         '關卡：第 11 波起威脅續爬、軟上限放寬；血量約 +8% 起、移速上限略升',
