@@ -7218,6 +7218,11 @@ function selectedTower() {
     return Math.max(0, Math.min((base || 0) + (offset || 0), cap));
   }
 
+  // 分裂體／裂殖體擊殺只給很少錢（約正常的兩成，至少 1）
+  function splitChildGold(raw) {
+    return Math.max(1, Math.round((Number(raw) || 2) * 0.2));
+  }
+
   function killEnemy(enemy) {
     if (enemy.dead) return;
     enemy.dead = true;
@@ -7232,7 +7237,7 @@ function selectedTower() {
         shard.maxHp = shardHp;
         shard.color = '#e4c6ff';
         shard.radius = 0.26;
-        shard.gold = 0;
+        shard.gold = splitChildGold(shard.gold);
         shard.leak = 1;
         shard.resist = '';
         shard.flying = false;
@@ -7251,7 +7256,7 @@ function selectedTower() {
         var kitChild = makeEnemy('grunt', state.wave);
         kitChild.hp = kitChildHp;
         kitChild.maxHp = kitChildHp;
-        kitChild.gold = 0;
+        kitChild.gold = splitChildGold(kitChild.gold);
         kitChild.leak = 1;
         kitChild.noSplit = true;
         kitChild.skipHellStats = true;
@@ -7271,7 +7276,7 @@ function selectedTower() {
         var child = makeEnemy(childType, state.wave);
         child.hp = childHp;
         child.maxHp = childHp;
-        child.gold = 0;
+        child.gold = splitChildGold(child.gold);
         child.leak = 1;
         child.noSplit = true;
         child.skipHellStats = true;
@@ -7864,7 +7869,7 @@ function selectedTower() {
         '介面：歡迎頁新插畫；整頁內縮；Google 登入改彩色標誌單行文案',
         '玩法：1–10 等塔傷約提高 1/4；「塔升級」卡可到 11 等，同屬塔越多複合 buff 越高',
         '外觀：箭／砲／毒／火／冰／雷 11 等各有傳奇造型；圖鑑塔明細下方可預覽',
-        '修正：分裂體不貼終點秒漏；分裂出來的怪擊殺不給金幣',
+        '修正：分裂體不貼終點秒漏；本體正常掉錢，分裂體擊殺只給很少金幣',
         '難度：1-3 起仍比教學關難；一般關第 10 波後補中後期壓力',
         '經濟：各塔金幣升級費用約提高一成多；廣告贈塔改為 1～2 等',
       ],
@@ -7876,7 +7881,7 @@ function selectedTower() {
         '等級：金幣仍最高 10（需鐵匠）；只有「塔升級」卡可到 11',
         '11 等：半徑約 2.6 格；同屬塔越多複合越高（每座攻擊 +8%／攻速 +3.5%，上限 40%／18%），可與樂手疊加',
         '11 等造型：金環五芒星暈；箭雙矢金鏃、砲焰口、毒多滴、火雙焰、冰晶雪、雷弧閃；圖鑑「塔明細」各塔下方有 ★11 預覽',
-        '分裂：分裂體出生點遠離終點；分裂體／裂殖體擊殺金幣為 0（本體仍給錢）',
+        '分裂：分裂體出生點遠離終點；本體正常掉錢；分裂體／裂殖體擊殺約正常兩成（至少 1）',
         '關卡：1-1／1-2 前半不變；1-3 起 hpScale 壓力約 1.12～1.26',
         '關卡：加壓關成長約 1.16、金幣 ×0.70；第 11 波起小怪／飛行／精英／跳躍／惡魔加量',
         '關卡：第 11 波起威脅續爬、軟上限放寬；血量約 +8% 起、移速上限略升',
@@ -9464,7 +9469,7 @@ function selectedTower() {
       {
         tag: '首領', title: '分裂王', paint: { kind: 'enemy', type: 'grunt', color: '#c084fc', bossId: 'split' },
         desc: '有手腳的大王，肩膀還長兩顆小頭，戴黃冠。只會在 5-5 最後一波出現。',
-        stats: ['<strong>出現</strong>：5-5 最後一波', '<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：本體有錢；分裂體擊殺不給錢'],
+        stats: ['<strong>出現</strong>：5-5 最後一波', '<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：本體正常；分裂體很少'],
       },
       {
         tag: '首領', title: '治癒王', paint: { kind: 'enemy', type: 'grunt', color: '#ff8fab', bossId: 'mend' },
@@ -9725,7 +9730,7 @@ function selectedTower() {
       if (def.id === 'speed') detail = '<strong>數值</strong>：移速 +' + Math.round(def.full * 100) + '%';
       else if (def.id === 'lock') detail = '<strong>數值</strong>：隨機鎖塔 ' + def.full + ' 秒';
       else if (def.id === 'boss') detail = '<strong>效果</strong>：每波額外隨機出一支王';
-      else if (def.id === 'split') detail = '<strong>數值</strong>：死後裂成兩隻，各帶 ' + Math.round(def.full * 100) + '% 血；分裂體擊殺不給錢';
+      else if (def.id === 'split') detail = '<strong>數值</strong>：死後裂成兩隻，各帶 ' + Math.round(def.full * 100) + '% 血；分裂體擊殺金幣很少';
       else if (def.id === 'regen') detail = '<strong>數值</strong>：每秒回復 ' + Math.round(def.full * 100) + '% 血 · 毒克制';
       else if (def.id === 'enrage') detail = '<strong>觸發</strong>：血量 ≤10% 時加速 ' + Math.round(def.full * 100) + '%';
       else if (def.id === 'thick') detail = '<strong>數值</strong>：血量 +' + Math.round(def.full * 100) + '% · 火克制';
