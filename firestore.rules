@@ -23,7 +23,12 @@ service cloud.firestore {
           && request.resource.data.name.size() <= 24
           && request.resource.data.picture is string
           && request.resource.data.picture.size() <= 500
-          && request.resource.data.keys().hasOnly(['uid', 'name', 'picture', 'wave', 'updated']);
+          && request.resource.data.frame is string
+          && request.resource.data.frame.size() <= 24
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 24
+          && (!('updated' in request.resource.data.keys()) || request.resource.data.updated is timestamp)
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'picture', 'frame', 'title', 'wave', 'updated']);
       }
       allow read: if knownBoard();
       allow create: if knownBoard() && signedIn() && validScore();
@@ -48,8 +53,12 @@ service cloud.firestore {
           && request.resource.data.name.size() <= 24
           && request.resource.data.picture is string
           && request.resource.data.picture.size() <= 500
+          && request.resource.data.frame is string
+          && request.resource.data.frame.size() <= 24
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 24
           && request.resource.data.updated is timestamp
-          && request.resource.data.keys().hasOnly(['uid', 'name', 'picture', 'wave', 'updated']);
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'picture', 'frame', 'title', 'wave', 'updated']);
       }
       function thisWeek() {
         return weekId == string(weekKeyOf(request.time.toMillis()));

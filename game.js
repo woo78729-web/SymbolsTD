@@ -2865,12 +2865,27 @@ function selectedTower() {
   function scoreRow(account, wave) {
     return {
       uid: account.uid,
-      name: account.name,
+      name: String((account && account.name) || '玩家').trim().slice(0, 24) || '玩家',
       picture: profilePicture(account),
-      frame: frameUnlocked(account.frame) ? account.frame : '',
-      title: titleUnlocked(account.title) ? account.title : '',
-      wave: wave,
+      frame: frameUnlocked(account && account.frame) ? account.frame : '',
+      title: titleUnlocked(account && account.title) ? account.title : '',
+      wave: Math.floor(Number(wave) || 0),
     };
+  }
+
+  function applyCloudBest(boardId, wave) {
+    wave = Math.floor(Number(wave) || 0);
+    if (!(wave > 0)) return;
+    var mode = boardId.indexOf('custom-') === 0 ? 'custom' : 'infinite';
+    var diff = boardId.indexOf('-hell') >= 0 ? 'hell' : 'normal';
+    var key = (mode === 'custom' ? 'fantasia-td-custom-best-' : 'fantasia-td-best-') + diff;
+    if (wave > loadNumber(key)) saveNumber(key, wave);
+    if (mode === 'infinite' && diff === 'normal' && wave > loadNumber('fantasia-td-best')) {
+      saveNumber('fantasia-td-best', wave);
+    }
+    if ((state.mode === 'infinite' || state.mode === 'custom') && runProfile() && runProfile().id === diff) {
+      if (wave > state.best) state.best = wave;
+    }
   }
 
   function paintLocalBoardCard() {
@@ -2949,10 +2964,11 @@ function selectedTower() {
         return null;
       }
       for (var i = 0; i < rows.length; i++) {
-        if (rows[i].uid === account.uid) {
-          onlineRanks[boardId] = rankInRows(rows, i);
-          return null;
-        }
+        if (rows[i].uid !== account.uid) continue;
+        onlineRanks[boardId] = rankInRows(rows, i);
+        applyCloudBest(boardId, rows[i].wave);
+        weekBests[boardId] = { week: week, wave: Math.max((weekBests[boardId] && weekBests[boardId].week === week ? weekBests[boardId].wave : 0), rows[i].wave) };
+        return null;
       }
       return col.doc(account.uid).get().then(function (mine) {
         if (!mine.exists) {
@@ -2960,6 +2976,8 @@ function selectedTower() {
           return null;
         }
         var mineWave = Number((mine.data() || {}).wave) || 0;
+        applyCloudBest(boardId, mineWave);
+        weekBests[boardId] = { week: week, wave: Math.max((weekBests[boardId] && weekBests[boardId].week === week ? weekBests[boardId].wave : 0), mineWave) };
         if (mineWave >= HELL_MIN_WAVE) {
           return col.where('wave', '>', mineWave).count().get().then(function (countSnap) {
             onlineRanks[boardId] = (countSnap.data().count || 0) + 1;
@@ -2986,11 +3004,24 @@ function selectedTower() {
     var jobs = [];
     for (var i = 0; i < BOARD_TABS.length; i++) jobs.push(refreshBoard(BOARD_TABS[i].id));
     return Promise.all(jobs).then(function () {
+      pushLocalBoardBests();
       if (screenBoard && !screenBoard.hidden) renderBoard();
     });
   }
 
+  // 登入後把本機地獄最遠波次補上雲端（修寫入失敗留下的落差）
+  function pushLocalBoardBests() {
+    if (!cloudReady()) return;
+    var account = loadAccount();
+    if (!account || String(account.uid).indexOf('guest-') === 0) return;
+    var infiniteHell = loadBest('hell', 'infinite');
+    var customHell = loadBest('hell', 'custom');
+    if (infiniteHell > 0) rememberScore('infinite-hell', infiniteHell);
+    if (customHell > 0) rememberScore('custom-hell', customHell);
+  }
+
   function rememberScore(boardId, wave) {
+    wave = Math.floor(Number(wave) || 0);
     if (!(wave > 0)) return;
     if (String(boardId).indexOf('-hell') < 0) return;
     if (!cloudReady()) return;
@@ -3010,15 +3041,26 @@ function selectedTower() {
     ref.get().then(function (snap) {
       if (currentWeekKey() !== week) return null;
       var prev = snap.exists && snap.data() ? Number(snap.data().wave) || 0 : 0;
-      weekBests[boardId] = { week: week, wave: Math.max(wave, prev) };
-      if (wave <= prev) return null;
+      if (wave <= prev) {
+        weekBests[boardId] = { week: week, wave: prev };
+        applyCloudBest(boardId, prev);
+        return null;
+      }
       var row = scoreRow(account, wave);
       row.updated = firebase.firestore.FieldValue.serverTimestamp();
-      return ref.set(row);
+      return ref.set(row).then(function () {
+        weekBests[boardId] = { week: week, wave: wave };
+        applyCloudBest(boardId, wave);
+      });
     }).then(function () {
       return refreshBoard(boardId);
-    }).catch(function () {
-      toast('成績沒送到線上');
+    }).catch(function (error) {
+      // 失敗時清掉快取，下次登入／破波還能再試
+      if (weekBests[boardId] && weekBests[boardId].week === week && weekBests[boardId].wave === wave) {
+        delete weekBests[boardId];
+      }
+      console.warn('board score failed', error && error.code, error && error.message);
+      toast(error && error.code === 'permission-denied' ? '排行寫入被拒，請更新 Firestore 規則' : '成績沒送到線上');
     });
   }
 
@@ -7689,6 +7731,17 @@ function selectedTower() {
   }
 
   var PATCH_NOTES = [
+    {
+      date: '10/30',
+      title: '排行榜成績寫入修復',
+      detail: [
+        '排行：同一 Google 手機／電腦地獄成績會合併上榜；本機較高波次登入後會補推雲端',
+      ],
+      full: [
+        '排行：寫入規則允許名片框／稱號；地獄榜成績不再被擋',
+        '同步：讀榜時雲端較高波次寫回本機；登入後也會把本機較高地獄波次補上雲端',
+      ],
+    },
     {
       date: '10/29',
       title: '後期壓力、抗控、破甲恢復、背景音樂、產錢調整',
