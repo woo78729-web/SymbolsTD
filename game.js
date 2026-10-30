@@ -1133,7 +1133,7 @@
     { id: 'rush', name: '狂暴', blurb: '小怪血量低於一半就加速' },
     { id: 'summon', name: '召喚', blurb: '沿路會不斷叫出小怪' },
     { id: 'ward', name: '護盾', blurb: '小怪出場就帶一層護盾' },
-    { id: 'split', name: '分裂', blurb: '小怪死後會裂成兩隻' },
+    { id: 'split', name: '分裂', blurb: '小怪死後裂成兩隻；第 3 波後分裂體短暫免疫 debuff' },
     { id: 'mend', name: '治癒', blurb: '小怪會慢慢把彼此補血' },
     { id: 'frost', name: '冰封', blurb: '會定期把塔凍住一下' },
     { id: 'armor', name: '鐵甲', blurb: '小怪受到的傷害減少' },
@@ -4764,6 +4764,10 @@ function selectedTower() {
       tickLateWaveControlWard(enemy, dt);
       tickFireBreak(enemy, dt);
       tickRecoverGuard(enemy, dt);
+      if (enemy.debuffImmune > 0) {
+        enemy.debuffImmune -= dt;
+        if (enemy.debuffImmune <= 0) enemy.debuffImmune = 0;
+      }
       if (enemy.freeze > 0) enemy.freeze -= dt;
       if (enemy.stun > 0) enemy.stun -= dt;
       if (enemy.rise > 0) enemy.rise = Math.max(0, enemy.rise - dt);
@@ -4845,6 +4849,26 @@ function selectedTower() {
     spreadAilments();
   }
 
+  // 塔直擊傳染：最多 3 隻，依接觸順序遞減；被傳染者不再往下傳
+  var AILMENT_PASS_MAX = 3;
+  var AILMENT_PASS_MUL = [0.7, 0.45, 0.25];
+
+  function markAilmentSpreader(enemy, prefix) {
+    if (!enemy) return;
+    if (enemy[prefix + 'PassLeft'] == null) {
+      enemy[prefix + 'PassLeft'] = AILMENT_PASS_MAX;
+      enemy[prefix + 'PassIdx'] = 0;
+    }
+  }
+
+  function nextAilmentPassMul(from, prefix) {
+    var idx = from[prefix + 'PassIdx'] || 0;
+    var mul = AILMENT_PASS_MUL[Math.min(idx, AILMENT_PASS_MUL.length - 1)] || 0.25;
+    from[prefix + 'PassIdx'] = idx + 1;
+    from[prefix + 'PassLeft'] = Math.max(0, (from[prefix + 'PassLeft'] == null ? AILMENT_PASS_MAX : from[prefix + 'PassLeft']) - 1);
+    return mul;
+  }
+
   function spreadAilments() {
     var sources = [];
     for (var i = 0; i < state.enemies.length; i++) {
@@ -4854,13 +4878,27 @@ function selectedTower() {
     for (var s = 0; s < sources.length; s++) {
       var from = sources[s];
       var fromPos = pointAt(from.dist);
+      var canBurn = from.burnTime > 0 && (from.burnPassLeft == null ? true : from.burnPassLeft > 0);
+      var canPoison = from.poisonTime > 0 && (from.poisonPassLeft == null ? true : from.poisonPassLeft > 0);
+      if (!canBurn && !canPoison) continue;
+      if (from.burnPassLeft == null && from.burnTime > 0) markAilmentSpreader(from, 'burn');
+      if (from.poisonPassLeft == null && from.poisonTime > 0) markAilmentSpreader(from, 'poison');
+      canBurn = from.burnTime > 0 && from.burnPassLeft > 0;
+      canPoison = from.poisonTime > 0 && from.poisonPassLeft > 0;
       for (var j = 0; j < state.enemies.length; j++) {
         var other = state.enemies[j];
-        if (other === from || other.dead) continue;
+        if (other === from || other.dead || ailmentImmune(other)) continue;
         var pos = pointAt(other.dist);
         if (Math.hypot(pos.x - fromPos.x, pos.y - fromPos.y) > from.radius + other.radius + 0.06) continue;
-        if (from.burnTime > 0 && !(other.burnTime > 0) && !resists(other, 'burn')) passBurn(from, other, pos);
-        if (from.poisonTime > 0 && !(other.poisonTime > 0) && !resists(other, 'poison')) passPoison(from, other, pos);
+        if (canBurn && !(other.burnTime > 0) && !resists(other, 'burn') && from.burnPassLeft > 0) {
+          passBurn(from, other, pos, nextAilmentPassMul(from, 'burn'));
+          canBurn = from.burnPassLeft > 0;
+        }
+        if (canPoison && !(other.poisonTime > 0) && !resists(other, 'poison') && from.poisonPassLeft > 0) {
+          passPoison(from, other, pos, nextAilmentPassMul(from, 'poison'));
+          canPoison = from.poisonPassLeft > 0;
+        }
+        if (!canBurn && !canPoison) break;
       }
     }
   }
@@ -4873,28 +4911,36 @@ function selectedTower() {
     return Math.max(0, enemy[prefix + 'Until'] - state.time);
   }
 
-  function passBurn(from, other, pos) {
+  function passBurn(from, other, pos, mul) {
+    if (ailmentImmune(other)) return;
     var left = (from.burnUntil || 0) - state.time;
     if (left <= 0.05) return;
-    other.burn = from.burn;
+    var scale = mul == null ? 1 : mul;
+    other.burn = Math.max(1, Math.round((from.burn || 1) * scale));
     other.burnBorn = from.burnBorn;
     other.burnUntil = from.burnUntil;
     other.burnTime = left;
     other.burnEvery = from.burnEvery || 0.5;
     other.burnTick = other.burnEvery;
+    other.burnPassLeft = 0;
+    other.burnPassIdx = 0;
     spawnFloater(pos.x, pos.y - 0.45, '灼燒', '#e02323');
     if (isFireCounterTarget(other)) triggerFireCounter(other);
   }
 
-  function passPoison(from, other, pos) {
+  function passPoison(from, other, pos, mul) {
+    if (ailmentImmune(other)) return;
     var left = (from.poisonUntil || 0) - state.time;
     if (left <= 0.05) return;
-    other.poison = from.poison;
+    var scale = mul == null ? 1 : mul;
+    other.poison = Math.max(1, Math.round((from.poison || 1) * scale));
     other.poisonBorn = from.poisonBorn;
     other.poisonUntil = from.poisonUntil;
     other.poisonTime = left;
     other.poisonEvery = from.poisonEvery || 0.4;
     other.poisonTick = other.poisonEvery;
+    other.poisonPassLeft = 0;
+    other.poisonPassIdx = 0;
     spawnFloater(pos.x, pos.y - 0.7, '中毒', '#3cbf4a');
     if (isPoisonCounterTarget(other) || from.poisonRuin) triggerPoisonCounter(other);
   }
@@ -4975,7 +5021,24 @@ function selectedTower() {
   }
 
   function controlImmune(enemy) {
-    return !!(enemy && enemy.controlWard > 0);
+    return !!(enemy && (enemy.controlWard > 0 || enemy.debuffImmune > 0));
+  }
+
+  function ailmentImmune(enemy) {
+    return !!(enemy && enemy.debuffImmune > 0);
+  }
+
+  // 第五章分裂：第 3 波後，分裂體出生有 0.5 秒無視任何 debuff
+  function grantSplitDebuffGrace(enemy) {
+    if (!enemy || !(state.wave > 3) || !chapterHasKit('split')) return;
+    enemy.debuffImmune = 0.5;
+    clearControl(enemy);
+    enemy.burn = 0;
+    enemy.burnTime = 0;
+    enemy.burnPassLeft = 0;
+    enemy.poison = 0;
+    enemy.poisonTime = 0;
+    enemy.poisonPassLeft = 0;
   }
 
   function tickLateWaveControlWard(enemy, dt) {
@@ -6964,6 +7027,7 @@ function selectedTower() {
   }
 
   function applyPoison(enemy, amount, time, every) {
+    if (ailmentImmune(enemy)) return;
     if (resists(enemy, 'poison')) {
       resistFloater(enemy, '抗毒');
       return;
@@ -6976,6 +7040,7 @@ function selectedTower() {
     enemy.poisonEvery = every || 0.4;
     if (fresh) {
       enemy.poisonTick = enemy.poisonEvery;
+      markAilmentSpreader(enemy, 'poison');
       spawnFloater(pointAt(enemy.dist).x, pointAt(enemy.dist).y - 0.45, '中毒', '#3cbf4a');
     }
     if (isPoisonCounterTarget(enemy)) triggerPoisonCounter(enemy);
@@ -7045,6 +7110,7 @@ function selectedTower() {
     if (shot.effect === 'slow' && shot.slow > 0) {
       chillEnemy(enemy, shot.slow, shot.slowTime);
     } else if (shot.effect === 'burn' && shot.burn > 0) {
+      if (ailmentImmune(enemy)) return;
       if (resists(enemy, 'burn')) {
         resistFloater(enemy, '抗燒');
         return;
@@ -7057,6 +7123,7 @@ function selectedTower() {
       enemy.burnEvery = shot.burnEvery;
       if (freshBurn) {
         enemy.burnTick = enemy.burnEvery || 0.5;
+        markAilmentSpreader(enemy, 'burn');
         spawnFloater(pos.x, pos.y - 0.45, '灼燒', '#e02323');
       }
       if (isFireCounterTarget(enemy)) triggerFireCounter(enemy);
@@ -7244,6 +7311,7 @@ function selectedTower() {
         shard.noSplit = true;
         shard.skipHellStats = true;
         shard.dist = splitSpawnDist(enemy.dist, (s - (splitCount - 1) / 2) * 0.22);
+        grantSplitDebuffGrace(shard);
         queueEnemy(shard);
       }
       var splitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
@@ -7262,6 +7330,7 @@ function selectedTower() {
         kitChild.skipHellStats = true;
         kitChild.radius = Math.max(0.2, (enemy.radius || 0.3) * 0.78);
         kitChild.dist = splitSpawnDist(enemy.dist, ks === 0 ? -0.18 : 0.18);
+        grantSplitDebuffGrace(kitChild);
         queueEnemy(kitChild);
       }
       var kitSplitPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
@@ -7284,6 +7353,7 @@ function selectedTower() {
         child.radius = Math.max(0.2, (enemy.radius || 0.3) * 0.78);
         if (spdBonus > 0) child.speed *= 1 + spdBonus;
         child.dist = splitSpawnDist(enemy.dist, h === 0 ? -0.18 : 0.18);
+        grantSplitDebuffGrace(child);
         queueEnemy(child);
       }
       var hellPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
@@ -7863,13 +7933,14 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/30',
-      title: '排行榜同步、歡迎頁、塔等傷害與 11 等、關卡加壓、分裂金幣',
+      title: '排行榜同步、塔等傷害、分裂加壓、毒火傳染',
       detail: [
         '排行：同一 Google 手機／電腦地獄成績會合併上榜；本機較高波次登入後會補推雲端',
         '介面：歡迎頁新插畫；整頁內縮；Google 登入改彩色標誌單行文案',
         '玩法：1–10 等塔傷約提高 1/4；「塔升級」卡可到 11 等，同屬塔越多複合 buff 越高',
         '外觀：箭／砲／毒／火／冰／雷 11 等各有傳奇造型；圖鑑塔明細下方可預覽',
-        '修正：分裂章／分裂王擊殺會正常掉錢並長出分裂體；分裂體擊殺只給很少金幣',
+        '修正：分裂章擊殺正常掉錢；第 3 波後分裂體出生有 0.5 秒無視 debuff',
+        '玩法：毒／火第一下傳染最多 3 隻且效果遞減；破盾／破甲／克制回血照舊',
         '難度：1-3 起仍比教學關難；一般關第 10 波後補中後期壓力',
         '經濟：各塔金幣升級費用約提高一成多；廣告贈塔改為 1～2 等',
       ],
@@ -7881,7 +7952,8 @@ function selectedTower() {
         '等級：金幣仍最高 10（需鐵匠）；只有「塔升級」卡可到 11',
         '11 等：半徑約 2.6 格；同屬塔越多複合越高（每座攻擊 +8%／攻速 +3.5%，上限 40%／18%），可與樂手疊加',
         '11 等造型：金環五芒星暈；箭雙矢金鏃、砲焰口、毒多滴、火雙焰、冰晶雪、雷弧閃；圖鑑「塔明細」各塔下方有 ★11 預覽',
-        '分裂：修好擊殺中斷；本體正常掉錢；分裂體／裂殖體約正常兩成（至少 1）；出生點遠離終點',
+        '分裂：本體正常掉錢；分裂體約兩成金；第 3 波後分裂體出生 0.5 秒免疫緩速／麻痺／冰凍／毒／火',
+        '毒火：直擊源傳染上限 3；倍率約 70%／45%／25%；被傳染者不再往下傳；破盾／破甲／毒蝕仍觸發',
         '關卡：1-1／1-2 前半不變；1-3 起 hpScale 壓力約 1.12～1.26',
         '關卡：加壓關成長約 1.16、金幣 ×0.70；第 11 波起小怪／飛行／精英／跳躍／惡魔加量',
         '關卡：第 11 波起威脅續爬、軟上限放寬；血量約 +8% 起、移速上限略升',
@@ -9469,7 +9541,7 @@ function selectedTower() {
       {
         tag: '首領', title: '分裂王', paint: { kind: 'enemy', type: 'grunt', color: '#c084fc', bossId: 'split' },
         desc: '有手腳的大王，肩膀還長兩顆小頭，戴黃冠。只會在 5-5 最後一波出現。',
-        stats: ['<strong>出現</strong>：5-5 最後一波', '<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：本體正常；分裂體很少'],
+        stats: ['<strong>出現</strong>：5-5 最後一波', '<strong>死亡</strong>：分成 3 隻小怪', '<strong>金幣</strong>：本體正常；分裂體很少', '<strong>第 3 波後</strong>：分裂體出生 0.5 秒無視 debuff'],
       },
       {
         tag: '首領', title: '治癒王', paint: { kind: 'enemy', type: 'grunt', color: '#ff8fab', bossId: 'mend' },
@@ -9573,6 +9645,7 @@ function selectedTower() {
         stats: [
           '<strong>造價</strong> 80',
           '<strong>毒</strong> 28→68／0.4秒',
+          '<strong>傳染</strong> 最多 3 隻、效果遞減',
           '<strong>克制</strong> 再生／治療／回血',
         ],
       },
@@ -9592,6 +9665,7 @@ function selectedTower() {
         stats: [
           '<strong>造價</strong> 90',
           '<strong>爆</strong> 60→143',
+          '<strong>傳染</strong> 最多 3 隻、效果遞減',
           '<strong>克制</strong> 破盾、破甲、厚皮時打一次總血 6%',
         ],
       },
@@ -9730,7 +9804,7 @@ function selectedTower() {
       if (def.id === 'speed') detail = '<strong>數值</strong>：移速 +' + Math.round(def.full * 100) + '%';
       else if (def.id === 'lock') detail = '<strong>數值</strong>：隨機鎖塔 ' + def.full + ' 秒';
       else if (def.id === 'boss') detail = '<strong>效果</strong>：每波額外隨機出一支王';
-      else if (def.id === 'split') detail = '<strong>數值</strong>：死後裂成兩隻，各帶 ' + Math.round(def.full * 100) + '% 血；分裂體擊殺金幣很少';
+      else if (def.id === 'split') detail = '<strong>數值</strong>：死後裂成兩隻，各帶 ' + Math.round(def.full * 100) + '% 血；分裂體金幣很少；第 3 波後出生 0.5 秒免疫 debuff';
       else if (def.id === 'regen') detail = '<strong>數值</strong>：每秒回復 ' + Math.round(def.full * 100) + '% 血 · 毒克制';
       else if (def.id === 'enrage') detail = '<strong>觸發</strong>：血量 ≤10% 時加速 ' + Math.round(def.full * 100) + '%';
       else if (def.id === 'thick') detail = '<strong>數值</strong>：血量 +' + Math.round(def.full * 100) + '% · 火克制';
@@ -10262,8 +10336,8 @@ function selectedTower() {
     if (tower && tower.level >= 5) bits.push('滿等×1.4');
     if (tower && tower.level > 5) bits.push('鐵匠再強化');
     if (stats.effect === 'slow') bits.push('緩速 ' + Math.round(stats.slow * 100) + '%', '3次凍結');
-    if (stats.effect === 'burn') bits.push('灼燒 ' + Math.round(stats.burn / stats.burnEvery) + '/秒', '破盾／破甲／厚皮+10%血', '傳染3秒');
-    if (stats.effect === 'poison') bits.push('中毒 ' + Math.round(stats.poison / stats.poisonEvery) + '/秒', '克制再生／治療／回血', '傳染3秒');
+    if (stats.effect === 'burn') bits.push('灼燒 ' + Math.round(stats.burn / stats.burnEvery) + '/秒', '破盾／破甲／厚皮+10%血', '傳染最多3隻、遞減');
+    if (stats.effect === 'poison') bits.push('中毒 ' + Math.round(stats.poison / stats.poisonEvery) + '/秒', '克制再生／治療／回血', '傳染最多3隻、遞減');
     if (stats.goldGen) bits = ['產金 ' + stats.goldGen + '/次', '間隔 ' + fmt(stats.cooldown) + '秒', '不攻擊'];
     return bits.join(' · ');
   }
