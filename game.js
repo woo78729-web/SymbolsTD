@@ -24,8 +24,8 @@
       category: 'neutral',
       upgradeCost: [35, 60, 95, 135, 180, 250, 340, 460, 620],
       levels: [
-        { damage: 16, range: 2.35, cooldown: 0.38, splash: 0, targets: 1 },
-        { damage: 26, range: 2.5, cooldown: 0.32, splash: 0, targets: 1 },
+        { damage: 20, range: 2.35, cooldown: 0.38, splash: 0, targets: 1 },
+        { damage: 33, range: 2.5, cooldown: 0.32, splash: 0, targets: 1 },
       ],
       specs: {
         arrow: {
@@ -33,10 +33,10 @@
           blurb: '便宜高傷 · 攻速快 · 滿等打兩隻 · 單體輸出最高',
           color: '#7dcea0',
           levels: [
-            { damage: 42, range: 2.6, cooldown: 0.28, splash: 0, targets: 1 },
-            { damage: 58, range: 2.7, cooldown: 0.24, splash: 0, targets: 1 },
-            { damage: 78, range: 2.8, cooldown: 0.2, splash: 0, targets: 1 },
-            { damage: 100, range: 2.9, cooldown: 0.16, splash: 0, targets: 2 },
+            { damage: 53, range: 2.6, cooldown: 0.28, splash: 0, targets: 1 },
+            { damage: 73, range: 2.7, cooldown: 0.24, splash: 0, targets: 1 },
+            { damage: 98, range: 2.8, cooldown: 0.2, splash: 0, targets: 1 },
+            { damage: 125, range: 2.9, cooldown: 0.16, splash: 0, targets: 2 },
           ],
         },
         cannon: {
@@ -44,10 +44,10 @@
           blurb: '範圍擴散 · 一次最多 3 發 · 中心傷高外圍遞減 · 擴散不疊加',
           color: '#e7a15a',
           levels: [
-            { damage: 44, range: 2.15, cooldown: 1.12, splash: 1.05, shots: 2 },
-            { damage: 58, range: 2.25, cooldown: 1.02, splash: 1.2, shots: 2 },
-            { damage: 74, range: 2.35, cooldown: 0.92, splash: 1.35, shots: 3 },
-            { damage: 92, range: 2.45, cooldown: 0.84, splash: 1.5, shots: 3 },
+            { damage: 55, range: 2.15, cooldown: 1.12, splash: 1.05, shots: 2 },
+            { damage: 73, range: 2.25, cooldown: 1.02, splash: 1.2, shots: 2 },
+            { damage: 93, range: 2.35, cooldown: 0.92, splash: 1.35, shots: 3 },
+            { damage: 115, range: 2.45, cooldown: 0.84, splash: 1.5, shots: 3 },
           ],
         },
       },
@@ -60,12 +60,12 @@
       category: 'element',
       upgradeCost: [55, 85, 120, 160, 210, 290, 390, 520, 700],
       levels: [
-        { damage: 12, range: 2.35, cooldown: 1.05, splash: 0, effect: 'poison', poison: 22, poisonTime: 3.2, poisonEvery: 0.4 },
-        { damage: 14, range: 2.4, cooldown: 0.95, splash: 0, effect: 'poison', poison: 28, poisonTime: 3.2, poisonEvery: 0.4 },
-        { damage: 16, range: 2.45, cooldown: 0.86, splash: 0, effect: 'poison', poison: 34, poisonTime: 3.2, poisonEvery: 0.4 },
-        { damage: 18, range: 2.5, cooldown: 0.78, splash: 0, effect: 'poison', poison: 40, poisonTime: 3.2, poisonEvery: 0.4 },
-        { damage: 20, range: 2.55, cooldown: 0.7, splash: 0, effect: 'poison', poison: 46, poisonTime: 3.2, poisonEvery: 0.4 },
-        { damage: 24, range: 2.6, cooldown: 0.62, splash: 0, effect: 'poison', poison: 54, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 15, range: 2.35, cooldown: 1.05, splash: 0, effect: 'poison', poison: 28, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 18, range: 2.4, cooldown: 0.95, splash: 0, effect: 'poison', poison: 35, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 20, range: 2.45, cooldown: 0.86, splash: 0, effect: 'poison', poison: 43, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 23, range: 2.5, cooldown: 0.78, splash: 0, effect: 'poison', poison: 50, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 25, range: 2.55, cooldown: 0.7, splash: 0, effect: 'poison', poison: 58, poisonTime: 3.2, poisonEvery: 0.4 },
+        { damage: 30, range: 2.6, cooldown: 0.62, splash: 0, effect: 'poison', poison: 68, poisonTime: 3.2, poisonEvery: 0.4 },
       ],
     },
     fire: {
@@ -76,12 +76,12 @@
       category: 'element',
       upgradeCost: [60, 95, 135, 180, 230, 310, 420, 560, 750],
       levels: [
-        { damage: 48, range: 2.25, cooldown: 1.1, splash: 0.95, effect: 'burn', burn: 4, burnTime: 2.4, burnEvery: 0.5 },
-        { damage: 58, range: 2.3, cooldown: 1.0, splash: 1.02, effect: 'burn', burn: 5, burnTime: 2.4, burnEvery: 0.5 },
-        { damage: 70, range: 2.35, cooldown: 0.9, splash: 1.1, effect: 'burn', burn: 5, burnTime: 2.4, burnEvery: 0.5 },
-        { damage: 84, range: 2.4, cooldown: 0.82, splash: 1.18, effect: 'burn', burn: 6, burnTime: 2.4, burnEvery: 0.5 },
-        { damage: 98, range: 2.45, cooldown: 0.74, splash: 1.26, effect: 'burn', burn: 7, burnTime: 2.4, burnEvery: 0.5 },
-        { damage: 114, range: 2.5, cooldown: 0.66, splash: 1.34, effect: 'burn', burn: 8, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 60, range: 2.25, cooldown: 1.1, splash: 0.95, effect: 'burn', burn: 5, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 73, range: 2.3, cooldown: 1.0, splash: 1.02, effect: 'burn', burn: 6, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 88, range: 2.35, cooldown: 0.9, splash: 1.1, effect: 'burn', burn: 6, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 105, range: 2.4, cooldown: 0.82, splash: 1.18, effect: 'burn', burn: 8, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 123, range: 2.45, cooldown: 0.74, splash: 1.26, effect: 'burn', burn: 9, burnTime: 2.4, burnEvery: 0.5 },
+        { damage: 143, range: 2.5, cooldown: 0.66, splash: 1.34, effect: 'burn', burn: 10, burnTime: 2.4, burnEvery: 0.5 },
       ],
     },
     ice: {
@@ -92,12 +92,12 @@
       category: 'element',
       upgradeCost: [55, 90, 130, 175, 220, 300, 400, 540, 720],
       levels: [
-        { damage: 28, range: 2.3, cooldown: 1.1, splash: 1.1, effect: 'slow', slow: 0.35, slowTime: 1.8 },
-        { damage: 34, range: 2.35, cooldown: 1.0, splash: 1.2, effect: 'slow', slow: 0.38, slowTime: 1.8 },
-        { damage: 40, range: 2.4, cooldown: 0.9, splash: 1.32, effect: 'slow', slow: 0.4, slowTime: 1.8 },
-        { damage: 46, range: 2.45, cooldown: 0.82, splash: 1.42, effect: 'slow', slow: 0.4, slowTime: 1.8 },
-        { damage: 52, range: 2.5, cooldown: 0.74, splash: 1.52, effect: 'slow', slow: 0.42, slowTime: 1.8 },
-        { damage: 60, range: 2.55, cooldown: 0.66, splash: 1.62, effect: 'slow', slow: 0.45, slowTime: 1.8 },
+        { damage: 35, range: 2.3, cooldown: 1.1, splash: 1.1, effect: 'slow', slow: 0.35, slowTime: 1.8 },
+        { damage: 43, range: 2.35, cooldown: 1.0, splash: 1.2, effect: 'slow', slow: 0.38, slowTime: 1.8 },
+        { damage: 50, range: 2.4, cooldown: 0.9, splash: 1.32, effect: 'slow', slow: 0.4, slowTime: 1.8 },
+        { damage: 58, range: 2.45, cooldown: 0.82, splash: 1.42, effect: 'slow', slow: 0.4, slowTime: 1.8 },
+        { damage: 65, range: 2.5, cooldown: 0.74, splash: 1.52, effect: 'slow', slow: 0.42, slowTime: 1.8 },
+        { damage: 75, range: 2.55, cooldown: 0.66, splash: 1.62, effect: 'slow', slow: 0.45, slowTime: 1.8 },
       ],
     },
     bolt: {
@@ -108,12 +108,12 @@
       category: 'element',
       upgradeCost: [55, 90, 130, 175, 220, 300, 400, 540, 720],
       levels: [
-        { damage: 24, range: 2.45, cooldown: 0.72, splash: 0, targets: 1, chain: 2, chainRange: 1.75, stunTime: 1.0 },
-        { damage: 32, range: 2.5, cooldown: 0.64, splash: 0, targets: 1, chain: 2, chainRange: 1.85, stunTime: 1.05 },
-        { damage: 42, range: 2.55, cooldown: 0.56, splash: 0, targets: 1, chain: 3, chainRange: 1.9, stunTime: 1.1 },
-        { damage: 54, range: 2.6, cooldown: 0.5, splash: 0, targets: 1, chain: 3, chainRange: 2.0, stunTime: 1.15 },
-        { damage: 68, range: 2.65, cooldown: 0.44, splash: 0, targets: 1, chain: 4, chainRange: 2.05, stunTime: 1.2 },
-        { damage: 84, range: 2.7, cooldown: 0.38, splash: 0, targets: 1, chain: 4, chainRange: 2.15, stunTime: 1.3 },
+        { damage: 30, range: 2.45, cooldown: 0.72, splash: 0, targets: 1, chain: 2, chainRange: 1.75, stunTime: 1.0 },
+        { damage: 40, range: 2.5, cooldown: 0.64, splash: 0, targets: 1, chain: 2, chainRange: 1.85, stunTime: 1.05 },
+        { damage: 53, range: 2.55, cooldown: 0.56, splash: 0, targets: 1, chain: 3, chainRange: 1.9, stunTime: 1.1 },
+        { damage: 68, range: 2.6, cooldown: 0.5, splash: 0, targets: 1, chain: 3, chainRange: 2.0, stunTime: 1.15 },
+        { damage: 85, range: 2.65, cooldown: 0.44, splash: 0, targets: 1, chain: 4, chainRange: 2.05, stunTime: 1.2 },
+        { damage: 105, range: 2.7, cooldown: 0.38, splash: 0, targets: 1, chain: 4, chainRange: 2.15, stunTime: 1.3 },
       ],
     },
     mint: {
@@ -5416,8 +5416,62 @@ function selectedTower() {
     return hasBlacksmith() ? 9 : 4;
   }
 
+  // 顯示等級：level+1。金幣最高 10；「塔升級」卡可到 11。
+  var APEX_LEVEL = 10;
+  var APEX_RADIUS = 2.6;
+  // 同屬塔越多複合越高：每座（含 11 等本體）疊一層，達上限封頂
+  var APEX_BONUS_PER = 0.08;
+  var APEX_BONUS_MAX = 0.40;
+  var APEX_HASTE_PER = 0.035;
+  var APEX_HASTE_MAX = 0.18;
+
+  function cardLevelCap() {
+    return hasBlacksmith() ? APEX_LEVEL : 5;
+  }
+
   function towerMaxed(tower) {
     return !tower || tower.type === 'hero' || tower.type === 'smith' || tower.level >= goldLevelCap();
+  }
+
+  function sameAffinity(a, b) {
+    if (!a || !b) return false;
+    if (a.type === 'hero' || b.type === 'hero' || a.type === 'smith' || b.type === 'smith') return false;
+    if (a.type !== b.type) return false;
+    if (a.type === 'basic') return (a.spec || 'arrow') === (b.spec || 'arrow');
+    return true;
+  }
+
+  function countAffinityNear(apex) {
+    var n = 0;
+    for (var i = 0; i < state.towers.length; i++) {
+      var other = state.towers[i];
+      if (!sameAffinity(apex, other)) continue;
+      var dist = Math.hypot((other.c + 0.5) - (apex.c + 0.5), (other.r + 0.5) - (apex.r + 0.5));
+      if (dist <= APEX_RADIUS + 0.001) n += 1;
+    }
+    return n;
+  }
+
+  function apexClusterBonus(count) {
+    return {
+      bonus: Math.min(APEX_BONUS_MAX, count * APEX_BONUS_PER),
+      haste: Math.min(APEX_HASTE_MAX, count * APEX_HASTE_PER),
+    };
+  }
+
+  function apexAura(tower) {
+    var bonus = 0;
+    var haste = 0;
+    for (var i = 0; i < state.towers.length; i++) {
+      var apex = state.towers[i];
+      if (apex.level < APEX_LEVEL || !sameAffinity(apex, tower)) continue;
+      var dist = Math.hypot((apex.c + 0.5) - (tower.c + 0.5), (apex.r + 0.5) - (tower.r + 0.5));
+      if (dist > APEX_RADIUS + 0.001) continue;
+      var pack = apexClusterBonus(countAffinityNear(apex));
+      bonus = Math.max(bonus, pack.bonus);
+      haste = Math.max(haste, pack.haste);
+    }
+    return { bonus: bonus, haste: haste };
   }
 
   function nextUpgradeCost(tower) {
@@ -5477,14 +5531,19 @@ function selectedTower() {
 
   function applySupport(stats, tower) {
     var aura = supportAura(tower);
-    if (aura.bonus <= 0 && aura.haste <= 0) return stats;
+    var apex = apexAura(tower);
+    var bonus = aura.bonus + apex.bonus;
+    var haste = aura.haste + apex.haste;
+    if (bonus <= 0 && haste <= 0) return stats;
     var copy = cloneStats(stats);
     if (tower.type === 'mint') {
-      if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + aura.haste);
+      if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + haste);
       return copy;
     }
-    copy.damage = Math.max(1, Math.round((copy.damage || 0) * (1 + aura.bonus)));
-    if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + aura.haste);
+    copy.damage = Math.max(1, Math.round((copy.damage || 0) * (1 + bonus)));
+    if (copy.poison) copy.poison = Math.max(1, Math.round(copy.poison * (1 + bonus)));
+    if (copy.burn) copy.burn = Math.max(1, Math.round(copy.burn * (1 + bonus)));
+    if (copy.cooldown) copy.cooldown = copy.cooldown / (1 + haste);
     return copy;
   }
 
@@ -6112,7 +6171,7 @@ function selectedTower() {
     return [
       { id: 'gold', name: '金幣 +200', desc: '立刻獲得 200 金幣' },
       { id: 'interest', name: '利息', desc: '立刻 +50，接下來 5 波每波 +30' },
-      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等。沒有鐵匠時金幣最高 5 等，這張卡可到 6 等。有鐵匠後，金幣可升到 10 等。' },
+      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等。沒鐵匠時金幣最高 5、這張卡可到 6。有鐵匠後金幣最高 10，只有這張卡能升到 11；11 等依附近同屬塔數疊複合 buff（有上限）。' },
       { id: 'wall', name: '阻擋物', desc: '放在路上，擋住怪物 10 秒' },
       { id: 'push', name: '擊退', desc: '使用後全場怪物沿路退回總長的 10%' },
       { id: 'hero', name: '英雄塔', desc: '自選一位尚未登場的英雄，免費放置，之後可拖曳換位' },
@@ -6140,9 +6199,9 @@ function selectedTower() {
   function applyLevelCard(tower) {
     if (tower.type === 'hero') { toast('英雄靠擊殺升級'); return false; }
     if (tower.type === 'smith') { toast('鐵匠不用升級'); return false; }
-    var cardCap = hasBlacksmith() ? 9 : 5;
+    var cardCap = cardLevelCap();
     if (tower.level >= cardCap) {
-      toast(hasBlacksmith() ? '這座塔已是 10 等' : '這座塔已是 6 等');
+      toast(hasBlacksmith() ? '這座塔已是 11 等' : '這座塔已是 6 等');
       return false;
     }
     if (needsSpec(tower)) {
@@ -6154,7 +6213,9 @@ function selectedTower() {
     }
     state.freeSpec = false;
     tower.level += 1;
-    toast(towerLabel(tower) + ' 升到 Lv.' + (tower.level + 1));
+    var tip = towerLabel(tower) + ' 升到 Lv.' + (tower.level + 1);
+    if (tower.level >= APEX_LEVEL) tip += ' · 同屬塔複合光環啟動';
+    toast(tip);
     Sfx.build();
     return true;
   }
@@ -6423,8 +6484,11 @@ function selectedTower() {
       finishCard();
     } else if (id === 'level') {
       var canBoost = false;
+      var cardCap = cardLevelCap();
       for (var i = 0; i < state.towers.length; i++) {
-        if (state.towers[i].type !== 'hero' && state.towers[i].level < 5) canBoost = true;
+        var cand = state.towers[i];
+        if (cand.type === 'hero' || cand.type === 'smith') continue;
+        if (cand.level < cardCap) canBoost = true;
       }
       if (!canBoost) {
         toast('沒有可以升級的塔');
@@ -6437,7 +6501,11 @@ function selectedTower() {
       state.selectedId = null;
       state.sellArmed = false;
       renderInspector();
-      state.banner = { text: '點一座塔', sub: '永久 +1 等，最高 6 等', life: 6 };
+      state.banner = {
+        text: '點一座塔',
+        sub: hasBlacksmith() ? '永久 +1 等，最高 11 等' : '永久 +1 等，最高 6 等',
+        life: 6,
+      };
       toast('點選要升級的塔');
       syncHud();
     } else if (id === 'hero') {
@@ -7733,18 +7801,21 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/30',
-      title: '排行榜同步、HUD、歡迎頁內縮',
+      title: '排行榜同步、歡迎頁、塔等傷害與 11 等',
       detail: [
         '排行：同一 Google 手機／電腦地獄成績會合併上榜；本機較高波次登入後會補推雲端',
-        '介面：音樂與音效鈕排在一起；金幣達 1000 起顯示為 1.00K',
         '介面：歡迎頁新插畫；整頁內縮；Google 登入改彩色標誌單行文案',
+        '玩法：1–10 等塔傷約提高 1/4；「塔升級」卡可到 11 等，同屬塔越多複合 buff 越高',
+        '外觀：箭／砲／毒／火／冰／雷 11 等各有傳奇造型；圖鑑塔明細下方可預覽',
       ],
       full: [
         '排行：寫入規則允許名片框／稱號；地獄榜成績不再被擋',
         '同步：讀榜時雲端較高波次寫回本機；登入後也會把本機較高地獄波次補上雲端',
-        'HUD：音樂／音效並排在暫停右側，不再換行拆開',
-        '金幣：≥1000 顯示為千分位 K，小數兩位（例如 1234 → 1.23K）',
         '歡迎頁：插畫內縮；帳號左／開始右往中靠；未登入＝彩色 Google 標誌＋「Google 登入」單行、訪客登入',
+        '塔傷：攻擊塔本體傷害／毒／火基質約 ×1.25',
+        '等級：金幣仍最高 10（需鐵匠）；只有「塔升級」卡可到 11',
+        '11 等：半徑約 2.6 格；同屬塔越多複合越高（每座攻擊 +8%／攻速 +3.5%，上限 40%／18%），可與樂手疊加',
+        '11 等造型：金環五芒星暈；箭雙矢金鏃、砲焰口、毒多滴、火雙焰、冰晶雪、雷弧閃；圖鑑「塔明細」各塔下方有 ★11 預覽',
       ],
     },
     {
@@ -8748,7 +8819,8 @@ function selectedTower() {
           g.fillText(resist.name, 0, -rad - 10);
         }
       } else if (spec.kind === 'tower') {
-        drawTowerGlyph(spec.type || 'basic', 22, -0.35);
+        if (spec.apex) drawTowerGlyphApex(spec.type || 'basic', 24, -0.35);
+        else drawTowerGlyph(spec.type || 'basic', 22, -0.35);
       } else if (spec.kind === 'hero') {
         drawHeroGlyph(spec.hero || 'sword', 26);
       } else if (spec.kind === 'hell') {
@@ -9387,18 +9459,34 @@ function selectedTower() {
       tag: '分支', title: '箭塔', paint: { kind: 'tower', type: 'arrow' },
       desc: '高傷高攻速；滿等打 2 隻。',
       stats: [
-        '<strong>傷</strong>：42→58→78→100',
+        '<strong>傷</strong>：53→73→98→125',
         '<strong>攻速</strong>：0.28→0.16 秒／發',
         '<strong>滿等</strong>：2 目標 · 單體 DPS 最高',
+      ],
+    });
+    appendInfoCard(list, {
+      tag: '11等', title: '箭塔 ★11', paint: { kind: 'tower', type: 'arrow', apex: true },
+      desc: '傳奇造型：金環五芒星暈、雙矢金鏃。需鐵匠金幣到 10，再用「塔升級」卡升到 11。',
+      stats: [
+        '<strong>取得</strong>：僅「塔升級」卡',
+        '<strong>光環</strong>：強化附近同屬（箭）塔，同屬越多複合越高',
       ],
     });
     appendInfoCard(list, {
       tag: '分支', title: '砲塔', paint: { kind: 'tower', type: 'cannon' },
       desc: '擴散清群；中心傷高、外圍遞減、不疊加。',
       stats: [
-        '<strong>傷</strong>：44→58→74→92（中心）',
+        '<strong>傷</strong>：55→73→93→115（中心）',
         '<strong>彈數</strong>：2→3 · 擴散 1.05→1.5',
         '<strong>定位</strong>：清群、壓線',
+      ],
+    });
+    appendInfoCard(list, {
+      tag: '11等', title: '砲塔 ★11', paint: { kind: 'tower', type: 'cannon', apex: true },
+      desc: '傳奇造型：金框砲身與炮口火花。需鐵匠金幣到 10，再用「塔升級」卡升到 11。',
+      stats: [
+        '<strong>取得</strong>：僅「塔升級」卡',
+        '<strong>光環</strong>：強化附近同屬（砲）塔，同屬越多複合越高',
       ],
     });
 
@@ -9413,8 +9501,17 @@ function selectedTower() {
         desc: '傳染毒 · 克制回血',
         stats: [
           '<strong>造價</strong> 80',
-          '<strong>毒</strong> 22→54／0.4秒',
+          '<strong>毒</strong> 28→68／0.4秒',
           '<strong>克制</strong> 再生／治療／回血',
+        ],
+      },
+      {
+        tag: '11等', title: '毒塔 ★11', cardClass: 'info-card--attr info-card--poison',
+        paint: { kind: 'tower', type: 'poison', apex: true },
+        desc: '傳奇造型：多滴毒液與金點。',
+        stats: [
+          '<strong>取得</strong>：僅「塔升級」卡',
+          '<strong>光環</strong>：附近毒塔複合 buff',
         ],
       },
       {
@@ -9423,8 +9520,17 @@ function selectedTower() {
         desc: '爆炸灼燒 · 破盾破甲',
         stats: [
           '<strong>造價</strong> 90',
-          '<strong>爆</strong> 48→114',
+          '<strong>爆</strong> 60→143',
           '<strong>克制</strong> 破盾、破甲、厚皮時打一次總血 6%',
+        ],
+      },
+      {
+        tag: '11等', title: '火塔 ★11', cardClass: 'info-card--attr info-card--fire',
+        paint: { kind: 'tower', type: 'fire', apex: true },
+        desc: '傳奇造型：雙層火焰與金燼。',
+        stats: [
+          '<strong>取得</strong>：僅「塔升級」卡',
+          '<strong>光環</strong>：附近火塔複合 buff',
         ],
       },
       {
@@ -9438,14 +9544,32 @@ function selectedTower() {
         ],
       },
       {
+        tag: '11等', title: '冰塔 ★11', cardClass: 'info-card--attr info-card--ice',
+        paint: { kind: 'tower', type: 'ice', apex: true },
+        desc: '傳奇造型：雙雪花與冰晶。',
+        stats: [
+          '<strong>取得</strong>：僅「塔升級」卡',
+          '<strong>光環</strong>：附近冰塔複合 buff',
+        ],
+      },
+      {
         tag: '雷', title: '雷塔', cardClass: 'info-card--attr info-card--bolt',
         paint: { kind: 'tower', type: 'bolt' },
         desc: '串連跳電 · 對空與跳躍增傷 · 麻痺',
         stats: [
           '<strong>造價</strong> 85',
-          '<strong>傷</strong> 24→84，飛行與跳躍 ×1.4',
+          '<strong>傷</strong> 30→105，飛行與跳躍 ×1.4',
           '<strong>麻痺</strong> 1.0→1.3 秒',
           '<strong>串連</strong> 2→4 跳',
+        ],
+      },
+      {
+        tag: '11等', title: '雷塔 ★11', cardClass: 'info-card--attr info-card--bolt',
+        paint: { kind: 'tower', type: 'bolt', apex: true },
+        desc: '傳奇造型：大金電與弧閃。',
+        stats: [
+          '<strong>取得</strong>：僅「塔升級」卡',
+          '<strong>光環</strong>：附近雷塔複合 buff',
         ],
       },
     ];
@@ -10027,6 +10151,11 @@ function selectedTower() {
     inspectTitle.textContent = towerLabel(tower) + '  Lv.' + (tower.level + 1);
     inspectMeta.textContent = needsSpec(tower) ? specChoiceText(tower) : statLine(stats, tower);
     if (maxed && !hasBlacksmith() && tower.level < 9) inspectMeta.textContent += ' 金幣升滿了。造一隻鐵匠後可升到 10 等。';
+    if (maxed && hasBlacksmith() && tower.level === 9) inspectMeta.textContent += ' 金幣已滿。「塔升級」卡可到 11 等；附近同屬塔越多複合 buff 越高。';
+    if (tower.level >= APEX_LEVEL) {
+      var pack = apexClusterBonus(countAffinityNear(tower));
+      inspectMeta.textContent += ' 11 等光環：同屬 ' + countAffinityNear(tower) + ' 座 → 攻擊 +' + Math.round(pack.bonus * 100) + '%、攻速 +' + Math.round(pack.haste * 100) + '%（上限 ' + Math.round(APEX_BONUS_MAX * 100) + '%／' + Math.round(APEX_HASTE_MAX * 100) + '%）。';
+    }
     if (needsSpec(tower)) {
       var row = document.createElement('div');
       row.className = 'spec-row';
@@ -10307,6 +10436,7 @@ function selectedTower() {
     drawAltar();
     drawFogs();
     drawPriestAuras();
+    drawApexAuras();
     drawRouteMarks();
     drawRouteHints();
     drawFlashes();
@@ -10338,6 +10468,20 @@ function selectedTower() {
         : (state.mode === 'campaign'
           ? (state.stagePlan && state.stagePlan.index === 5 ? '最後一波是本章首領' : '守住基地。受傷越少，星星越多')
           : '點空地放塔，每 10 波隨機獎勵'));
+    }
+  }
+
+  function drawApexAuras() {
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (tower.level < APEX_LEVEL) continue;
+      ctx.beginPath();
+      ctx.arc(worldX(tower.c + 0.5), worldY(tower.r + 0.5), APEX_RADIUS * view.tile, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(120, 90, 255, 0.08)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(120, 90, 255, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
   }
 
@@ -10594,6 +10738,152 @@ function selectedTower() {
     inkLine(s * 0.1, 0, s * 0.85, -s * 0.18, 3);
     inkStroke();
     ctx.lineWidth = prev;
+  }
+
+  function drawApexHalo(s) {
+    ctx.save();
+    ctx.strokeStyle = '#c9a227';
+    ctx.lineWidth = Math.max(2, s * 0.1);
+    inkCircle(0, 0, s * 1.18, 18);
+    inkStroke();
+    ctx.fillStyle = '#c9a227';
+    for (var i = 0; i < 5; i++) {
+      var a = -Math.PI / 2 + (Math.PI * 2 * i) / 5;
+      var px = Math.cos(a) * s * 1.28;
+      var py = Math.sin(a) * s * 1.28;
+      ctx.beginPath();
+      ctx.moveTo(px, py - s * 0.14);
+      ctx.lineTo(px + s * 0.09, py);
+      ctx.lineTo(px, py + s * 0.14);
+      ctx.lineTo(px - s * 0.09, py);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+    }
+    ctx.restore();
+  }
+
+  function drawTowerGlyphApex(type, s, aim) {
+    inkSeed = (type || 'x').length * 31 + (type ? type.charCodeAt(0) : 1) * 29 + 777;
+    inkSetup(Math.max(2.4, s * 0.14));
+    drawApexHalo(s);
+    if (type === 'arrow') {
+      ctx.fillStyle = '#fff';
+      inkCircle(0, 0, s * 1.02, 18);
+      ctx.fill();
+      inkStroke();
+      ctx.strokeStyle = '#c9a227';
+      ctx.lineWidth = Math.max(2, s * 0.08);
+      inkCircle(0, 0, s * 0.78, 16);
+      inkStroke();
+      ctx.strokeStyle = '#161616';
+      ctx.save();
+      ctx.rotate(aim || 0);
+      markArrow(s * 0.82);
+      inkLine(-s * 0.55, s * 0.22, s * 0.15, s * 0.22, 3);
+      inkStroke();
+      ctx.fillStyle = '#c9a227';
+      ctx.beginPath();
+      ctx.moveTo(s * 0.55, -s * 0.12);
+      ctx.lineTo(s * 0.88, 0);
+      ctx.lineTo(s * 0.55, s * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      inkStroke();
+      ctx.restore();
+    } else if (type === 'bolt') {
+      ctx.fillStyle = '#fff';
+      inkCircle(0, 0, s * 1.02, 18);
+      ctx.fill();
+      inkStroke();
+      ctx.save();
+      ctx.rotate(aim || 0);
+      ctx.fillStyle = '#ffe14a';
+      markBolt(s * 0.78);
+      ctx.fill();
+      inkStroke();
+      ctx.strokeStyle = '#c9a227';
+      ctx.lineWidth = Math.max(2, s * 0.1);
+      inkLine(-s * 0.7, -s * 0.35, -s * 0.35, -s * 0.55, 2);
+      inkStroke();
+      inkLine(s * 0.55, s * 0.2, s * 0.82, s * 0.45, 2);
+      inkStroke();
+      ctx.restore();
+    } else if (type === 'cannon') {
+      drawGlyphPlate('square', s * 1.05);
+      ctx.strokeStyle = '#c9a227';
+      ctx.lineWidth = Math.max(2, s * 0.08);
+      inkRect(-s * 0.78, -s * 0.78, s * 1.56, s * 1.56);
+      inkStroke();
+      ctx.strokeStyle = '#161616';
+      ctx.fillStyle = '#161616';
+      markCannon(s * 1.12);
+      ctx.fillStyle = '#e07a2f';
+      inkCircle(s * 0.72, -s * 0.22, s * 0.16, 10);
+      ctx.fill();
+      inkStroke();
+      ctx.fillStyle = '#c9a227';
+      inkCircle(s * 0.88, -s * 0.38, s * 0.08, 8);
+      ctx.fill();
+    } else if (type === 'poison') {
+      drawGlyphPlate('square', s * 1.05);
+      ctx.fillStyle = '#2fa83c';
+      markDroplet(s * 0.7);
+      ctx.fill();
+      inkStroke();
+      ctx.fillStyle = '#7dff8a';
+      markDroplet(s * 0.32);
+      ctx.save();
+      ctx.translate(-s * 0.42, s * 0.28);
+      ctx.fill();
+      inkStroke();
+      ctx.restore();
+      ctx.save();
+      ctx.translate(s * 0.4, s * 0.18);
+      markDroplet(s * 0.24);
+      ctx.fill();
+      inkStroke();
+      ctx.restore();
+      ctx.fillStyle = '#c9a227';
+      inkCircle(0, -s * 0.72, s * 0.12, 8);
+      ctx.fill();
+      inkStroke();
+    } else if (type === 'fire') {
+      drawGlyphPlate('square', s * 1.05);
+      ctx.fillStyle = '#ff5a2a';
+      markFlame(s * 0.72);
+      ctx.fill();
+      inkStroke();
+      ctx.fillStyle = '#ffe14a';
+      markFlame(s * 0.38);
+      ctx.fill();
+      inkStroke();
+      ctx.fillStyle = '#c9a227';
+      for (var e = 0; e < 3; e++) {
+        inkCircle((-0.5 + e * 0.5) * s * 0.55, s * 0.72, s * 0.08, 7);
+        ctx.fill();
+      }
+    } else if (type === 'ice') {
+      drawGlyphPlate('square', s * 1.05);
+      ctx.strokeStyle = '#5eb0ff';
+      ctx.lineWidth = Math.max(2.6, s * 0.16);
+      markSnowflake(s * 0.7);
+      ctx.strokeStyle = '#161616';
+      ctx.lineWidth = Math.max(2.2, s * 0.11);
+      markSnowflake(s * 0.42);
+      ctx.fillStyle = '#c9a227';
+      inkCircle(0, 0, s * 0.12, 8);
+      ctx.fill();
+      inkStroke();
+      ctx.strokeStyle = '#8fd4ff';
+      inkLine(-s * 0.85, -s * 0.2, -s * 0.55, -s * 0.55, 2);
+      inkStroke();
+      inkLine(s * 0.85, s * 0.15, s * 0.55, s * 0.5, 2);
+      inkStroke();
+      ctx.strokeStyle = '#161616';
+    } else {
+      drawTowerGlyph(type, s, aim);
+    }
   }
 
   function drawTowerGlyph(type, s, aim) {
@@ -11303,7 +11593,8 @@ function selectedTower() {
     }
     var x = worldX(ax);
     var y = worldY(ay);
-    var s = tower.type === 'hero' ? tile * 0.3 : tile * 0.26;
+    var apex = tower.type !== 'hero' && tower.level >= APEX_LEVEL;
+    var s = tower.type === 'hero' ? tile * 0.3 : (apex ? tile * 0.3 : tile * 0.26);
     ctx.save();
     ctx.translate(x, y);
     ctx.lineWidth = 2.5;
@@ -11323,17 +11614,18 @@ function selectedTower() {
       var glyphType = tower.type;
       if (isArrowPath(tower)) glyphType = 'arrow';
       else if (isCannonPath(tower)) glyphType = 'cannon';
-      drawTowerGlyph(glyphType, s, tower.aim || 0);
+      if (apex) drawTowerGlyphApex(glyphType, s, tower.aim || 0);
+      else drawTowerGlyph(glyphType, s, tower.aim || 0);
     }
     ctx.restore();
     if (tower.type !== 'smith') {
     var shown = tower.level + 1;
-    ctx.fillStyle = '#161616';
+    ctx.fillStyle = apex ? '#6b4cff' : '#161616';
     if (shown > 6) {
       ctx.font = '800 ' + Math.max(10, Math.round(tile * 0.22)) + 'px ' + FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Lv.' + shown, x, y + tile * 0.36);
+      ctx.fillText(apex ? '★11' : ('Lv.' + shown), x, y + tile * 0.38);
     } else {
       var pip = tile * 0.055;
       var gap = tile * 0.02;
