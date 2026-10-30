@@ -1247,8 +1247,7 @@
       else if (w === 3) grunts = Math.max(grunts, 8);
       else if (w === 4) grunts = Math.max(grunts, 9);
       if (press && w >= 3) grunts += 1;
-      if (press && w >= 5) grunts += 1;
-      if (press && w >= 8) grunts += 1;
+      if (press && w >= 6) grunts += 1;
       if (stage >= 4 && w >= 8) grunts += 1;
       var swifts = 0;
       if (w === 2) swifts = 3;
@@ -1388,8 +1387,9 @@
             var hp = (1 + (c - 1) * 0.08 + (s - 1) * 0.03) * 1.05;
             // 1-1／1-2 維持教學手感；1-3 起血量壓力明顯上升
             if (!(c === 1 && s <= 2)) {
-              var pressure = 1.18 + Math.max(0, s - 2) * 0.035 + Math.max(0, c - 1) * 0.022;
-              hp *= Math.min(1.34, pressure);
+              // 升級金已調高，血量壓力略收回（仍比 1-1／1-2 明顯難）
+              var pressure = 1.12 + Math.max(0, s - 2) * 0.028 + Math.max(0, c - 1) * 0.018;
+              hp *= Math.min(1.26, pressure);
             }
             return Math.round(hp * 100) / 100;
           })(),
@@ -1601,7 +1601,7 @@ function selectedTower() {
       var stageBoost = (state.stagePlan.chapter - 1) * 0.48 + (state.stagePlan.index - 1) * 0.48 * stageRamp;
       // 1-3 起額外威脅；1-1／1-2 維持原曲線
       if (!(state.stagePlan.chapter === 1 && state.stagePlan.index <= 2)) {
-        stageBoost += 0.55 + (state.stagePlan.index - 1) * 0.16 + Math.max(0, state.stagePlan.chapter - 1) * 0.12;
+        stageBoost += 0.35 + (state.stagePlan.index - 1) * 0.12 + Math.max(0, state.stagePlan.chapter - 1) * 0.08;
       }
       var raw = within + stageBoost;
       // Soft-cap very high threat so late bosses do not explode while mid-run stays harsh.
@@ -2543,11 +2543,11 @@ function selectedTower() {
       speedCap = diff.speedCap;
     } else if (state.mode === 'campaign') {
       var stagePress = state.stagePlan && !(state.stagePlan.chapter === 1 && state.stagePlan.index <= 2);
-      growth = stagePress ? 1.175 : 1.15;
-      goldMul = stagePress ? 0.65 : 0.72;
-      speedMul = stagePress ? 1.05 : 1.02;
-      speedGrow = stagePress ? 0.038 : 0.032;
-      speedCap = stagePress ? 1.55 : 1.48;
+      growth = stagePress ? 1.16 : 1.15;
+      goldMul = stagePress ? 0.70 : 0.72;
+      speedMul = stagePress ? 1.035 : 1.02;
+      speedGrow = stagePress ? 0.034 : 0.032;
+      speedCap = stagePress ? 1.50 : 1.48;
     } else if (state.mode === 'custom') {
       growth = 1.2;
       hpMul *= 1.22;
@@ -7841,7 +7841,7 @@ function selectedTower() {
         '玩法：1–10 等塔傷約提高 1/4；「塔升級」卡可到 11 等，同屬塔越多複合 buff 越高',
         '外觀：箭／砲／毒／火／冰／雷 11 等各有傳奇造型；圖鑑塔明細下方可預覽',
         '修正：分裂體不貼終點秒漏；分裂出來的怪擊殺不給金幣',
-        '難度：1-3 起關卡明顯變難；再微幅加血／加怪／略緊金幣；1-1／1-2 仍偏教學',
+        '難度：1-3 起仍比教學關難；配合升級金上調，血量／威脅／金幣略收回一截',
         '經濟：各塔金幣升級費用約提高一成多；廣告贈塔改為 1～2 等',
       ],
       full: [
@@ -7853,8 +7853,8 @@ function selectedTower() {
         '11 等：半徑約 2.6 格；同屬塔越多複合越高（每座攻擊 +8%／攻速 +3.5%，上限 40%／18%），可與樂手疊加',
         '11 等造型：金環五芒星暈；箭雙矢金鏃、砲焰口、毒多滴、火雙焰、冰晶雪、雷弧閃；圖鑑「塔明細」各塔下方有 ★11 預覽',
         '分裂：分裂體出生點遠離終點；分裂體／裂殖體擊殺金幣為 0（本體仍給錢）',
-        '關卡：1-1／1-2 不變；1-3 起 hpScale 再抬（壓力約 1.18～1.34）、中後波多一點小怪',
-        '關卡：加壓關成長約 1.175、金幣 ×0.65、移速略升；威脅曲線再加一截',
+        '關卡：1-1／1-2 不變；1-3 起 hpScale 壓力約 1.12～1.26（較上一檔收回）',
+        '關卡：加壓關成長約 1.16、金幣 ×0.70、移速微升；威脅加成略收；中後波怪數不再額外加一檔',
         '升級金：無屬 40→70→110…；毒／火／冰／雷／產錢各表約 ×1.12；鐵匠之後超表仍依末檔 ×1.32 遞增',
         '廣告贈塔：隨機 1 或 2 等（不再出 3 等／直接分支）',
       ],
