@@ -910,17 +910,19 @@ canvas[hidden] { display: none !important; }
   flex: 1;
   width: 100%;
   min-height: 0;
-  padding: 0;
+  /* 整頁往內縮，手機四邊鍊條／裝飾不被裁切 */
+  padding: clamp(12px, 3.6vw, 20px);
   box-sizing: border-box;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
   container-type: size;
 }
 .welcome-art {
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: 0;
   flex: 1 1 auto;
 }
 .welcome-bg {
@@ -929,11 +931,31 @@ canvas[hidden] { display: none !important; }
   width: 100%;
   height: 100%;
   margin: 0;
-  object-fit: cover;
-  object-position: center top;
+  /* 撐滿內縮區域並完整顯示四邊（略伸縮） */
+  object-fit: fill;
+  object-position: center center;
   pointer-events: none;
   user-select: none;
   z-index: 0;
+}
+/* 底部鍊框內：登入左右／已登入帳號左＋開始右（往中間靠） */
+.welcome-dock {
+  position: absolute;
+  left: 10.5%;
+  right: 10.5%;
+  top: 81.5%;
+  bottom: 6.8%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 3.5cqw, 18px);
+  box-sizing: border-box;
+  padding: clamp(6px, 1.8cqh, 10px) clamp(10px, 4cqw, 20px);
+  pointer-events: none;
+}
+.welcome-dock > * {
+  pointer-events: auto;
 }
 .welcome-user[hidden],
 .welcome-account[hidden],
@@ -945,29 +967,39 @@ canvas[hidden] { display: none !important; }
   display: none !important;
 }
 .welcome-user {
-  position: absolute;
-  left: 50%;
-  top: 56%;
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
   z-index: 5;
   display: flex;
   align-items: center;
-  gap: 8px;
-  max-width: 78%;
-  padding: 6px 12px 6px 6px;
-  transform: translate(-50%, -50%);
+  align-self: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 32%;
+  min-width: 0;
+  height: auto;
+  max-height: none;
+  padding: 2px 8px 2px 2px;
   border: 2px solid #161616;
-  border-radius: 18px;
+  border-radius: 999px;
   background: #fff;
   color: #161616;
+  font-size: clamp(10px, 2.6cqw, 13px);
   font-weight: 800;
+  letter-spacing: -0.02em;
+  box-sizing: border-box;
 }
 .welcome-user img,
 .welcome-user canvas,
 .account-chip img {
   position: static;
   inset: auto;
-  width: 28px;
-  height: 28px;
+  width: clamp(18px, 5vw, 24px);
+  height: clamp(18px, 5vw, 24px);
+  flex: 0 0 auto;
   border: 2px solid #161616;
   border-radius: 50%;
   object-fit: cover;
@@ -978,48 +1010,56 @@ canvas[hidden] { display: none !important; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 .welcome-account {
-  position: absolute;
-  left: 50%;
-  top: 66%;
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
   z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  width: min(72%, 280px);
-  min-height: 52px;
-  padding: 8px 16px;
-  transform: translate(-50%, -50%);
+  gap: 5px;
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 46%;
+  height: auto;
+  max-height: 78%;
+  min-height: clamp(36px, 7cqh, 48px);
+  padding: 3px 12px;
   border: 2px solid #161616;
-  border-radius: 18px;
+  border-radius: 999px;
   background: #fff;
   color: #161616;
   font: inherit;
-  font-size: 16px;
+  font-size: clamp(11px, 2.8cqw, 14px);
   font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: none;
+  box-sizing: border-box;
 }
 .welcome-account:active {
-  transform: translate(-50%, calc(-50% + 1px));
+  transform: translateY(1px);
   box-shadow: none;
 }
 .welcome-guest {
-  top: 77%;
+  top: auto;
   background: #fff;
 }
 .g-mark {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: 50%;
-  border: 2px solid #161616;
-  background: #fff;
-  color: #161616;
-  font-weight: 800;
+  display: block;
+  width: clamp(18px, 5vw, 24px);
+  height: clamp(18px, 5vw, 24px);
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+}
+#welcome-account-label {
+  white-space: nowrap;
 }
 .account-chip {
   display: flex;
@@ -1038,16 +1078,18 @@ canvas[hidden] { display: none !important; }
   cursor: pointer;
 }
 .welcome-start {
-  position: absolute;
-  left: 50%;
-  top: 71%;
-  width: min(46%, 220px);
-  min-width: 140px;
-  min-height: 0;
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 48%;
   height: auto;
-  transform: translate(-50%, -50%);
+  max-height: 82%;
   margin: 0;
-  padding: 8px 10px;
+  padding: 0;
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -1058,17 +1100,20 @@ canvas[hidden] { display: none !important; }
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
   box-sizing: border-box;
 }
 .welcome-start img {
   pointer-events: none;
-  width: 100%;
-  height: auto;
+  width: auto;
+  height: clamp(42px, 8.5cqh, 58px);
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   display: block;
 }
 .welcome-start:active {
-  transform: translate(-50%, calc(-50% + 2px));
+  transform: translateY(2px);
 }
 .welcome-start:active img {
   filter: brightness(0.96);
@@ -2806,14 +2851,22 @@ body #screen-menu.play-home,
   min-height: 52px;
 }
 .welcome-account,
-.welcome-user,
 .account-chip {
   background-color: #fff;
   background-image: none;
   color: #161616;
   border: 2px solid #161616;
   border-image: none;
-  border-radius: 18px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.welcome-user {
+  background-color: #fff;
+  background-image: none;
+  color: #161616;
+  border: 2px solid #161616;
+  border-image: none;
+  border-radius: 999px;
   box-shadow: none;
 }
 .play-home .home-dock {
@@ -3077,7 +3130,7 @@ body #screen-menu.play-home,
 .play-home .sketch-box-dark,
 .play-home .sketch-circle-dark { color: #ffffff !important; }
 
-button:not(.sketch-box):not(.sketch-circle):not(.welcome-start):not(#btn-mode-custom):not(#btn-mode-infinite):not(#home-stars) {
+button:not(.sketch-box):not(.sketch-circle):not(.welcome-start):not(.welcome-account):not(#btn-mode-custom):not(#btn-mode-infinite):not(#home-stars) {
   overflow: visible;
   background: transparent !important;
   background-image: none !important;
@@ -3091,7 +3144,7 @@ button:not(.sketch-box):not(.sketch-circle):not(.welcome-start):not(.welcome-acc
   position: relative;
   z-index: 1;
 }
-button:not(.sketch-box):not(.sketch-circle):not(.welcome-start):not(#btn-mode-custom):not(#btn-mode-infinite):not(#home-stars)::before {
+button:not(.sketch-box):not(.sketch-circle):not(.welcome-start):not(.welcome-account):not(#btn-mode-custom):not(#btn-mode-infinite):not(#home-stars)::before {
   content: "";
   position: absolute;
   inset: 0;
