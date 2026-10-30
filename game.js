@@ -7733,13 +7733,16 @@ function selectedTower() {
   var PATCH_NOTES = [
     {
       date: '10/30',
-      title: '排行榜成績寫入修復',
+      title: '排行榜同步、HUD 音樂音效、金幣顯示',
       detail: [
         '排行：同一 Google 手機／電腦地獄成績會合併上榜；本機較高波次登入後會補推雲端',
+        '介面：音樂與音效鈕排在一起；金幣達 1000 起顯示為 1.00K',
       ],
       full: [
         '排行：寫入規則允許名片框／稱號；地獄榜成績不再被擋',
         '同步：讀榜時雲端較高波次寫回本機；登入後也會把本機較高地獄波次補上雲端',
+        'HUD：音樂／音效並排在暫停右側，不再換行拆開',
+        '金幣：≥1000 顯示為千分位 K，小數兩位（例如 1234 → 1.23K）',
       ],
     },
     {
@@ -10078,9 +10081,15 @@ function selectedTower() {
     return btn;
   }
 
+  function formatGold(amount) {
+    var n = Math.floor(Number(amount) || 0);
+    if (n < 1000) return String(n);
+    return (n / 1000).toFixed(2) + 'K';
+  }
+
   function syncHud() {
     hudLives.textContent = String(state.lives);
-    hudGold.textContent = String(state.gold);
+    hudGold.textContent = formatGold(state.gold);
     statLife.classList.toggle('is-low', state.lives > 0 && state.lives <= 6);
     if (state.lives < state.shownLives) {
       statLife.classList.remove('is-hurt');

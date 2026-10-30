@@ -94,6 +94,12 @@ button:disabled { cursor: default; }
   border-bottom: 2px solid #161616;
 }
 
+.hud-audio-pair {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .hud .icon-btn {
   width: 40px;
   height: 40px;
