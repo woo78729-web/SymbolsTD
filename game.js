@@ -7932,6 +7932,18 @@ function selectedTower() {
 
   var PATCH_NOTES = [
     {
+      date: '10/31',
+      title: '訪客可綁定 Google',
+      detail: [
+        '帳號：設定與名片可把訪客綁定成 Google，進度接到同一個帳號',
+      ],
+      full: [
+        '設定：訪客顯示「綁定 Google」；已綁定則顯示已綁定',
+        '名片：訪客可直接綁定',
+        '綁定：Firebase 匿名用 link 保住同一 uid；若該 Google 已有帳號可改登入並合併本機進度',
+      ],
+    },
+    {
       date: '10/30',
       title: '排行榜同步、塔等傷害、分裂加壓、毒火傳染',
       detail: [
@@ -8451,20 +8463,35 @@ function selectedTower() {
     var musicLabel = Bgm.muted ? '音樂：關' : '音樂：開';
     var sfxLabel = Sfx.muted ? '音效：關' : '音效：開';
     var speedLabel = '預設速度：×' + preferredSpeed();
+    var account = loadAccount();
+    var guest = isGuestAccount(account);
+    var actions = [];
+    if (guest) {
+      actions.push({ label: '綁定 Google', className: 'btn-mint', onClick: beginLinkGoogle });
+    } else if (account) {
+      actions.push({
+        label: '帳號：已綁定 Google',
+        className: 'btn-ghost',
+        onClick: function () { toast('已是 Google 帳號'); openSettings(); },
+      });
+    }
+    actions.push(
+      { label: musicLabel, className: 'btn-ghost', onClick: togglePreferredBgm },
+      { label: sfxLabel, className: 'btn-ghost', onClick: togglePreferredSfx },
+      { label: speedLabel, className: 'btn-ghost', onClick: cyclePreferredSpeed },
+      { label: '輸入代碼', className: 'btn-ghost', onClick: openCodeRedeem },
+      { label: '更新細項', className: 'btn-ghost', onClick: openPatchFullNotes },
+      { label: '意見提供', className: 'btn-ghost', onClick: openFeedback },
+      { label: '關閉', className: 'btn-ghost is-exit', onClick: closeModal }
+    );
     openModal({
       tone: 'reward',
       kicker: '目錄',
       title: '設定',
-      desc: '音樂、音效、預設速度、代碼與更新細項。',
-      actions: [
-        { label: musicLabel, className: 'btn-ghost', onClick: togglePreferredBgm },
-        { label: sfxLabel, className: 'btn-ghost', onClick: togglePreferredSfx },
-        { label: speedLabel, className: 'btn-ghost', onClick: cyclePreferredSpeed },
-        { label: '輸入代碼', className: 'btn-ghost', onClick: openCodeRedeem },
-        { label: '更新細項', className: 'btn-ghost', onClick: openPatchFullNotes },
-        { label: '意見提供', className: 'btn-ghost', onClick: openFeedback },
-        { label: '關閉', className: 'btn-ghost is-exit', onClick: closeModal },
-      ],
+      desc: guest
+        ? '訪客可點「綁定 Google」把進度接到 Google。也可改音樂、音效、速度與代碼。'
+        : '音樂、音效、預設速度、代碼與更新細項。',
+      actions: actions,
     });
   }
 
@@ -9103,6 +9130,82 @@ function selectedTower() {
     }
   }
 
+  function isGuestAccount(account) {
+    account = account || loadAccount();
+    if (!account || !account.uid) return false;
+    if (account.guest) return true;
+    return String(account.uid).indexOf('guest-') === 0;
+  }
+
+  function mergeProgressUid(fromUid, toUid) {
+    if (!fromUid || !toUid || fromUid === toUid) return;
+    if (String(fromUid).indexOf('guest-') === 0) return; // 本機訪客本來就寫在無帳號 key
+    try {
+      var fromStars = normalizeStarMap(JSON.parse(localStorage.getItem('fantasy_td_stars:' + fromUid) || '{}'));
+      var toStars = normalizeStarMap(JSON.parse(localStorage.getItem('fantasy_td_stars:' + toUid) || '{}'));
+      var mergedStars = mergeStarMaps(toStars, fromStars);
+      localStorage.setItem('fantasy_td_stars:' + toUid, JSON.stringify(mergedStars));
+      var fromDeeds = sanitizeDeedsMap(JSON.parse(localStorage.getItem('symbols-td-deeds:' + fromUid) || '{}'));
+      var toDeeds = sanitizeDeedsMap(JSON.parse(localStorage.getItem('symbols-td-deeds:' + toUid) || '{}'));
+      localStorage.setItem('symbols-td-deeds:' + toUid, JSON.stringify(mergeDeedsMaps(toDeeds, fromDeeds)));
+    } catch (error) { /* ignore */ }
+  }
+
+  function googleAuthProvider() {
+    var provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    return provider;
+  }
+
+  function finishGoogleAuthSuccess(msg) {
+    closeModal();
+    showMenu();
+    paintAccount();
+    toast(msg || '已登入，成績會記到這個帳號');
+  }
+
+  function handleGoogleAuthError(error, provider, linking) {
+    var code = error && error.code;
+    if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+      firebase.auth().signInWithRedirect(provider);
+      return;
+    }
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+    if (linking && (code === 'auth/credential-already-in-use' || code === 'auth/email-already-in-use')) {
+      var cred = error.credential;
+      var prevUid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+      if (!cred) {
+        toast('這個 Google 已綁過別的帳號，請改用 Google 登入');
+        return;
+      }
+      openModal({
+        tone: 'reward',
+        kicker: '綁定',
+        title: '這個 Google 已有帳號',
+        desc: '要改用那個 Google 登入嗎？本機關卡進度會盡量合併過去。',
+        actions: [
+          {
+            label: '改用該 Google',
+            className: 'btn-mint',
+            onClick: function () {
+              firebase.auth().signInWithCredential(cred).then(function (result) {
+                var nextUid = result && result.user && result.user.uid;
+                if (prevUid && nextUid) mergeProgressUid(prevUid, nextUid);
+                state.stars = loadStars();
+                finishGoogleAuthSuccess('已改用 Google 帳號');
+              }).catch(function () {
+                toast('切換失敗');
+              });
+            },
+          },
+          { label: '取消', className: 'btn-ghost', onClick: openSettings },
+        ],
+      });
+      return;
+    }
+    toast(linking ? '綁定失敗' : '登入失敗');
+  }
+
   function beginGoogleSignIn() {
     if (!cloudReady()) {
       openModal({
@@ -9117,20 +9220,46 @@ function selectedTower() {
       });
       return;
     }
-    var provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
+    var provider = googleAuthProvider();
     firebase.auth().signInWithPopup(provider).then(function () {
-      closeModal();
-      showMenu();
-      toast('已登入，成績會記到這個帳號');
+      finishGoogleAuthSuccess('已登入，成績會記到這個帳號');
     }).catch(function (error) {
-      var code = error && error.code;
-      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
-        firebase.auth().signInWithRedirect(provider);
-        return;
-      }
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
-      toast('登入失敗');
+      handleGoogleAuthError(error, provider, false);
+    });
+  }
+
+  // 訪客 → Google：匿名帳號用 link 保住同一 uid；本機訪客則改登入 Google
+  function beginLinkGoogle() {
+    if (!cloudReady()) {
+      toast('線上帳號還沒接上');
+      return;
+    }
+    var account = loadAccount();
+    if (!account) {
+      beginGoogleSignIn();
+      return;
+    }
+    if (!isGuestAccount(account)) {
+      toast('已經是 Google 帳號');
+      openSettings();
+      return;
+    }
+    var provider = googleAuthProvider();
+    var user = firebase.auth().currentUser;
+    if (user && user.isAnonymous) {
+      user.linkWithPopup(provider).then(function () {
+        finishGoogleAuthSuccess('已綁定 Google，進度留在這個帳號');
+        openSettings();
+      }).catch(function (error) {
+        handleGoogleAuthError(error, provider, true);
+      });
+      return;
+    }
+    firebase.auth().signInWithPopup(provider).then(function () {
+      finishGoogleAuthSuccess('已綁定 Google，本機進度會合併');
+      openSettings();
+    }).catch(function (error) {
+      handleGoogleAuthError(error, provider, true);
     });
   }
 
@@ -9181,28 +9310,35 @@ function selectedTower() {
     var epithet = rankEpithet(hellRank());
     profilePick = null;
     profileEditTab = 'face';
+    var actions = [
+      { label: '儲存', className: 'btn-mint', onClick: saveProfileCard },
+    ];
+    if (isGuestAccount(account)) {
+      actions.push({ label: '綁定 Google', className: 'btn-mint', onClick: beginLinkGoogle });
+    }
+    actions.push(
+      { label: '登出', className: 'btn-ghost', onClick: function () {
+        var done = function () {
+          clearAccount();
+          onlineBoards = {};
+          onlineRanks = {};
+          closeModal();
+          paintAccount();
+          toast('已登出');
+        };
+        if (cloudReady()) firebase.auth().signOut().then(done).catch(done);
+        else done();
+      } },
+      { label: '關閉', className: 'btn-mint', onClick: closeModal }
+    );
     openModal({
       tone: 'reward',
       kicker: '名片',
       title: '編輯名片',
-      desc: 'ID　' + account.friendId + '。名字最多 12 字。頭像、框和稱號可以自己選。前 10 名的榜上稱號會另外顯示。',
+      desc: (isGuestAccount(account) ? '目前是訪客。可綁定 Google 換裝置同步。' : '') +
+        'ID　' + (account.friendId || '對齊中') + '。名字最多 12 字。頭像、框和稱號可以自己選。前 10 名的榜上稱號會另外顯示。',
       profile: true,
-      actions: [
-        { label: '儲存', className: 'btn-mint', onClick: saveProfileCard },
-        { label: '登出', className: 'btn-ghost', onClick: function () {
-          var done = function () {
-            clearAccount();
-            onlineBoards = {};
-            onlineRanks = {};
-            closeModal();
-            paintAccount();
-            toast('已登出');
-          };
-          if (cloudReady()) firebase.auth().signOut().then(done).catch(done);
-          else done();
-        } },
-        { label: '關閉', className: 'btn-mint', onClick: closeModal },
-      ],
+      actions: actions,
     });
   }
 
