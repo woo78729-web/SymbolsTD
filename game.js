@@ -7871,6 +7871,16 @@ function selectedTower() {
     });
   }
 
+  // 失敗／跳出：回作戰選關或無限／自訂難度，不要回歡迎頁
+  function returnAfterRun() {
+    state.userPaused = false;
+    if (pauseBtn) pauseBtn.setAttribute('aria-pressed', 'false');
+    closeModal();
+    if (state.mode === 'campaign') openStages(state.chapter);
+    else if (state.mode === 'infinite' || state.mode === 'custom') openDifficulty(state.mode);
+    else showMenu();
+  }
+
   function openGameOverModal() {
     var actions = [];
     if (!state.reviveUsed) {
@@ -7883,10 +7893,11 @@ function selectedTower() {
     }
     var retryLabel = state.mode === 'campaign' ? '重試本關' : '重新開始';
     actions.push({ label: retryLabel, className: 'btn-ghost', onClick: restartGame });
-    if (state.mode === 'campaign') {
-      actions.push({ label: '返回關卡選擇', className: 'btn-ghost', onClick: function () { closeModal(); openStages(state.chapter); } });
-    }
-    actions.push({ label: '返回選單', className: 'btn-ghost', onClick: function () { closeModal(); showWelcome(); } });
+    actions.push({
+      label: state.mode === 'campaign' ? '返回關卡選擇' : '返回選單',
+      className: 'btn-ghost',
+      onClick: returnAfterRun,
+    });
     var record = (state.mode === 'infinite' || state.mode === 'custom') && state.best > 0
       ? (state.difficulty === 'hell' ? '地獄' : '普通') + '最遠第 ' + state.best + ' 波。'
       : '';
@@ -7931,6 +7942,17 @@ function selectedTower() {
   }
 
   var PATCH_NOTES = [
+    {
+      date: '11/7',
+      title: '失敗跳出改回作戰選關',
+      detail: [
+        '介面：失敗、暫停離開、返回不再進歡迎頁；作戰回選關，無限／自訂回難度頁',
+      ],
+      full: [
+        '失敗／暫停／返回：campaign → 作戰選關（記住章節）；infinite／custom → 難度選擇',
+        '歡迎頁仍可從作戰頁左上返回進入',
+      ],
+    },
     {
       date: '10/31',
       title: '訪客可綁定 Google',
@@ -10006,10 +10028,10 @@ function selectedTower() {
       tone: 'reward',
       kicker: '暫停',
       title: '遊戲暫停',
-      desc: '戰鬥已暫停。可繼續，或返回選單（本局進度不保留）。',
+      desc: '戰鬥已暫停。可繼續，或離開本局（進度不保留）。',
       actions: [
         { label: '繼續遊戲', className: 'btn-mint', onClick: function () { togglePause(); } },
-        { label: '返回選單', className: 'btn-ghost', onClick: function () { state.userPaused = false; if (pauseBtn) pauseBtn.setAttribute('aria-pressed', 'false'); closeModal(); showWelcome(); } },
+        { label: state.mode === 'campaign' ? '回作戰選關' : '返回選單', className: 'btn-ghost', onClick: returnAfterRun },
       ],
     });
   }
@@ -13948,8 +13970,7 @@ function selectedTower() {
         title: '離開這一關？',
         desc: '這一局的進度不會保留。星星只在通關時計入。',
         actions: [
-          { label: '返回關卡選擇', className: 'btn-mint', onClick: function () { closeModal(); openStages(state.chapter); } },
-          { label: '回到主選單', className: 'btn-ghost', onClick: function () { closeModal(); showWelcome(); } },
+          { label: '返回關卡選擇', className: 'btn-mint', onClick: returnAfterRun },
           { label: '繼續', className: 'btn-ghost', onClick: closeModal },
         ],
       });
@@ -13962,13 +13983,13 @@ function selectedTower() {
         title: '回到選單？',
         desc: '這一局的進度不會保留。',
         actions: [
-          { label: '回到選單', className: 'btn-mint', onClick: function () { closeModal(); showWelcome(); } },
+          { label: '回到選單', className: 'btn-mint', onClick: returnAfterRun },
           { label: '繼續', className: 'btn-ghost', onClick: closeModal },
         ],
       });
       return;
     }
-    showWelcome();
+    returnAfterRun();
   }
 
   function loadSheets(done) {
