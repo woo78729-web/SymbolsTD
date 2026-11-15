@@ -86,18 +86,18 @@
     },
     ice: {
       name: '冰塔',
-      blurb: '藍色光波 · 緩速 · 第 3 次凍結',
+      blurb: '藍色光波 · 緩速 · 第 5 次凍結',
       cost: 85,
       color: '#8fd4ff',
       category: 'element',
       upgradeCost: [60, 100, 145, 195, 250, 335, 450, 605, 810],
       levels: [
-        { damage: 35, range: 2.3, cooldown: 1.1, splash: 1.1, effect: 'slow', slow: 0.35, slowTime: 1.8 },
-        { damage: 43, range: 2.35, cooldown: 1.0, splash: 1.2, effect: 'slow', slow: 0.38, slowTime: 1.8 },
-        { damage: 50, range: 2.4, cooldown: 0.9, splash: 1.32, effect: 'slow', slow: 0.4, slowTime: 1.8 },
-        { damage: 58, range: 2.45, cooldown: 0.82, splash: 1.42, effect: 'slow', slow: 0.4, slowTime: 1.8 },
-        { damage: 65, range: 2.5, cooldown: 0.74, splash: 1.52, effect: 'slow', slow: 0.42, slowTime: 1.8 },
-        { damage: 75, range: 2.55, cooldown: 0.66, splash: 1.62, effect: 'slow', slow: 0.45, slowTime: 1.8 },
+        { damage: 35, range: 2.3, cooldown: 1.1, splash: 1.1, effect: 'slow', slow: 0.28, slowTime: 1.8 },
+        { damage: 43, range: 2.35, cooldown: 1.0, splash: 1.2, effect: 'slow', slow: 0.30, slowTime: 1.8 },
+        { damage: 50, range: 2.4, cooldown: 0.9, splash: 1.32, effect: 'slow', slow: 0.32, slowTime: 1.8 },
+        { damage: 58, range: 2.45, cooldown: 0.82, splash: 1.42, effect: 'slow', slow: 0.33, slowTime: 1.8 },
+        { damage: 65, range: 2.5, cooldown: 0.74, splash: 1.52, effect: 'slow', slow: 0.34, slowTime: 1.8 },
+        { damage: 75, range: 2.55, cooldown: 0.66, splash: 1.62, effect: 'slow', slow: 0.35, slowTime: 1.8 },
       ],
     },
     bolt: {
@@ -108,12 +108,12 @@
       category: 'element',
       upgradeCost: [60, 100, 145, 195, 250, 335, 450, 605, 810],
       levels: [
-        { damage: 30, range: 2.45, cooldown: 0.72, splash: 0, targets: 1, chain: 2, chainRange: 1.75, stunTime: 1.0 },
-        { damage: 40, range: 2.5, cooldown: 0.64, splash: 0, targets: 1, chain: 2, chainRange: 1.85, stunTime: 1.05 },
-        { damage: 53, range: 2.55, cooldown: 0.56, splash: 0, targets: 1, chain: 3, chainRange: 1.9, stunTime: 1.1 },
-        { damage: 68, range: 2.6, cooldown: 0.5, splash: 0, targets: 1, chain: 3, chainRange: 2.0, stunTime: 1.15 },
-        { damage: 85, range: 2.65, cooldown: 0.44, splash: 0, targets: 1, chain: 4, chainRange: 2.05, stunTime: 1.2 },
-        { damage: 105, range: 2.7, cooldown: 0.38, splash: 0, targets: 1, chain: 4, chainRange: 2.15, stunTime: 1.3 },
+        { damage: 30, range: 2.45, cooldown: 0.72, splash: 0, targets: 1, chain: 2, chainRange: 1.75, stunTime: 0.18 },
+        { damage: 40, range: 2.5, cooldown: 0.64, splash: 0, targets: 1, chain: 2, chainRange: 1.85, stunTime: 0.26 },
+        { damage: 53, range: 2.55, cooldown: 0.56, splash: 0, targets: 1, chain: 3, chainRange: 1.9, stunTime: 0.34 },
+        { damage: 68, range: 2.6, cooldown: 0.5, splash: 0, targets: 1, chain: 3, chainRange: 2.0, stunTime: 0.40 },
+        { damage: 85, range: 2.65, cooldown: 0.44, splash: 0, targets: 1, chain: 4, chainRange: 2.05, stunTime: 0.46 },
+        { damage: 105, range: 2.7, cooldown: 0.38, splash: 0, targets: 1, chain: 4, chainRange: 2.15, stunTime: 0.50 },
       ],
     },
     mint: {
@@ -134,12 +134,13 @@
     },
     smith: {
       name: '鐵匠',
-      blurb: '不攻擊。在場時，其他塔可以用金幣升到 10 等。',
+      blurb: '不攻擊。1 等讓塔金幣升到 10；升到 2 等後，「塔升級」卡才能破 10 上 11。',
       cost: 480,
       color: '#8d6e63',
       category: 'support',
-      upgradeCost: [],
+      upgradeCost: [2000],
       levels: [
+        { damage: 0, range: 0, cooldown: 99 },
         { damage: 0, range: 0, cooldown: 99 },
       ],
     },
@@ -152,8 +153,8 @@
     { id: 'ward', name: '護盾王', blurb: '週期張開護盾', color: '#67e8f9' },
     { id: 'split', name: '分裂王', blurb: '死後分成三隻', color: '#c084fc' },
     { id: 'mend', name: '治癒王', blurb: '治療附近的敵人', color: '#ff8fab' },
-    { id: 'frost', name: '冰封王', blurb: '定期凍結所有防禦塔', color: '#9bd4ff' },
-    { id: 'armor', name: '鐵甲王', blurb: '受到的傷害減半', color: '#8aa0b8' },
+    { id: 'frost', name: '冰封王', blurb: '所到之處，附近塔攻速減少 60%', color: '#9bd4ff' },
+    { id: 'armor', name: '鐵甲王', blurb: '受到的傷害降低', color: '#8aa0b8' },
   ];
 
   var Ads = window.AdManager || {
@@ -1135,7 +1136,7 @@
     { id: 'ward', name: '護盾', blurb: '小怪出場就帶一層護盾' },
     { id: 'split', name: '分裂', blurb: '小怪死後裂成兩隻；第 3 波後分裂體短暫免疫 debuff' },
     { id: 'mend', name: '治癒', blurb: '小怪會慢慢把彼此補血' },
-    { id: 'frost', name: '冰封', blurb: '會定期把塔凍住一下' },
+    { id: 'frost', name: '冰封', blurb: '靠近時附近塔攻速大減' },
     { id: 'armor', name: '鐵甲', blurb: '小怪受到的傷害減少' },
     { id: 'wheel', name: '轉盤', blurb: '開局與每 10 波轉動命運轉盤' },
   ];
@@ -1241,25 +1242,27 @@
       var late = Math.max(0, beat - 2);
       var press = chapter > 1 || stage >= 3;
       var grunts = 4 + beat + Math.floor(late * 0.9) + Math.floor(w / 6) + (chapter >= 2 ? 1 : 0) + (chapter >= 5 ? 1 : 0) + (chapter >= 7 ? 1 : 0);
-      // Opening: wave 1 holds with one Lv1; wave 2+ needs upgrade or a second tower.
+      // 前三波保底可守：少飛少量；第 4 波起加壓
       if (w === 1) grunts = 4;
-      else if (w === 2) grunts = 8;
-      else if (w === 3) grunts = Math.max(grunts, 8);
-      else if (w === 4) grunts = Math.max(grunts, 9);
-      if (press && w >= 3) grunts += 1;
+      else if (w === 2) grunts = press ? 6 : 7;
+      else if (w === 3) grunts = press ? 7 : 8;
+      else if (w === 4) grunts = Math.max(grunts, press ? 10 : 9);
+      if (press && w >= 4) grunts += 1;
       if (press && w >= 6) grunts += 1;
+      if (press && w >= 8) grunts += 1;
       if (stage >= 4 && w >= 8) grunts += 1;
       var swifts = 0;
-      if (w === 2) swifts = 3;
-      else if (w === 3) swifts = 3;
-      else if (w === 4) swifts = 4;
+      if (w === 2) swifts = press ? 1 : 2;
+      else if (w === 3) swifts = press ? 2 : 2;
+      else if (w === 4) swifts = press ? 4 : 3;
       else if (w >= 5) swifts = beat >= 2 ? 2 : 1;
       if (w >= 5 && beat >= 3) swifts += 1;
       if (beat >= 5) swifts += Math.floor(beat / 2.5);
       if (stage >= 3 && beat >= 4) swifts += 1;
       if (stage >= 5 && beat >= 5) swifts += 1;
       if (chapter >= 3 && beat >= 5) swifts += 1;
-      if (press && w >= 4) swifts += 1;
+      if (press && w >= 5) swifts += 1;
+      if (press && w >= 8) swifts += 1;
       var brutes = 0;
       // Elite from wave 6 so early 1-1／1-2 不會秒漏；1-3 起提前加壓
       if (!boss && w >= (press ? 5 : 6)) brutes = 1;
@@ -1282,16 +1285,16 @@
         if (chapter >= 5 && beat >= 7) devils += 1;
         devils = Math.min(stage >= 5 ? 3 : 2, devils);
       }
-      // 第 10 波後中後期偏鬆，補數量與特殊怪壓力（首領波不加精英堆疊）
+      // 第 10 波後中後期加壓（首領波不加精英堆疊）
       if (w >= 11) {
-        grunts += 2 + Math.floor((w - 10) / 3);
-        swifts += 1 + (w >= 14 ? 1 : 0);
+        grunts += 3 + Math.floor((w - 10) / 2);
+        swifts += 1 + (w >= 13 ? 1 : 0) + (w >= 16 ? 1 : 0);
         if (!boss) {
           brutes = Math.max(brutes, 1);
-          if (w >= 13) brutes += 1;
-          if (w >= 16 && w % 2 === 0) brutes += 1;
-          hoppers = Math.min(stage >= 4 ? 4 : 3, hoppers + 1 + (w >= 15 ? 1 : 0));
-          devils = Math.min(stage >= 5 ? 4 : 3, Math.max(devils, 1) + (w >= 14 ? 1 : 0));
+          if (w >= 12) brutes += 1;
+          if (w >= 15 && w % 2 === 0) brutes += 1;
+          hoppers = Math.min(stage >= 4 ? 4 : 3, hoppers + 1 + (w >= 14 ? 1 : 0));
+          devils = Math.min(stage >= 5 ? 4 : 3, Math.max(devils, 1) + (w >= 13 ? 1 : 0));
         }
       }
       var bones = 0;
@@ -1397,14 +1400,15 @@
           initialGold: 65 + (c - 1) * 4 + (s - 1) * 2 + (c >= 5 ? 6 : 0) + (c >= 7 ? 8 : 0),
           hpScale: (function () {
             var hp = (1 + (c - 1) * 0.08 + (s - 1) * 0.03) * 1.05;
-            // 1-1／1-2 維持教學手感；1-3 起血量壓力明顯上升
+            // 1-1／1-2 教學關維持較薄；其餘闖關加血壓
             if (!(c === 1 && s <= 2)) {
-              // 升級金已調高，血量壓力略收回（仍比 1-1／1-2 明顯難）
-              var pressure = 1.12 + Math.max(0, s - 2) * 0.028 + Math.max(0, c - 1) * 0.018;
-              hp *= Math.min(1.26, pressure);
+              // 加壓但保留一般塔可磨，避免只能靠英雄%傷
+              var pressure = 1.14 + Math.max(0, s - 2) * 0.028 + Math.max(0, c - 1) * 0.018;
+              hp *= Math.min(1.28, pressure);
             }
             return Math.round(hp * 100) / 100;
           })(),
+          tutorial: c === 1 && s <= 2,
         });
       }
     }
@@ -1795,7 +1799,7 @@ function selectedTower() {
 
   var HELL_DEFFS = [
     { id: 'speed', name: '疾行', blurb: '怪移速 +10%', full: 0.10 },
-    { id: 'lock', name: '鎖塔', blurb: '隨機鎖住一座塔 2 秒', full: 2 },
+    { id: 'lock', name: '鎖塔', blurb: '不定時範圍鎖塔', full: 1.6 },
     { id: 'boss', name: '亂王', blurb: '每波隨機出一支王', full: 1 },
     { id: 'split', name: '分裂', blurb: '怪死後裂成兩隻 20% 血', full: 0.20 },
     { id: 'regen', name: '回血', blurb: '怪每秒回復 3% 血', full: 0.03 },
@@ -2291,15 +2295,11 @@ function selectedTower() {
       }
     }
     if (chapterHasKit('frost')) {
-      state.kitFrostCd = (state.kitFrostCd == null ? 6 : state.kitFrostCd) - dt;
-      if (state.kitFrostCd <= 0) {
-        state.kitFrostCd = 8;
-        if (state.towers.length) {
-          for (var t = 0; t < state.towers.length; t++) {
-            state.towers[t].chill = Math.max(state.towers[t].chill || 0, 0.7);
-          }
-          spawnFloater(state.towers[0].c + 0.5, state.towers[0].r + 0.4, '冰封', '#9bd4ff');
-        }
+      // 本章小怪／王靠近時對附近塔施放攻速減弱（與冰封王同概念）
+      for (var fk = 0; fk < state.enemies.length; fk++) {
+        var frostHost = state.enemies[fk];
+        if (frostHost.dead) continue;
+        applyFrostAura(frostHost, 1.85, 0.35);
       }
     }
     if (chapterHasKit('mend')) {
@@ -2323,13 +2323,37 @@ function selectedTower() {
     if (!hasHellDeff('lock') || state.phase !== 'combat') return;
     state.hellLockCd = (state.hellLockCd || 0) - dt;
     if (state.hellLockCd > 0) return;
-    state.hellLockCd = 4.8;
+    // 不規則間隔
+    state.hellLockCd = 1.8 + Math.random() * 5.2;
     if (!state.towers.length) return;
-    var tower = state.towers[Math.floor(Math.random() * state.towers.length)];
-    var dur = Math.max(0.6, hellDeffValue('lock'));
-    tower.chill = Math.max(tower.chill || 0, dur);
-    var pos = { x: tower.c + 0.5, y: tower.r + 0.5 };
-    spawnFloater(pos.x, pos.y - 0.55, '鎖塔', '#161616');
+    var pivot = state.towers[Math.floor(Math.random() * state.towers.length)];
+    var ox = pivot.c + 0.5;
+    var oy = pivot.r + 0.5;
+    var radius = 1.55 + Math.random() * 0.9;
+    var dur = Math.max(0.7, hellDeffValue('lock') || 1.6);
+    var locked = 0;
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (Math.hypot((tower.c + 0.5) - ox, (tower.r + 0.5) - oy) > radius) continue;
+      tower.chill = Math.max(tower.chill || 0, dur);
+      locked += 1;
+      spawnFloater(tower.c + 0.5, tower.r + 0.5 - 0.45, '鎖塔', '#161616');
+    }
+    if (locked) {
+      state.shocks.push({ x: ox, y: oy, life: 0.34, maxLife: 0.34, radius: radius, color: '#161616', rings: 2, bomb: false });
+    }
+  }
+
+  function applyFrostAura(enemy, radius, hold) {
+    if (!enemy || enemy.dead) return;
+    var pos = enemyPos(enemy);
+    var r = radius == null ? 2.15 : radius;
+    var keep = hold == null ? 0.28 : hold;
+    for (var i = 0; i < state.towers.length; i++) {
+      var tower = state.towers[i];
+      if (Math.hypot((tower.c + 0.5) - pos.x, (tower.r + 0.5) - pos.y) > r) continue;
+      tower.frostAura = Math.max(tower.frostAura || 0, keep);
+    }
   }
 
   function applyHellSpawnStats(enemy) {
@@ -2567,8 +2591,10 @@ function selectedTower() {
       speedMul = stagePress ? 1.035 : 1.02;
       speedGrow = stagePress ? 0.034 : 0.032;
       speedCap = stagePress ? 1.50 : 1.48;
+      // 前三波略慢，降低漏關；第 4 波起才吃滿移速成長
+      if (wave <= 3) speedMul *= 0.92;
       if (wave >= 11) {
-        hpMul *= 1.08 + Math.min(0.14, (wave - 10) * 0.018);
+        hpMul *= 1.06 + Math.min(0.12, (wave - 10) * 0.015);
         speedMul *= 1.03;
         speedCap = Math.min(1.62, speedCap + 0.04 + Math.min(0.08, (wave - 10) * 0.01));
       }
@@ -2593,7 +2619,7 @@ function selectedTower() {
       devil: { hp: Math.round(gruntHp * 0.95), speed: Math.min((diff ? speedCap : 1.7) + 0.2, gruntSpeed * 1.2), gold: Math.max(4, softWaveGold + 2), radius: 0.28, color: '#c62828', leak: 1 },
       ram: { hp: Math.round(gruntHp * 2.8), speed: gruntSpeed * 0.82, gold: Math.max(5, softWaveGold + 3), radius: 0.36, color: '#5c4033', leak: 1 },
       bone: { hp: Math.round(gruntHp * 0.85), speed: gruntSpeed * 0.88, gold: Math.max(3, softWaveGold + 1), radius: 0.28, color: '#efe6d6', leak: 1 },
-      brute: { hp: Math.round(gruntHp * 7.5), speed: gruntSpeed * 0.52, gold: 8 + softWaveGold * 2, radius: 0.44, color: '#8d6bff', leak: 3 },
+      brute: { hp: Math.round(gruntHp * 6.2), speed: gruntSpeed * 0.52, gold: 8 + softWaveGold * 2, radius: 0.44, color: '#8d6bff', leak: 3 },
     };
     var spec = table[type] || table.grunt;
     if (goldMul !== 1) spec.gold = Math.max(2, Math.round(spec.gold * goldMul));
@@ -4687,11 +4713,18 @@ function selectedTower() {
     state.spawnTimer = 0.55;
     var deffText = hellDeffLabel();
     if (refreshed && deffText) toast((chapterHasKit('wheel') ? '魔王城' : '地獄') + '詞綴 · ' + deffText);
-    state.banner = plan.boss
-      ? { text: '第 ' + n + ' 波 · ' + plan.boss.name, sub: deffText || plan.boss.blurb, life: 3.2 }
-      : (plan.elite
-        ? { text: '第 ' + n + ' 波 · ' + plan.elite.name, sub: plan.elite.blurb, life: 2.8 }
-        : { text: '第 ' + n + ' 波', sub: deffText || compositionText(plan), life: 2.2 });
+    if (state.stagePlan && state.stagePlan.tutorial && n === 1) {
+      state.tutorialStep = Math.max(state.tutorialStep || 0, 2);
+      state.banner = { text: '教學 · 第 1 波', sub: '看路線放塔。怪物走到終點會扣生命；守住後可升級或再放塔。', life: 3.6 };
+    } else if (state.stagePlan && state.stagePlan.tutorial && n === 2) {
+      state.banner = { text: '教學 · 第 2 波', sub: '點塔可升級。金幣不夠就先撐，或再放一座便宜塔。', life: 3.4 };
+    } else {
+      state.banner = plan.boss
+        ? { text: '第 ' + n + ' 波 · ' + plan.boss.name, sub: deffText || plan.boss.blurb, life: 3.2 }
+        : (plan.elite
+          ? { text: '第 ' + n + ' 波 · ' + plan.elite.name, sub: plan.elite.blurb, life: 2.8 }
+          : { text: '第 ' + n + ' 波', sub: deffText || compositionText(plan), life: 2.2 });
+    }
     if (state.mode === 'infinite' || state.mode === 'custom') markBest(n);
     if (plan.boss || plan.elite) Sfx.boss();
     else Sfx.fanfare();
@@ -5289,14 +5322,10 @@ function selectedTower() {
       }
     }
     if (bossHas(enemy, 'frost')) {
-      enemy.frostTimer = (enemy.frostTimer || enemy.abilityTimer || 3.2) - dt;
-      if (enemy.frostTimer <= 0) {
-        enemy.frostTimer = 5.4;
-        for (var t = 0; t < state.towers.length; t++) {
-          state.towers[t].cooldown += 1.05;
-          state.towers[t].chill = 0.85;
-        }
-        spawnFloater(pos.x, pos.y - 0.6, '冰封', '#9bd4ff');
+      applyFrostAura(enemy, 2.25, 0.32);
+      if (state.time - (enemy.frostPing || 0) > 1.1) {
+        enemy.frostPing = state.time;
+        spawnFloater(pos.x, pos.y - 0.55, '寒域', '#9bd4ff');
         markAbilityFx(enemy, 'frost');
       }
     }
@@ -5336,13 +5365,25 @@ function selectedTower() {
     }
   }
 
+  function demoteTower(tower) {
+    if (!tower || tower.type === 'hero' || tower.type === 'smith') return false;
+    if (!(tower.level > 0)) {
+      tower.chill = Math.max(tower.chill || 0, 1.4);
+      return false;
+    }
+    tower.level -= 1;
+    if (tower.type === 'basic' && tower.level < 2) tower.spec = null;
+    if (state.selectedId === tower.id) renderInspector();
+    return true;
+  }
+
   function crushNearestTower(enemy) {
     var pos = enemyPos(enemy);
     var best = null;
     var bestDist = 1.42;
     for (var i = 0; i < state.towers.length; i++) {
       var tower = state.towers[i];
-      if (tower.type === 'hero') continue;
+      if (tower.type === 'hero' || tower.type === 'smith') continue;
       var dist = Math.hypot((tower.c + 0.5) - pos.x, (tower.r + 0.5) - pos.y);
       if (dist < bestDist) {
         best = tower;
@@ -5350,15 +5391,10 @@ function selectedTower() {
       }
     }
     if (!best) return;
-    state.towers = state.towers.filter(function (item) { return item.id !== best.id; });
-    if (state.selectedId === best.id) {
-      state.selectedId = null;
-      state.sellArmed = false;
-      renderInspector();
-    }
-    enemy.ramCd = 0.5;
-    spawnFloater(best.c + 0.5, best.r + 0.5 - 0.45, '撞破', '#161616');
-    burst(best.c + 0.5, best.r + 0.5, '#161616', 10);
+    enemy.ramCd = 0.85;
+    var dropped = demoteTower(best);
+    spawnFloater(best.c + 0.5, best.r + 0.5 - 0.45, dropped ? '降階' : '震暈', '#5c4033');
+    burst(best.c + 0.5, best.r + 0.5, '#5c4033', 8);
     Sfx.cannon();
   }
 
@@ -5502,10 +5538,20 @@ function selectedTower() {
   }
 
   function hasBlacksmith() {
+    return smithTier() >= 0;
+  }
+
+  // -1 無鐵匠；0＝1 等；1＝2 等（才能破 10 上 11）
+  function smithTier() {
+    var best = -1;
     for (var i = 0; i < state.towers.length; i++) {
-      if (state.towers[i].type === 'smith') return true;
+      if (state.towers[i].type === 'smith') best = Math.max(best, state.towers[i].level | 0);
     }
-    return false;
+    return best;
+  }
+
+  function smithApexReady() {
+    return smithTier() >= 1;
   }
 
   function smithReady() {
@@ -5522,7 +5568,7 @@ function selectedTower() {
     return hasBlacksmith() ? 9 : 4;
   }
 
-  // 顯示等級：level+1。金幣最高 10；「塔升級」卡可到 11。
+  // 顯示等級：level+1。金幣最高 10；鐵匠 2 等時「塔升級」卡可到 11。
   var APEX_LEVEL = 10;
   var APEX_RADIUS = 2.6;
   // 同屬塔越多複合越高：每座（含 11 等本體）疊一層，達上限封頂
@@ -5532,11 +5578,15 @@ function selectedTower() {
   var APEX_HASTE_MAX = 0.18;
 
   function cardLevelCap() {
-    return hasBlacksmith() ? APEX_LEVEL : 5;
+    if (smithApexReady()) return APEX_LEVEL;
+    if (hasBlacksmith()) return 9;
+    return 5;
   }
 
   function towerMaxed(tower) {
-    return !tower || tower.type === 'hero' || tower.type === 'smith' || tower.level >= goldLevelCap();
+    if (!tower || tower.type === 'hero') return true;
+    if (tower.type === 'smith') return tower.level >= 1;
+    return tower.level >= goldLevelCap();
   }
 
   function sameAffinity(a, b) {
@@ -5559,15 +5609,22 @@ function selectedTower() {
   }
 
   function apexClusterBonus(count) {
+    var n = Math.max(1, count || 1);
+    // 同屬越多：爆擊率 20%→30%，當前血傷害 0.5%→1%
+    var t = Math.min(1, (n - 1) / 4);
     return {
-      bonus: Math.min(APEX_BONUS_MAX, count * APEX_BONUS_PER),
-      haste: Math.min(APEX_HASTE_MAX, count * APEX_HASTE_PER),
+      bonus: Math.min(APEX_BONUS_MAX, n * APEX_BONUS_PER),
+      haste: Math.min(APEX_HASTE_MAX, n * APEX_HASTE_PER),
+      critChance: 0.20 + t * 0.10,
+      critHp: 0.005 + t * 0.005,
     };
   }
 
   function apexAura(tower) {
     var bonus = 0;
     var haste = 0;
+    var critChance = 0;
+    var critHp = 0;
     for (var i = 0; i < state.towers.length; i++) {
       var apex = state.towers[i];
       if (apex.level < APEX_LEVEL || !sameAffinity(apex, tower)) continue;
@@ -5576,12 +5633,22 @@ function selectedTower() {
       var pack = apexClusterBonus(countAffinityNear(apex));
       bonus = Math.max(bonus, pack.bonus);
       haste = Math.max(haste, pack.haste);
+      if (pack.critChance >= critChance) {
+        critChance = pack.critChance;
+        critHp = Math.max(critHp, pack.critHp);
+      }
     }
-    return { bonus: bonus, haste: haste };
+    return { bonus: bonus, haste: haste, critChance: critChance, critHp: critHp };
   }
 
   function nextUpgradeCost(tower) {
-    if (!tower || tower.type === 'hero' || tower.type === 'smith' || tower.level >= goldLevelCap()) return 0;
+    if (!tower || tower.type === 'hero') return 0;
+    if (tower.type === 'smith') {
+      if (tower.level >= 1) return 0;
+      var smithCosts = TOWERS.smith.upgradeCost;
+      return (smithCosts && smithCosts[0]) || 2000;
+    }
+    if (tower.level >= goldLevelCap()) return 0;
     var costs = TOWERS[tower.type] && TOWERS[tower.type].upgradeCost;
     if (!costs || !costs.length) return 0;
     if (tower.level < costs.length) return costs[tower.level];
@@ -5862,10 +5929,11 @@ function selectedTower() {
       if (trap.c !== c || trap.r !== r) continue;
       state.traps.splice(i, 1);
       if (state.berserk || controlImmune(enemy)) spawnFloater(pos.x, pos.y - 0.4, state.berserk ? '狂暴' : '抗控', '#c4b5fd');
-      else if (resists(enemy, 'freeze')) resistFloater(enemy, '抗凍');
       else {
-        enemy.freeze = Math.max(enemy.freeze || 0, 3);
-        spawnFloater(pos.x, pos.y - 0.4, '陷阱', '#161616');
+        var trapFreeze = 3 * (resists(enemy, 'freeze') ? 0.5 : 1);
+        enemy.freeze = Math.max(enemy.freeze || 0, trapFreeze);
+        if (resists(enemy, 'freeze')) resistFloater(enemy, '抗凍·半效');
+        else spawnFloater(pos.x, pos.y - 0.4, '陷阱', '#161616');
       }
       return;
     }
@@ -6145,14 +6213,16 @@ function selectedTower() {
       state.shocks.push({ x: pos.x, y: pos.y, life: 0.36, maxLife: 0.36, radius: 1.05, color: '#e02323', rings: 2, bomb: true });
     } else if (roll === 1) {
       var chilled = enemiesNear(pos.x, pos.y, 1.1);
-      var slow = Math.min(0.55, 0.28 + rank * 0.22);
+      var slow = Math.min(0.35, 0.25 + rank * 0.1);
       for (var n = 0; n < chilled.length; n++) {
         hurtEnemy(chilled[n], 12 + tower.level * 3, tower.id);
-        if (state.berserk || resists(chilled[n], 'slow')) {
-          if (!state.berserk && resists(chilled[n], 'slow')) resistFloater(chilled[n], '抗緩');
-        } else {
-          chilled[n].slow = Math.max(chilled[n].slow || 0, slow);
-          chilled[n].slowTime = Math.max(chilled[n].slowTime || 0, 1.8);
+        if (!state.berserk && !controlImmune(chilled[n])) {
+          var mageSlow = 1.8 * (resists(chilled[n], 'slow') ? 0.5 : 1);
+          chilled[n].slow = Math.min(0.35, Math.max(chilled[n].slow || 0, slow));
+          chilled[n].slowTime = Math.max(chilled[n].slowTime || 0, mageSlow);
+          if (resists(chilled[n], 'slow')) resistFloater(chilled[n], '抗緩·半效');
+        } else if (!state.berserk && resists(chilled[n], 'slow')) {
+          resistFloater(chilled[n], '抗緩·半效');
         }
       }
       state.shocks.push({ x: pos.x, y: pos.y, life: 0.36, maxLife: 0.36, radius: 1.1, color: '#2f7bff', rings: 2, bomb: false });
@@ -6212,13 +6282,15 @@ function selectedTower() {
   function updateHero(tower, dt) {
     if (tower.skillCd > 0) tower.skillCd -= dt;
     if (tower.buffTime > 0) tower.buffTime -= dt;
+    if (tower.frostAura > 0) tower.frostAura = Math.max(0, tower.frostAura - dt);
     if (tower.hero === 'priest' || tower.hero === 'god' || tower.hero === 'herald') return;
     var stats = heroStats(tower);
+    var heroTick = tower.frostAura > 0 ? dt * 0.4 : dt;
     if (tower.hero === 'sword') {
-      updateSword(tower, dt, stats);
+      updateSword(tower, heroTick, stats);
       return;
     }
-    tower.cooldown -= dt;
+    tower.cooldown -= heroTick;
     var targets = targetsInRange(tower, stats.range, stats.targets || 1);
     if (!targets.length) return;
     var pos = enemyPos(targets[0]);
@@ -6277,7 +6349,7 @@ function selectedTower() {
     return [
       { id: 'gold', name: '金幣 +200', desc: '立刻獲得 200 金幣' },
       { id: 'interest', name: '利息', desc: '立刻 +50，接下來 5 波每波 +30' },
-      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等。沒鐵匠時金幣最高 5、這張卡可到 6。有鐵匠後金幣最高 10，只有這張卡能升到 11；11 等依附近同屬塔數疊複合 buff（有上限）。' },
+      { id: 'level', name: '塔升級', desc: '選一座塔永久 +1 等。沒鐵匠時金幣最高 5、這張卡可到 6。有鐵匠後金幣最高 10；鐵匠升到 2 等後，只有這張卡能破 10 上 11。11 等依附近同屬塔數疊複合 buff（有上限）。' },
       { id: 'wall', name: '阻擋物', desc: '放在路上，擋住怪物 10 秒' },
       { id: 'push', name: '擊退', desc: '使用後全場怪物沿路退回總長的 10%' },
       { id: 'hero', name: '英雄塔', desc: '自選一位尚未登場的英雄，免費放置，之後可拖曳換位' },
@@ -6304,10 +6376,12 @@ function selectedTower() {
 
   function applyLevelCard(tower) {
     if (tower.type === 'hero') { toast('英雄靠擊殺升級'); return false; }
-    if (tower.type === 'smith') { toast('鐵匠不用升級'); return false; }
+    if (tower.type === 'smith') { toast('鐵匠請用金幣升級'); return false; }
     var cardCap = cardLevelCap();
     if (tower.level >= cardCap) {
-      toast(hasBlacksmith() ? '這座塔已是 11 等' : '這座塔已是 6 等');
+      if (smithApexReady()) toast('這座塔已是 11 等');
+      else if (hasBlacksmith()) toast('鐵匠升到 2 等後才能破 10 上 11');
+      else toast('這座塔已是 6 等');
       return false;
     }
     if (needsSpec(tower)) {
@@ -6609,7 +6683,7 @@ function selectedTower() {
       renderInspector();
       state.banner = {
         text: '點一座塔',
-        sub: hasBlacksmith() ? '永久 +1 等，最高 11 等' : '永久 +1 等，最高 6 等',
+        sub: smithApexReady() ? '永久 +1 等，最高 11 等' : (hasBlacksmith() ? '永久 +1 等，最高 10 等（鐵匠 2 等可到 11）' : '永久 +1 等，最高 6 等'),
         life: 6,
       };
       toast('點選要升級的塔');
@@ -6704,6 +6778,7 @@ function selectedTower() {
     if (state.phase !== 'combat') return;
     for (var i = 0; i < state.towers.length; i++) {
       var tower = state.towers[i];
+      if (tower.frostAura > 0) tower.frostAura = Math.max(0, tower.frostAura - dt);
       if (tower.chill > 0) continue;
       if (tower.type === 'hero') {
         updateHero(tower, dt);
@@ -6711,7 +6786,9 @@ function selectedTower() {
       }
       if (tower.type === 'smith') continue;
       var stats = towerStats(tower);
-      tower.cooldown -= dt;
+      // 冰封王寒域：攻速 -60%（冷卻流逝剩 40%）
+      var tick = tower.frostAura > 0 ? dt * 0.4 : dt;
+      tower.cooldown -= tick;
       if (tower.type === 'mint') {
         if (tower.cooldown <= 0) {
           var gain = Math.max(1, stats.goldGen || 0);
@@ -6805,12 +6882,14 @@ function selectedTower() {
   }
 
   function stunEnemy(enemy, time) {
-    if (!enemy || enemy.dead || state.berserk || controlImmune(enemy) || resists(enemy, 'shock')) return;
+    if (!enemy || enemy.dead || state.berserk || controlImmune(enemy)) return;
+    var dur = Math.max(0.08, Math.min(0.5, (time || 0.18) * (resists(enemy, 'shock') ? 0.5 : 1)));
     var fresh = !(enemy.stun > 0);
-    enemy.stun = Math.max(enemy.stun || 0, time || 1);
+    enemy.stun = Math.max(enemy.stun || 0, dur);
     if (!fresh) return;
     var pos = pointAt(enemy.dist);
-    spawnFloater(pos.x, pos.y - 0.55, '麻痺', '#e0b000');
+    if (resists(enemy, 'shock')) resistFloater(enemy, '抗電·半效');
+    else spawnFloater(pos.x, pos.y - 0.55, '麻痺', '#e0b000');
   }
 
   function fire(tower, targets, stats) {
@@ -6819,11 +6898,6 @@ function selectedTower() {
     tower.flash = 1;
     if (tower.type === 'bolt') {
       var chain = chainFrom(targets[0], stats.chain || 1, stats.chainRange || 1.8);
-      if (!chain.length) {
-        resistFloater(targets[0], '抗電');
-        Sfx.arrow();
-        return;
-      }
       var fromX = originX;
       var fromY = originY;
       for (var c = 0; c < chain.length; c++) {
@@ -6837,7 +6911,7 @@ function selectedTower() {
           maxLife: 0.16,
         });
         hurtEnemy(chain[c], Math.round(stats.damage * boltPreyBonus(chain[c])), tower.id);
-        if (!chain[c].dead) stunEnemy(chain[c], stats.stunTime || 1);
+        if (!chain[c].dead) stunEnemy(chain[c], stats.stunTime || 0.28);
         fromX = hit.x;
         fromY = hit.y;
       }
@@ -6926,16 +7000,17 @@ function selectedTower() {
   function chainFrom(first, count, reach) {
     var hits = [];
     var used = {};
+    if (!first || first.dead) return hits;
     used[first.id] = true;
+    hits.push(first);
     var from = pointAt(first.dist);
-    if (!resists(first, 'shock')) hits.push(first);
     var limit = reach * reach;
     while (hits.length < count) {
       var next = null;
       var best = limit;
       for (var i = 0; i < state.enemies.length; i++) {
         var enemy = state.enemies[i];
-        if (enemy.dead || used[enemy.id] || resists(enemy, 'shock')) continue;
+        if (enemy.dead || used[enemy.id]) continue;
         var pos = pointAt(enemy.dist);
         var dx = pos.x - from.x;
         var dy = pos.y - from.y;
@@ -7133,22 +7208,23 @@ function selectedTower() {
   function chillEnemy(enemy, slow, slowTime) {
     if (state.berserk || controlImmune(enemy)) return;
     var pos = pointAt(enemy.dist);
-    if (resists(enemy, 'slow')) resistFloater(enemy, '抗緩');
-    else {
-      var freshSlow = !(enemy.slowTime > 0);
-      enemy.slow = Math.max(enemy.slow || 0, slow);
-      enemy.slowTime = slowTime;
-      if (freshSlow) spawnFloater(pos.x, pos.y - 0.45, '緩速', '#2f7bff');
+    var slowAmt = Math.min(0.35, slow || 0);
+    var slowDur = Math.max(0.1, (slowTime || 0) * (resists(enemy, 'slow') ? 0.5 : 1));
+    var freshSlow = !(enemy.slowTime > 0);
+    enemy.slow = Math.max(enemy.slow || 0, slowAmt);
+    if (enemy.slow > 0.35) enemy.slow = 0.35;
+    enemy.slowTime = Math.max(enemy.slowTime || 0, slowDur);
+    if (freshSlow) {
+      if (resists(enemy, 'slow')) resistFloater(enemy, '抗緩·半效');
+      else spawnFloater(pos.x, pos.y - 0.45, '緩速', '#2f7bff');
     }
     enemy.iceHits = (enemy.iceHits || 0) + 1;
-    if (enemy.iceHits < 3) return;
+    if (enemy.iceHits < 5) return;
     enemy.iceHits = 0;
-    if (resists(enemy, 'freeze')) {
-      resistFloater(enemy, '抗凍');
-      return;
-    }
-    enemy.freeze = 0.9;
-    spawnFloater(pos.x, pos.y - 0.7, '凍結', '#2f7bff');
+    var freezeDur = 0.5 * (resists(enemy, 'freeze') ? 0.5 : 1);
+    enemy.freeze = Math.max(enemy.freeze || 0, freezeDur);
+    if (resists(enemy, 'freeze')) resistFloater(enemy, '抗凍·半效');
+    else spawnFloater(pos.x, pos.y - 0.7, '凍結', '#2f7bff');
   }
 
   function updateWave(shot, dt) {
@@ -7205,11 +7281,26 @@ function selectedTower() {
         opts.ignoreShield = true;
       }
     }
+    if (ownerId && !opts.noApexCrit) {
+      var critOwner = towerById(ownerId);
+      if (critOwner && critOwner.type !== 'hero' && critOwner.type !== 'smith') {
+        var critAura = apexAura(critOwner);
+        if (critAura.critChance > 0 && Math.random() < critAura.critChance) {
+          var critAdd = Math.max(1, Math.round(Math.max(0, enemy.hp) * critAura.critHp));
+          damage += critAdd;
+          if (state.time - (enemy.lastCrit || 0) > 0.14) {
+            enemy.lastCrit = state.time;
+            var critPos = pointAt(Math.min(enemy.dist, WAYPOINTS.length - 1));
+            spawnFloater(critPos.x, critPos.y - 0.7, '爆擊', '#f2c14e');
+          }
+        }
+      }
+    }
     var kitArmor = chapterHasKit('armor') && !enemy.boss;
     var eliteArmor = !!(enemy.elite && bossHas(enemy, 'armor'));
     var pierceArmor = opts.pierce || enemy.firePierce || (enemy.burnTime > 0 && (bossHas(enemy, 'armor') || kitArmor));
-    if (bossHas(enemy, 'armor') && !enemy.elite && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.5));
-    else if ((eliteArmor || kitArmor) && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.75));
+    if (bossHas(enemy, 'armor') && !enemy.elite && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.7));
+    else if ((eliteArmor || kitArmor) && !pierceArmor) damage = Math.max(1, Math.round(damage * 0.85));
     if (enemy.shield > 0 && !opts.ignoreShield) {
       var blocked = Math.min(enemy.shield, damage);
       enemy.shield -= blocked;
@@ -7458,11 +7549,16 @@ function selectedTower() {
       noteNewTitles(beforeStars);
       beginClearCountdown('victory');
       if (state.banner) state.banner.text = starGlyph(starCount(mask)) + ' 通過';
+      if (state.stagePlan && state.stagePlan.tutorial) toast('教學完成：之後關卡會更難，前三波仍偏好守');
       return;
     }
     state.phase = 'reward';
     state.outcome = 'reward';
     beginClearCountdown('wave');
+    if (state.stagePlan && state.stagePlan.tutorial && state.wave === 1 && state.banner) {
+      state.banner.sub = '教學：可升級或再放塔 · ' + state.banner.sub;
+      toast('教學：點塔升級，或再放一座');
+    }
   }
 
   function grantRouteTiles() {
@@ -7942,6 +8038,31 @@ function selectedTower() {
   }
 
   var PATCH_NOTES = [
+    {
+      date: '11/15',
+      title: '鐵匠 2 等、教學、控場、11 等爆擊、歡迎頁',
+      detail: [
+        '介面：歡迎頁換成新插畫（標題城堡／底部角色）',
+        '玩法：鐵匠 2 等要 2000；2 等後才能破 10 上 11',
+        '教學：1-1／1-2 有教學提示；闖關前三波較好守',
+        '控場：雷麻痺最高 0.5 秒；冰 5 下才凍 0.5 秒；緩速上限 35%',
+        '11 等：同屬光環可爆擊（當前血 %，同屬越多越高）',
+        '敵人：破塔怪改降一階；鎖塔改範圍不定時；冰封王附近塔攻速 -60%',
+        '平衡：略降血壓與鐵甲減傷，減少只能靠英雄%傷的情況',
+      ],
+      full: [
+        '歡迎頁：bg-welcome-v12；登入／開始改放插畫中段留白',
+        '鐵匠：升 2 等 2000；1 等＝金幣到 10；2 等＝卡可到 11',
+        '雷麻痺：0.18→0.50 秒（硬上限 0.5）',
+        '冰塔：緩速 28%→35%；累積 5 下凍結 0.5 秒',
+        '11 等爆擊：基礎 20%／當前血 0.5%，同屬越多至 30%／1%',
+        '破塔怪：降 1 等；1 等塔改震暈；英雄／鐵匠免疫',
+        '鎖塔詞綴：隨機中心＋範圍，間隔約 1.8～7 秒',
+        '冰封王／冰封章：靠近範圍內塔攻速 -60%（寒域）',
+        '鐵甲減傷約 30%；精英／章節鐵甲約 15%；精英血 ×6.2',
+        '血壓：非教學關約 1.14～1.28；前三波移速 ×0.92',
+      ],
+    },
     {
       date: '11/7',
       title: '失敗跳出改回作戰選關',
@@ -9644,20 +9765,21 @@ function selectedTower() {
       },
       {
         tag: '小怪', title: '破塔怪', paint: { kind: 'enemy', type: 'ram', color: '#5c4033' },
-        desc: '手繪衝角獸。無限和自訂模式第 40 波起出現，走近一般塔會把塔撞破。英雄塔不會被撞掉。',
+        desc: '手繪衝角獸。無限和自訂模式第 40 波起出現，走近一般塔會讓塔降一階。英雄／鐵匠不會被降階。',
         stats: [
           '<strong>血量</strong>：普通怪 ×2.8',
           '<strong>移速</strong>：普通怪 ×0.82',
-          '<strong>撞塔</strong>：撞破後塔消失，不退金幣',
+          '<strong>撞塔</strong>：降 1 等；已是 1 等則短暫震暈',
           '<strong>出現</strong>：無限、自訂，第 40 波起每波 1 隻',
         ],
       },
       {
         tag: '抗性', title: '屬性抗性', paint: { kind: 'enemy', type: 'grunt', color: '#e25b4a', resist: 'burn' },
-        desc: '第 3 波起有機率掛抗性標籤。',
+        desc: '第 3 波起有機率掛抗性標籤。抗性不免疫傷害；控場（麻痺／冰凍／緩速）時間減半。',
         stats: [
           '<strong>種類</strong>：抗凍／抗電／抗燒／抗毒／抗緩',
-          '<strong>效果</strong>：對應屬性幾乎無效',
+          '<strong>控場</strong>：麻痺／冰凍／緩速時間減半，仍會生效與受傷',
+          '<strong>毒／火</strong>：仍吃直擊傷害；持續毒／燒較難掛上',
           '<strong>顯示</strong>：邊緣會標抗性名',
           '<strong>出現率</strong>：約 16% 起，隨波次上升（上限約 40%）',
         ],
@@ -9709,12 +9831,12 @@ function selectedTower() {
       {
         tag: '首領', title: '冰封王', paint: { kind: 'enemy', type: 'grunt', color: '#9bd4ff', bossId: 'frost' },
         desc: '有手腳的大王，瀏海掛冰柱，一隻手高舉冰晶，戴黃冠。只會在 7-5 最後一波出現。',
-        stats: ['<strong>出現</strong>：7-5 最後一波', '<strong>技能</strong>：定期凍結所有塔', '<strong>應對</strong>：預留輸出與節奏'],
+        stats: ['<strong>出現</strong>：7-5 最後一波', '<strong>寒域</strong>：附近塔攻速 -60%', '<strong>應對</strong>：分散塔位、保持輸出'],
       },
       {
         tag: '首領', title: '鐵甲王', paint: { kind: 'enemy', type: 'grunt', color: '#8aa0b8', bossId: 'armor' },
         desc: '有手腳的大王，戴頭盔跟肩甲，胸前有鐵板，戴黃冠。只會在 8-5 最後一波出現。',
-        stats: ['<strong>出現</strong>：8-5 最後一波', '<strong>減傷</strong>：受到傷害減半', '<strong>克制</strong>：火塔破甲並打血量 10%'],
+        stats: ['<strong>出現</strong>：8-5 最後一波', '<strong>減傷</strong>：約三成（火破甲後全額）', '<strong>克制</strong>：火塔破甲並打血量 10%'],
       },
       {
         tag: '首領', title: '骷髏王', paint: { kind: 'enemy', type: 'grunt', color: '#f4efe4', bossId: 'skull' },
@@ -9730,7 +9852,7 @@ function selectedTower() {
         desc: '地獄難度額外詞綴，可疊加壓力。',
         stats: [
           '<strong>疾行</strong>：移速 +10%',
-          '<strong>鎖塔</strong>：週期鎖住防禦塔',
+          '<strong>鎖塔</strong>：不定時範圍鎖塔',
           '<strong>亂王／分裂</strong>：干擾與增殖',
           '<strong>回血</strong>：被毒克制',
           '<strong>殘暴</strong>：血到 10% 加速 15%',
@@ -9839,10 +9961,11 @@ function selectedTower() {
       {
         tag: '冰', title: '冰塔', cardClass: 'info-card--attr info-card--ice',
         paint: { kind: 'tower', type: 'ice' },
-        desc: '緩速 · 第 3 次凍結',
+        desc: '緩速 · 第 5 次凍結 0.5 秒',
         stats: [
           '<strong>造價</strong> 85',
-          '<strong>緩</strong> 35%→45%',
+          '<strong>緩</strong> 28%→35%（上限 35%）',
+          '<strong>凍結</strong> 累積 5 下 → 0.5 秒',
           '<strong>擴散</strong> 1.1→1.62',
         ],
       },
@@ -9862,8 +9985,8 @@ function selectedTower() {
         stats: [
           '<strong>造價</strong> 85',
           '<strong>傷</strong> 30→105，飛行與跳躍 ×1.4',
-          '<strong>麻痺</strong> 1.0→1.3 秒',
-          '<strong>串連</strong> 2→4 跳',
+          '<strong>麻痺</strong> 0.18→0.50 秒（上限 0.5）',
+          '<strong>串連</strong> 2→4 跳；抗電仍受傷，麻痺減半',
         ],
       },
       {
@@ -9890,10 +10013,11 @@ function selectedTower() {
     });
     appendInfoCard(list, {
       tag: '經濟', title: '鐵匠', paint: { kind: 'tower', type: 'smith' },
-      desc: '不攻擊。第 20 波起，或已經有塔升滿時可造，全場一隻。在場時其他塔可以用金幣升到 10 等。',
+      desc: '不攻擊。第 20 波起，或已經有塔升滿時可造，全場一隻。1 等讓塔金幣到 10；升到 2 等後「塔升級」卡才能破 10 上 11。',
       stats: [
-        '<strong>造價</strong>：480',
-        '<strong>效果</strong>：其他塔金幣上限 5 等 → 10 等',
+        '<strong>造價</strong>：480 · 升 2 等 2000',
+        '<strong>1 等</strong>：其他塔金幣上限 5 → 10',
+        '<strong>2 等</strong>：「塔升級」卡可破 10 上 11',
         '<strong>賣掉</strong>：已升過的等級留著，但不能再往上升',
       ],
     });
@@ -9960,7 +10084,7 @@ function selectedTower() {
       var def = HELL_DEFFS[h];
       var detail = '';
       if (def.id === 'speed') detail = '<strong>數值</strong>：移速 +' + Math.round(def.full * 100) + '%';
-      else if (def.id === 'lock') detail = '<strong>數值</strong>：隨機鎖塔 ' + def.full + ' 秒';
+      else if (def.id === 'lock') detail = '<strong>數值</strong>：不定時範圍鎖塔約 ' + def.full + ' 秒';
       else if (def.id === 'boss') detail = '<strong>效果</strong>：每波額外隨機出一支王';
       else if (def.id === 'split') detail = '<strong>數值</strong>：死後裂成兩隻，各帶 ' + Math.round(def.full * 100) + '% 血；分裂體金幣很少；第 3 波後出生 0.5 秒免疫 debuff';
       else if (def.id === 'regen') detail = '<strong>數值</strong>：每秒回復 ' + Math.round(def.full * 100) + '% 血 · 毒克制';
@@ -10129,7 +10253,15 @@ function selectedTower() {
     state.kitSummonCd = 7;
     state.kitFrostCd = 6;
     state.kitMendCd = 2;
-    if (mode === 'campaign' && level && level.goals) {
+    state.tutorialStep = 0;
+    if (mode === 'campaign' && level && level.tutorial) {
+      state.banner = {
+        text: '教學 · ' + level.stageId,
+        sub: '點空地放無屬塔 → 點「開始第 1 波」。前三波偏溫和，先熟悉建造與升級。',
+        life: 5.2,
+      };
+      toast('教學關：先放塔再出兵');
+    } else if (mode === 'campaign' && level && level.goals) {
       var goalBits = [];
       for (var gi = 0; gi < level.goals.length; gi++) goalBits.push(goalLabel(level.goals[gi]));
       var runKit = chapterKitById(level.chapter);
@@ -10260,6 +10392,10 @@ function selectedTower() {
     state.buildSite = null;
     Sfx.build();
     vibrate(15);
+    if (state.stagePlan && state.stagePlan.tutorial && state.tutorialStep === 0 && state.towers.length === 1) {
+      state.tutorialStep = 1;
+      state.banner = { text: '教學', sub: '塔放好了。點下方「開始第 1 波」出兵；不夠再放第二座或升級。', life: 4.8 };
+    }
     syncHud();
   }
 
@@ -10425,9 +10561,17 @@ function selectedTower() {
     inspector.classList.add('is-open');
     inspectActions.replaceChildren();
     if (tower.type === 'smith') {
-      inspectTitle.textContent = '鐵匠';
-      inspectMeta.textContent = '不攻擊。在場時，其他塔可以用金幣升到 10 等。賣走之後就不能再往上升。';
-      appendSellRow(Math.floor(tower.invested * sellRatio()));
+      inspectTitle.textContent = '鐵匠  Lv.' + (tower.level + 1);
+      if (tower.level >= 1) {
+        inspectMeta.textContent = '2 等：其他塔金幣可到 10，「塔升級」卡可破 10 上 11。賣走後就不能再往上升。';
+        appendSellRow(Math.floor(tower.invested * sellRatio()));
+      } else {
+        inspectMeta.textContent = '1 等：其他塔金幣可到 10。升到 2 等後，「塔升級」卡才能上 11。';
+        var smithUp = makeActButton('升級 ' + nextUpgradeCost(tower), 'btn-mint btn-primary-act', 'upgrade');
+        smithUp.disabled = state.gold < nextUpgradeCost(tower);
+        inspectActions.appendChild(smithUp);
+        appendSellRow(Math.floor(tower.invested * sellRatio()));
+      }
       placeInspector();
       return;
     }
@@ -10454,10 +10598,11 @@ function selectedTower() {
     inspectTitle.textContent = towerLabel(tower) + '  Lv.' + (tower.level + 1);
     inspectMeta.textContent = needsSpec(tower) ? specChoiceText(tower) : statLine(stats, tower);
     if (maxed && !hasBlacksmith() && tower.level < 9) inspectMeta.textContent += ' 金幣升滿了。造一隻鐵匠後可升到 10 等。';
-    if (maxed && hasBlacksmith() && tower.level === 9) inspectMeta.textContent += ' 金幣已滿。「塔升級」卡可到 11 等；附近同屬塔越多複合 buff 越高。';
+    if (maxed && hasBlacksmith() && !smithApexReady() && tower.level === 9) inspectMeta.textContent += ' 金幣已滿。把鐵匠升到 2 等後，「塔升級」卡可破 10 上 11。';
+    if (maxed && smithApexReady() && tower.level === 9) inspectMeta.textContent += ' 金幣已滿。「塔升級」卡可到 11 等；附近同屬塔越多複合 buff 越高。';
     if (tower.level >= APEX_LEVEL) {
       var pack = apexClusterBonus(countAffinityNear(tower));
-      inspectMeta.textContent += ' 11 等光環：同屬 ' + countAffinityNear(tower) + ' 座 → 攻擊 +' + Math.round(pack.bonus * 100) + '%、攻速 +' + Math.round(pack.haste * 100) + '%（上限 ' + Math.round(APEX_BONUS_MAX * 100) + '%／' + Math.round(APEX_HASTE_MAX * 100) + '%）。';
+      inspectMeta.textContent += ' 11 等光環：同屬 ' + countAffinityNear(tower) + ' 座 → 攻擊 +' + Math.round(pack.bonus * 100) + '%、攻速 +' + Math.round(pack.haste * 100) + '%；爆擊 ' + Math.round(pack.critChance * 100) + '%／當前血 ' + (Math.round(pack.critHp * 1000) / 10) + '%。';
     }
     if (needsSpec(tower)) {
       var row = document.createElement('div');
@@ -10488,12 +10633,13 @@ function selectedTower() {
       '攻速 ' + fmt(1 / stats.cooldown) + '/秒',
     ];
     if (stats.chain) bits.push('串連 ' + stats.chain);
+    if (stats.stunTime) bits.push('麻痺 ' + fmt(stats.stunTime) + '秒');
     if (stats.splash && stats.effect !== 'slow') bits.push('範圍 ' + fmt(stats.splash));
     if (stats.shots) bits.push('彈數 ' + Math.min(3, stats.shots));
     if (stats.targets > 1) bits.push('目標 ' + stats.targets);
     if (tower && tower.level >= 5) bits.push('滿等×1.4');
     if (tower && tower.level > 5) bits.push('鐵匠再強化');
-    if (stats.effect === 'slow') bits.push('緩速 ' + Math.round(stats.slow * 100) + '%', '3次凍結');
+    if (stats.effect === 'slow') bits.push('緩速 ' + Math.round(stats.slow * 100) + '%（上限35%）', '5次凍結0.5秒');
     if (stats.effect === 'burn') bits.push('灼燒 ' + Math.round(stats.burn / stats.burnEvery) + '/秒', '破盾／破甲／厚皮+10%血', '傳染最多3隻、遞減');
     if (stats.effect === 'poison') bits.push('中毒 ' + Math.round(stats.poison / stats.poisonEvery) + '/秒', '克制再生／治療／回血', '傳染最多3隻、遞減');
     if (stats.goldGen) bits = ['產金 ' + stats.goldGen + '/次', '間隔 ' + fmt(stats.cooldown) + '秒', '不攻擊'];
@@ -11951,6 +12097,13 @@ function selectedTower() {
       ctx.arc(x, y, tile * 0.4, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
+    }
+    if (tower.frostAura > 0) {
+      ctx.strokeStyle = 'rgba(155, 212, 255, 0.95)';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(x, y, tile * 0.36, 0, Math.PI * 2);
+      ctx.stroke();
     }
     if (tower.dizzy > 0) {
       ctx.save();

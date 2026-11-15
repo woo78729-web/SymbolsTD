@@ -910,8 +910,8 @@ canvas[hidden] { display: none !important; }
   flex: 1;
   width: 100%;
   min-height: 0;
-  /* 整頁往內縮，手機四邊鍊條／裝飾不被裁切 */
-  padding: clamp(12px, 3.6vw, 20px);
+  /* 新插畫無邊框鍊，只留安全邊距 */
+  padding: clamp(8px, 2.4vw, 14px);
   box-sizing: border-box;
   display: flex;
   align-items: stretch;
@@ -931,20 +931,20 @@ canvas[hidden] { display: none !important; }
   width: 100%;
   height: 100%;
   margin: 0;
-  /* 撐滿內縮區域並完整顯示四邊（略伸縮） */
+  /* 撐滿並完整顯示標題城堡／底部角色 */
   object-fit: fill;
   object-position: center center;
   pointer-events: none;
   user-select: none;
   z-index: 0;
 }
-/* 底部鍊框內：登入左右／已登入帳號左＋開始右（往中間靠） */
+/* 插畫中段留白：登入／開始放中央，避開上方標題與下方角色 */
 .welcome-dock {
   position: absolute;
-  left: 10.5%;
-  right: 10.5%;
-  top: 81.5%;
-  bottom: 6.8%;
+  left: 8%;
+  right: 8%;
+  top: 40%;
+  bottom: 26%;
   z-index: 5;
   display: flex;
   align-items: center;
