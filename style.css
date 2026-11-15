@@ -938,24 +938,37 @@ canvas[hidden] { display: none !important; }
   user-select: none;
   z-index: 0;
 }
-/* 插畫中段留白：登入／開始放中央，避開上方標題與下方角色 */
+/* 插畫中段留白：兩種狀態都往下置中（避開上方城堡、下方角色） */
 .welcome-dock {
   position: absolute;
   left: 8%;
   right: 8%;
-  top: 40%;
-  bottom: 26%;
+  top: 52%;
+  bottom: 18%;
   z-index: 5;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(10px, 3.5cqw, 18px);
+  gap: clamp(16px, 3cqh, 24px);
   box-sizing: border-box;
-  padding: clamp(6px, 1.8cqh, 10px) clamp(10px, 4cqw, 20px);
+  padding: clamp(8px, 2cqh, 14px) clamp(12px, 4cqw, 22px);
   pointer-events: none;
 }
 .welcome-dock > * {
   pointer-events: auto;
+}
+.welcome-auth {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: clamp(12px, 2.4cqh, 18px);
+  width: min(86%, 300px);
+  pointer-events: auto;
+}
+.welcome-auth[hidden] {
+  display: none !important;
 }
 .welcome-user[hidden],
 .welcome-account[hidden],
@@ -975,19 +988,19 @@ canvas[hidden] { display: none !important; }
   display: flex;
   align-items: center;
   align-self: center;
-  gap: 4px;
+  gap: 10px;
   flex: 0 0 auto;
-  width: max-content;
-  max-width: 32%;
+  width: min(86%, 300px);
+  max-width: 100%;
   min-width: 0;
   height: auto;
   max-height: none;
-  padding: 2px 8px 2px 2px;
-  border: 2px solid #161616;
+  padding: 8px 18px 8px 8px;
+  border: 2.5px solid #161616;
   border-radius: 999px;
   background: #fff;
   color: #161616;
-  font-size: clamp(10px, 2.6cqw, 13px);
+  font-size: clamp(17px, 4.8cqw, 22px);
   font-weight: 800;
   letter-spacing: -0.02em;
   box-sizing: border-box;
@@ -997,10 +1010,10 @@ canvas[hidden] { display: none !important; }
 .account-chip img {
   position: static;
   inset: auto;
-  width: clamp(18px, 5vw, 24px);
-  height: clamp(18px, 5vw, 24px);
+  width: clamp(32px, 8.5vw, 40px);
+  height: clamp(32px, 8.5vw, 40px);
   flex: 0 0 auto;
-  border: 2px solid #161616;
+  border: 2.5px solid #161616;
   border-radius: 50%;
   object-fit: cover;
   background: #fff;
@@ -1021,21 +1034,21 @@ canvas[hidden] { display: none !important; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  flex: 0 1 auto;
-  width: auto;
+  gap: 10px;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
-  max-width: 46%;
+  max-width: none;
   height: auto;
-  max-height: 78%;
-  min-height: clamp(36px, 7cqh, 48px);
-  padding: 3px 12px;
-  border: 2px solid #161616;
+  max-height: none;
+  min-height: clamp(54px, 10.5cqh, 66px);
+  padding: 12px 22px;
+  border: 2.5px solid #161616;
   border-radius: 999px;
   background: #fff;
   color: #161616;
   font: inherit;
-  font-size: clamp(11px, 2.8cqw, 14px);
+  font-size: clamp(17px, 4.8cqw, 22px);
   font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
@@ -1048,12 +1061,13 @@ canvas[hidden] { display: none !important; }
 }
 .welcome-guest {
   top: auto;
+  width: 100%;
   background: #fff;
 }
 .g-mark {
   display: block;
-  width: clamp(18px, 5vw, 24px);
-  height: clamp(18px, 5vw, 24px);
+  width: clamp(28px, 7.5vw, 34px);
+  height: clamp(28px, 7.5vw, 34px);
   flex: 0 0 auto;
   border: 0;
   background: transparent;
@@ -1083,11 +1097,11 @@ canvas[hidden] { display: none !important; }
   top: auto;
   transform: none;
   flex: 0 0 auto;
-  width: auto;
+  width: min(86%, 320px);
   min-width: 0;
-  max-width: 48%;
+  max-width: 100%;
   height: auto;
-  max-height: 82%;
+  max-height: none;
   margin: 0;
   padding: 0;
   border: 0;
@@ -1105,10 +1119,10 @@ canvas[hidden] { display: none !important; }
 }
 .welcome-start img {
   pointer-events: none;
-  width: auto;
-  height: clamp(42px, 8.5cqh, 58px);
+  width: 100%;
+  height: auto;
   max-width: 100%;
-  max-height: 100%;
+  max-height: clamp(72px, 14cqh, 110px);
   object-fit: contain;
   display: block;
 }

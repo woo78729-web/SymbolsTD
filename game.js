@@ -8042,7 +8042,7 @@ function selectedTower() {
       date: '11/15',
       title: '鐵匠 2 等、教學、控場、11 等爆擊、歡迎頁',
       detail: [
-        '介面：歡迎頁換成新插畫（標題城堡／底部角色）',
+        '介面：歡迎頁新插畫；Google／訪客／帳號／開始改上下排列並放大',
         '玩法：鐵匠 2 等要 2000；2 等後才能破 10 上 11',
         '教學：1-1／1-2 有教學提示；闖關前三波較好守',
         '控場：雷麻痺最高 0.5 秒；冰 5 下才凍 0.5 秒；緩速上限 35%',
@@ -8051,7 +8051,7 @@ function selectedTower() {
         '平衡：略降血壓與鐵甲減傷，減少只能靠英雄%傷的情況',
       ],
       full: [
-        '歡迎頁：bg-welcome-v12；登入／開始改放插畫中段留白',
+        '歡迎頁：bg-welcome-v12；中段直向：Google／訪客上下排；登入後帳號上、開始下並放大',
         '鐵匠：升 2 等 2000；1 等＝金幣到 10；2 等＝卡可到 11',
         '雷麻痺：0.18→0.50 秒（硬上限 0.5）',
         '冰塔：緩速 28%→35%；累積 5 下凍結 0.5 秒',
@@ -9248,6 +9248,7 @@ function selectedTower() {
     var welcomeUser = document.getElementById('welcome-user');
     var welcomeName = document.getElementById('welcome-user-name');
     var welcomeAvatar = document.getElementById('welcome-avatar');
+    var welcomeAuth = document.getElementById('welcome-auth');
     var welcomeAccount = document.getElementById('btn-welcome-account');
     var welcomeGuest = document.getElementById('btn-welcome-guest');
     var welcomeStart = document.getElementById('btn-welcome-start');
@@ -9255,6 +9256,7 @@ function selectedTower() {
     var chipName = document.getElementById('account-name');
     var chipAvatar = document.getElementById('account-avatar');
     if (welcomeUser) welcomeUser.hidden = !account;
+    if (welcomeAuth) welcomeAuth.hidden = !!account;
     if (welcomeAccount) welcomeAccount.hidden = !!account;
     if (welcomeGuest) welcomeGuest.hidden = !!account;
     if (welcomeStart) welcomeStart.hidden = !account;
